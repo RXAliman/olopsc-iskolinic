@@ -20,7 +20,7 @@ Expected Files:
    (Rename accordingly)
 
 Recommended Models:
-- Streaming: `sherpa-onnx-streaming-zipformer-en-2023-02-21`
-- Offline: `sherpa-onnx-zipformer-en-2023-06-26`
+- Streaming: `sherpa-onnx-streaming-zipformer-en-2023-02-21` from https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2
+- Offline: `sherpa-onnx-zipformer-en-2023-06-26` from https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-en-2023-06-26.tar.bz2
 
 https://github.com/k2-fsa/sherpa-onnx/releases
