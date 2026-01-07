@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:hive_ce_flutter/adapters.dart';
+// import 'package:vvella/alt/testing.dart';
 import 'package:vvella/pages/home.dart';
-import 'package:vvella/pages/testing.dart';
+import 'package:vvella/services/constants.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+  await Hive.initFlutter();
+  await Hive.openBox(bloodPressureLogBoxName);
+  await Hive.openBox(bloodSugarLogBoxName);
+  await Hive.openBox(weightLogBoxName);
+  await Hive.openBox(exerciseLogBoxName);
+  await Hive.openBox(mealLogBoxName);
+  await Hive.openBox(sleepLogBoxName);
+  await Hive.openBox(waterIntakeLogBoxName);
   runApp(const MyApp());
 }
 
@@ -19,7 +30,6 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.teal,
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        // Set a default high-contrast text theme for accessibility
         textTheme: const TextTheme(
           bodyLarge: TextStyle(fontSize: 18.0, color: Colors.black87),
           bodyMedium: TextStyle(fontSize: 16.0, color: Colors.black54),
