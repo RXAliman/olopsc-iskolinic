@@ -1,19 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:vvella/pages/home.dart';
+import 'package:provider/provider.dart';
+import 'logic/vvella_provider.dart';
+import 'ui/vvella_screen.dart';
 
-Future<void> main() async {
-  runApp(const MyApp());
+void main() {
+  runApp(const VVellaApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class VVellaApp extends StatelessWidget {
+  const VVellaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'VVella',
-      home: const HomePage(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => VvellaProvider()),
+      ],
+      child: MaterialApp(
+        title: 'VVella',
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          primarySwatch: Colors.blue,
+          useMaterial3: true,
+        ),
+        home: const VvellaScreen(),
+      ),
     );
   }
 }
