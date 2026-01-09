@@ -5,6 +5,7 @@ import 'dart:ffi';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../native/ffi_bridge.dart';
 import 'audio_pipeline.dart';
@@ -25,8 +26,11 @@ class VvellaProvider extends ChangeNotifier {
   String _lastRecognizedText = "";
   String get lastRecognizedText => _lastRecognizedText;
 
-  String _statusMessage = "Initializing...";
+  String _statusMessage = "Starting up...";
   String get statusMessage => _statusMessage;
+
+  double _loadingProgress = 0.0;
+  double get loadingProgress => _loadingProgress;
 
   SherpaService? _sherpa;
   final NLUProcessor _nlu = NLUProcessor();
@@ -37,12 +41,22 @@ class VvellaProvider extends ChangeNotifier {
   late String _localModelDir;
 
   VvellaProvider() {
-    _init();
+    // Delay initialization to allow splash screen to render first
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      // Additional small delay to ensure smooth transition
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _init();
+      });
+    });
   }
 
   Future<void> _init() async {
     try {
-      // 1. Permissions
+      // Stage 1: Permissions (15%)
+      _statusMessage = "Requesting permissions...";
+      _loadingProgress = 0.0;
+      notifyListeners();
+
       final status = await Permission.microphone.request();
       if (!status.isGranted) {
         _statusMessage = "Microphone permission denied";
@@ -50,13 +64,34 @@ class VvellaProvider extends ChangeNotifier {
         return;
       }
 
-      // 2. Health Repo
+      _loadingProgress = 0.15;
+      notifyListeners();
+
+      // Stage 2: Health Repository (25%)
+      _statusMessage = "Setting up storage...";
+      _loadingProgress = 0.2;
+      notifyListeners();
+
       await _repo.init();
 
-      // 3. Copy Assets
+      _loadingProgress = 0.25;
+      notifyListeners();
+
+      // Stage 3: Copy/Verify Assets (40%)
+      _statusMessage = "Verifying AI models...";
+      _loadingProgress = 0.3;
+      notifyListeners();
+
       await _copyAssets();
 
-      // 4. Init Sherpa Service (loads native library)
+      _loadingProgress = 0.4;
+      notifyListeners();
+
+      // Stage 4: Load Native Library (55%)
+      _statusMessage = "Loading native libraries...";
+      _loadingProgress = 0.45;
+      notifyListeners();
+
       try {
         _sherpa = SherpaService();
       } catch (e) {
@@ -66,7 +101,14 @@ class VvellaProvider extends ChangeNotifier {
         return;
       }
 
-      // 5. Init Sherpa KWS (Streaming model for keyword spotting)
+      _loadingProgress = 0.55;
+      notifyListeners();
+
+      // Stage 5: Init Keyword Spotter (70%)
+      _statusMessage = "Initializing wake word detection...";
+      _loadingProgress = 0.6;
+      notifyListeners();
+
       _sherpa!.initKeywordSpotter(
         "$_localModelDir/tokens.txt",
         "$_localModelDir/encoder-streaming.onnx",
@@ -76,7 +118,14 @@ class VvellaProvider extends ChangeNotifier {
         "",
       );
 
-      // 6. Init Sherpa ASR (Offline model for command recognition)
+      _loadingProgress = 0.7;
+      notifyListeners();
+
+      // Stage 6: Init Speech Recognizer (85%)
+      _statusMessage = "Initializing speech recognizer...";
+      _loadingProgress = 0.75;
+      notifyListeners();
+
       _sherpa!.initOfflineRecognizer(
         "$_localModelDir/tokens.txt",
         "$_localModelDir/encoder-offline.onnx",
@@ -84,12 +133,27 @@ class VvellaProvider extends ChangeNotifier {
         "$_localModelDir/joiner-offline.onnx",
       );
 
-      // 7. Audio Pipeline
+      _loadingProgress = 0.85;
+      notifyListeners();
+
+      // Stage 7: Audio Pipeline (100%)
+      _statusMessage = "Starting audio pipeline...";
+      _loadingProgress = 0.9;
+      notifyListeners();
+
       _audioPipeline = AudioPipeline(
         onAudio: _handleAudio,
         isKwsMode: () => _state == VoiceState.idle,
       );
       await _audioPipeline!.start();
+
+      // Complete
+      _loadingProgress = 1.0;
+      _statusMessage = "Ready!";
+      notifyListeners();
+
+      // Small delay to show completion
+      await Future.delayed(const Duration(milliseconds: 300));
 
       _state = VoiceState.idle;
       _statusMessage = "Listening for 'VVella'...";
