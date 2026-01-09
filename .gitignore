@@ -48,4 +48,9 @@ app.*.map.json
 *.env
 
 # Models
-/assets/models/*
+/assets/models/decoder-offline.onnx
+/assets/models/decoder-streaming.onnx
+/assets/models/encoder-offline.onnx
+/assets/models/encoder-streaming.onnx
+/assets/models/joiner-offline.onnx
+/assets/models/joiner-streaming.onnx

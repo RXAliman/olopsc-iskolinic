@@ -1,18 +1,23 @@
 #include "sherpa-onnx/c-api/c-api.h"
-#include <vector>
 #include <string.h>
 #include <stdio.h>
+#include <android/log.h>
+
+#define TAG "VVellaNative"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 extern "C" {
 
-    // --- Keyword Spotter ---
     const SherpaOnnxKeywordSpotter* CreateKeywordSpotter(
         const char* tokens,
         const char* encoder,
         const char* decoder,
         const char* joiner,
         const char* keywords_file,
-        const char* keywords_score_file) {
+        const char* keywords_score_file) { 
+        
+        LOGI("Creating KWS with keywords: %s", keywords_file);
         
         SherpaOnnxKeywordSpotterConfig config;
         memset(&config, 0, sizeof(config));
@@ -24,66 +29,82 @@ extern "C" {
         config.model_config.transducer.decoder = decoder;
         config.model_config.transducer.joiner = joiner;
         config.model_config.tokens = tokens;
-        config.model_config.num_threads = 1;
+        config.model_config.num_threads = 2;
         config.model_config.debug = 0;
-        
         config.keywords_file = keywords_file;
-        config.keywords_score_file = keywords_score_file;
+        
+        // Balanced threshold - not too sensitive, not too strict
+        config.keywords_threshold = 0.1; 
 
-        return SherpaOnnxCreateKeywordSpotter(&config);
+        const SherpaOnnxKeywordSpotter* kws = SherpaOnnxCreateKeywordSpotter(&config);
+        if (kws) {
+            LOGI("KWS created successfully");
+        } else {
+            LOGE("Failed to create KWS!");
+        }
+        return kws;
     }
 
     void DestroyKeywordSpotter(const SherpaOnnxKeywordSpotter* kws) {
         SherpaOnnxDestroyKeywordSpotter(kws);
     }
 
-    const SherpaOnnxKeywordStream* CreateKeywordStream(const SherpaOnnxKeywordSpotter* kws) {
+    const SherpaOnnxOnlineStream* CreateKeywordStream(const SherpaOnnxKeywordSpotter* kws) {
         return SherpaOnnxCreateKeywordStream(kws);
     }
 
-    void DestroyKeywordStream(const SherpaOnnxKeywordStream* stream) {
-        SherpaOnnxDestroyKeywordStream(stream);
+    void DestroyKeywordStream(const SherpaOnnxOnlineStream* stream) {
+        SherpaOnnxDestroyOnlineStream(stream);
     }
 
-    void AcceptWaveformKWS(const SherpaOnnxKeywordStream* stream, int32_t sample_rate, const float* samples, int32_t n) {
-        SherpaOnnxKeywordStreamAcceptWaveform(stream, sample_rate, samples, n);
+    void AcceptWaveformKWS(const SherpaOnnxOnlineStream* stream, int32_t sample_rate, const float* samples, int32_t n) {
+        SherpaOnnxOnlineStreamAcceptWaveform(stream, sample_rate, samples, n);
     }
 
-    int32_t IsKeywordDetected(const SherpaOnnxKeywordStream* stream) {
-        return SherpaOnnxIsKeywordStreamReady(stream);
+    // Simple check - just returns if the engine thinks it's ready
+    int32_t IsKeywordReady(const SherpaOnnxKeywordSpotter* kws, const SherpaOnnxOnlineStream* stream) {
+        return SherpaOnnxIsKeywordStreamReady(kws, stream) ? 1 : 0;
     }
-
-    void ResetKeywordStream(const SherpaOnnxKeywordStream* stream) {
-         // Sherpa-ONNX streams might not have explicit reset, usually we create a new one or just keep running.
-         // For KWS, it's continuous.
+    
+    // MUST be called after IsKeywordReady returns 1
+    void DecodeKeyword(const SherpaOnnxKeywordSpotter* kws, const SherpaOnnxOnlineStream* stream) {
+        SherpaOnnxDecodeKeywordStream(kws, stream);
+    }
+    
+    // MUST be called after DecodeKeyword
+    int32_t GetKeywordResult(const SherpaOnnxKeywordSpotter* kws, const SherpaOnnxOnlineStream* stream, char* out_text, int max_len) {
+        const SherpaOnnxKeywordResult* result = SherpaOnnxGetKeywordResult(kws, stream);
+        if (result == nullptr) {
+            LOGI("GetKeywordResult: result is null");
+            return 0;
+        }
+        
+        if (result->keyword && strlen(result->keyword) > 0) {
+            LOGI("KWS MATCHED: '%s'", result->keyword);
+            strncpy(out_text, result->keyword, max_len - 1);
+            out_text[max_len - 1] = '\0';
+            SherpaOnnxDestroyKeywordResult(result);
+            return 1;
+        }
+        
+        LOGI("GetKeywordResult: keyword is empty");
+        SherpaOnnxDestroyKeywordResult(result);
+        return 0;
     }
 
     // --- Offline Recognizer ---
     const SherpaOnnxOfflineRecognizer* CreateOfflineRecognizer(
-        const char* tokens,
-        const char* encoder, 
-        const char* decoder,
-        const char* joiner) {
-        
+        const char* tokens, const char* encoder, const char* decoder, const char* joiner) {
         SherpaOnnxOfflineRecognizerConfig config;
         memset(&config, 0, sizeof(config));
-        
         config.feat_config.sample_rate = 16000;
         config.feat_config.feature_dim = 80;
-        
         config.model_config.transducer.encoder = encoder;
         config.model_config.transducer.decoder = decoder;
         config.model_config.transducer.joiner = joiner;
         config.model_config.tokens = tokens;
-        config.model_config.num_threads = 1;
-        config.model_config.debug = 0;
-        
-        // zipformer
-        config.model_config.transducer.encoder = encoder; // re-assign just to be safe, logic depends on model type
-        
-        // Decoding method greedy_search
+        config.model_config.num_threads = 2;
         config.decoding_method = "greedy_search";
-        
         return SherpaOnnxCreateOfflineRecognizer(&config);
     }
     
@@ -107,12 +128,16 @@ extern "C" {
         SherpaOnnxDecodeOfflineStream(recognizer, stream);
     }
     
-    const char* GetOfflineStreamResult(const SherpaOnnxOfflineStream* stream) {
+    int32_t GetOfflineResult(const SherpaOnnxOfflineStream* stream, char* out_text, int max_len) {
         const SherpaOnnxOfflineRecognizerResult* result = SherpaOnnxGetOfflineStreamResult(stream);
-        return result->text;
-    }
-    
-    void DestroyOfflineStreamResult(const SherpaOnnxOfflineRecognizerResult* result) {
+        if (result == nullptr) return 0;
+        if (result->text && strlen(result->text) > 0) {
+            strncpy(out_text, result->text, max_len - 1);
+            out_text[max_len - 1] = '\0';
+            SherpaOnnxDestroyOfflineRecognizerResult(result);
+            return 1;
+        }
         SherpaOnnxDestroyOfflineRecognizerResult(result);
+        return 0;
     }
 }
