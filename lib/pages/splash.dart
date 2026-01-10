@@ -31,14 +31,11 @@ class SplashContent extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // White square logo placeholder
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              // App icon
+              Image.asset(
+                'assets/images/icon.png',
+                width: 80,
+                fit: BoxFit.cover,
               ),
               const SizedBox(height: 30),
               // Progress bar and status

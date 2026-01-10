@@ -43,6 +43,7 @@ dependencies:
   path_provider: ^2.1.2
   flutter_voice_processor: ^1.1.0
   provider: ^6.1.1
+  animated_bottom_navigation_bar: ^1.3.3
 
 
 dev_dependencies:
@@ -73,6 +74,7 @@ flutter:
   #   - images/a_dot_ham.jpeg
   assets:
     - .env
+    - assets/images/icon.png
     # NOTE: Models are NOT bundled (too large, 400MB+)
     # Push them manually using: adb push assets/models/ /sdcard/Android/data/com.example.vvella/files/models/
 

@@ -32,6 +32,17 @@ class VvellaProvider extends ChangeNotifier {
   double _loadingProgress = 0.0;
   double get loadingProgress => _loadingProgress;
 
+  // Chat history
+  final List<Map<String, String>> _chatHistory = [];
+  List<Map<String, String>> get chatHistory => _chatHistory;
+
+  // Typing animation state
+  bool _isVvellaTyping = false;
+  bool get isVvellaTyping => _isVvellaTyping;
+
+  String _currentTypingText = "";
+  String get currentTypingText => _currentTypingText;
+
   SherpaService? _sherpa;
   final NLUProcessor _nlu = NLUProcessor();
   final HealthRepository _repo = HealthRepository();
@@ -279,23 +290,82 @@ class VvellaProvider extends ChangeNotifier {
     _lastRecognizedText = text;
     print("Recognized: $text");
 
-    // NLU
+    // Add user message to chat
+    if (text.isNotEmpty) {
+      _chatHistory.add({'actor': 'user', 'content': text});
+      notifyListeners();
+    }
+
+    // NLU - Process command
     final intent = _nlu.process(text);
 
+    String vvellaResponse;
     if (intent != null) {
       await _repo.saveRecord(intent);
+      vvellaResponse = "Okay, I've logged that for you.";
       _statusMessage = "Saved: ${intent.toString()}";
+    } else if (text.isEmpty) {
+      vvellaResponse = "I didn't catch that. Please try again.";
+      _statusMessage = "No speech detected";
     } else {
+      vvellaResponse =
+          "I'm not sure how to help with that. Try saying 'log blood pressure 120 over 80'.";
       _statusMessage = "No command recognized from: $text";
     }
 
-    notifyListeners();
+    // Animate VVella response (typewriter effect)
+    await _addVvellaMessageWithAnimation(vvellaResponse);
 
-    // Back to idle after delay
-    await Future.delayed(const Duration(seconds: 3));
+    // Back to idle after animation completes
     if (_state == VoiceState.processing) {
       _state = VoiceState.idle;
       _statusMessage = "Listening for 'VVella'...";
+      notifyListeners();
+    }
+  }
+
+  // Typewriter animation for VVella's responses
+  Future<void> _addVvellaMessageWithAnimation(String message) async {
+    _isVvellaTyping = true;
+    _currentTypingText = "";
+
+    // Add empty placeholder message
+    _chatHistory.add({'actor': 'vvella', 'content': '', 'isTyping': 'true'});
+    notifyListeners();
+
+    // Animate each character
+    for (int i = 0; i < message.length; i++) {
+      await Future.delayed(const Duration(milliseconds: 10));
+      _currentTypingText = message.substring(0, i + 1);
+
+      // Update the last message
+      _chatHistory.last['content'] = _currentTypingText;
+      notifyListeners();
+    }
+
+    // Mark as complete
+    _chatHistory.last.remove('isTyping');
+    _isVvellaTyping = false;
+    _currentTypingText = "";
+    notifyListeners();
+  }
+
+  // Public methods for manual control
+
+  /// Manually start listening without wake word
+  void startListeningManually() {
+    if (_state == VoiceState.idle && _sherpa != null) {
+      _transitionToListening();
+    }
+  }
+
+  /// Stop listening and return to idle
+  void stopListening() {
+    if (_state == VoiceState.listening) {
+      _silenceTimer?.cancel();
+      _state = VoiceState.idle;
+      _statusMessage = "Listening for 'VVella'...";
+      _lastRecognizedText = "";
       notifyListeners();
     }
   }
