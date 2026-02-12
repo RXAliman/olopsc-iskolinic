@@ -140,4 +140,77 @@ extern "C" {
         SherpaOnnxDestroyOfflineRecognizerResult(result);
         return 0;
     }
+
+    // ==================== TTS Functions ====================
+    
+
+
+const SherpaOnnxOfflineTts* CreateTts(
+        const char* model,
+        const char* voices,
+        const char* tokens,
+        const char* data_dir,
+        int32_t num_threads
+    ) {
+        LOGI("Creating TTS: model=%s", model);
+        LOGI("TTS voices: %s", voices);
+        LOGI("TTS tokens: %s", tokens);
+        LOGI("TTS data_dir: %s", data_dir);
+        
+        SherpaOnnxOfflineTtsConfig config;
+        memset(&config, 0, sizeof(config));
+        
+        // Kokoro model config
+        config.model.kokoro.model = model;
+        config.model.kokoro.voices = voices;
+        config.model.kokoro.tokens = tokens;
+        config.model.kokoro.data_dir = data_dir;
+        config.model.num_threads = num_threads;
+        config.model.debug = 1; // Enable debug for troubleshooting
+        
+        const SherpaOnnxOfflineTts* tts = SherpaOnnxCreateOfflineTts(&config);
+        
+        if (tts) {
+            LOGI("TTS created successfully");
+        } else {
+            LOGE("TTS creation failed!");
+        }
+        return tts;
+    }
+
+    void DestroyTts(const SherpaOnnxOfflineTts* tts) {
+        SherpaOnnxDestroyOfflineTts(tts);
+    }
+
+    const SherpaOnnxGeneratedAudio* GenerateSpeech(
+        const SherpaOnnxOfflineTts* tts,
+        const char* text,
+        int32_t speaker_id,
+        float speed
+    ) {
+        LOGI("Generating TTS for: %s", text);
+        return SherpaOnnxOfflineTtsGenerate(tts, text, speaker_id, speed);
+    }
+
+    int32_t GetNumSamples(const SherpaOnnxGeneratedAudio* audio) {
+        return audio->n;
+    }
+
+    int32_t GetSampleRate(const SherpaOnnxGeneratedAudio* audio) {
+        return audio->sample_rate;
+    }
+
+    void CopyAudioSamples(
+        const SherpaOnnxGeneratedAudio* audio,
+        float* buffer,
+        int32_t buffer_size
+    ) {
+        int32_t n = audio->n < buffer_size ? audio->n : buffer_size;
+        memcpy(buffer, audio->samples, n * sizeof(float));
+        LOGI("Copied %d audio samples", n);
+    }
+
+    void DestroyGeneratedAudio(const SherpaOnnxGeneratedAudio* audio) {
+        SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
+    }
 }

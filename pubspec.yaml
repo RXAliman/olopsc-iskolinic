@@ -44,6 +44,7 @@ dependencies:
   flutter_voice_processor: ^1.1.0
   provider: ^6.1.1
   animated_bottom_navigation_bar: ^1.3.3
+  just_audio: ^0.9.40
 
 
 dev_dependencies:

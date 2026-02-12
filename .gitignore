@@ -54,3 +54,4 @@ app.*.map.json
 /assets/models/encoder-streaming.onnx
 /assets/models/joiner-offline.onnx
 /assets/models/joiner-streaming.onnx
+/assets/models/tts/kokoro-en-v0_19

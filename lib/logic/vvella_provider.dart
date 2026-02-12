@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart';
 import '../native/ffi_bridge.dart';
 import 'audio_pipeline.dart';
 import 'nlu_processor.dart';
+import 'tts_player.dart';
 import '../data/health_repository.dart';
 
 enum VoiceState {
@@ -47,6 +48,7 @@ class VvellaProvider extends ChangeNotifier {
   final NLUProcessor _nlu = NLUProcessor();
   final HealthRepository _repo = HealthRepository();
   AudioPipeline? _audioPipeline;
+  TtsPlayer? _ttsPlayer;
 
   // Model paths
   late String _localModelDir;
@@ -147,9 +149,9 @@ class VvellaProvider extends ChangeNotifier {
       _loadingProgress = 0.85;
       notifyListeners();
 
-      // Stage 7: Audio Pipeline (100%)
+      // Stage 7: Audio Pipeline (90%)
       _statusMessage = "Starting audio pipeline...";
-      _loadingProgress = 0.9;
+      _loadingProgress = 0.85;
       notifyListeners();
 
       _audioPipeline = AudioPipeline(
@@ -157,6 +159,17 @@ class VvellaProvider extends ChangeNotifier {
         isKwsMode: () => _state == VoiceState.idle,
       );
       await _audioPipeline!.start();
+
+      _loadingProgress = 0.9;
+      notifyListeners();
+
+      // Stage 8: TTS (100%)
+      _statusMessage = "Initializing text-to-speech...";
+      _loadingProgress = 0.95;
+      notifyListeners();
+
+      _sherpa!.initTts("$_localModelDir/tts/kokoro-en-v0_19");
+      _ttsPlayer = TtsPlayer();
 
       // Complete
       _loadingProgress = 1.0;
@@ -313,8 +326,8 @@ class VvellaProvider extends ChangeNotifier {
       _statusMessage = "No command recognized from: $text";
     }
 
-    // Animate VVella response (typewriter effect)
-    await _addVvellaMessageWithAnimation(vvellaResponse);
+    // Add VVella response with TTS
+    await _addVvellaResponse(vvellaResponse);
 
     // Back to idle after animation completes
     if (_state == VoiceState.processing) {
@@ -324,30 +337,24 @@ class VvellaProvider extends ChangeNotifier {
     }
   }
 
-  // Typewriter animation for VVella's responses
-  Future<void> _addVvellaMessageWithAnimation(String message) async {
-    _isVvellaTyping = true;
-    _currentTypingText = "";
-
-    // Add empty placeholder message
-    _chatHistory.add({'actor': 'vvella', 'content': '', 'isTyping': 'true'});
+  // TTS-based response (replaces typewriter animation)
+  Future<void> _addVvellaResponse(String message) async {
+    // Add message to chat instantly
+    _chatHistory.add({'actor': 'vvella', 'content': message});
     notifyListeners();
 
-    // Animate each character
-    for (int i = 0; i < message.length; i++) {
-      await Future.delayed(const Duration(milliseconds: 10));
-      _currentTypingText = message.substring(0, i + 1);
-
-      // Update the last message
-      _chatHistory.last['content'] = _currentTypingText;
-      notifyListeners();
+    // Generate and play speech
+    // Note: TTS generation may cause brief UI pause - this is expected
+    // for on-device neural TTS. Could be improved with native threading.
+    try {
+      final samples = _sherpa!.speak(message, speakerId: 0, speed: 1.0);
+      if (samples.isNotEmpty) {
+        final sampleRate = _sherpa!.lastSampleRate;
+        await _ttsPlayer!.speak(samples, sampleRate);
+      }
+    } catch (e) {
+      print("TTS error: $e");
     }
-
-    // Mark as complete
-    _chatHistory.last.remove('isTyping');
-    _isVvellaTyping = false;
-    _currentTypingText = "";
-    notifyListeners();
   }
 
   // Public methods for manual control
