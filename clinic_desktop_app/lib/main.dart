@@ -31,7 +31,7 @@ class ClinicApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
       ],
       child: MaterialApp(
-        title: 'VVella Clinic App',
+        title: 'IskoLinic App',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         home: const _AuthGate(),

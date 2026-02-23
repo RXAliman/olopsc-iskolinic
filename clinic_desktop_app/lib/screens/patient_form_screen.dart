@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import '../formatters/uppercase_text.dart';
 import '../models/patient.dart';
 import '../providers/patient_provider.dart';
 import '../theme/app_theme.dart';
@@ -127,6 +128,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   labelText: 'Student Name *',
                   prefixIcon: Icon(Icons.person_outline),
                 ),
+                inputFormatters: [UpperCaseTextFormatter()],
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Name is required' : null,
               ),
@@ -163,6 +165,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   labelText: 'Guardian / Parent Name',
                   prefixIcon: Icon(Icons.family_restroom_outlined),
                 ),
+                inputFormatters: [UpperCaseTextFormatter()],
               ),
               const SizedBox(height: 16),
 

@@ -110,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Clinic Admin',
+                      'IskoLinic Staff Sign In',
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
@@ -174,6 +174,54 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               )
                             : const Text('Sign In'),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // OR divider
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Divider(color: AppTheme.dividerColor),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'OR',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        const Expanded(
+                          child: Divider(color: AppTheme.dividerColor),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Google Sign-In Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                // TODO: Implement Google Sign-In
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Google Sign-In requires Firebase setup',
+                                    ),
+                                  ),
+                                );
+                              },
+                        icon: Image.asset(
+                          'assets/google-logo.png',
+                          width: 22,
+                          height: 22,
+                        ),
+                        label: const Text('Sign in with Google'),
                       ),
                     ),
                     const SizedBox(height: 16),
