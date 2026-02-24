@@ -1,4 +1,4 @@
-name: clinic_desktop_app
+name: clinic_input_app
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -32,16 +32,9 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  provider: ^6.1.2
-  sqflite_common_ffi: ^2.3.4+4
-  path_provider: ^2.1.5
-  path: ^1.9.1
-  fl_chart: ^0.70.2
   google_fonts: ^6.2.1
-  intl: ^0.20.2
+  mobile_scanner: ^6.0.2
   uuid: ^4.5.1
-  audioplayers: ^6.1.0
-  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
@@ -64,11 +57,6 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
-
-  assets:
-    - assets/app-icon-white.png
-    - assets/app-icon-colored.png
-    - assets/google-logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

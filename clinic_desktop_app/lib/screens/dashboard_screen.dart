@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import 'patient_list_screen.dart';
 import 'analytics_screen.dart';
 import 'emergency_screen.dart';
+import 'queue_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
+    _NavItem(Icons.format_list_numbered_rounded, 'Queue'),
     _NavItem(Icons.people_rounded, 'Patients'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
     _NavItem(Icons.warning_amber_rounded, 'Emergency'),
@@ -52,10 +54,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0:
         return _buildDashboardHome();
       case 1:
-        return const PatientListScreen();
+        return const QueueScreen();
       case 2:
-        return const AnalyticsScreen();
+        return const PatientListScreen();
       case 3:
+        return const AnalyticsScreen();
+      case 4:
         return const EmergencyScreen();
       default:
         return _buildDashboardHome();
