@@ -135,19 +135,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _QuickAction(
                     icon: Icons.person_add_rounded,
                     label: 'Add Patient',
-                    onTap: () => setState(() => _selectedIndex = 1),
+                    onTap: () => setState(() => _selectedIndex = 2),
                   ),
                   const SizedBox(width: 16),
                   _QuickAction(
                     icon: Icons.analytics_rounded,
                     label: 'View Analytics',
-                    onTap: () => setState(() => _selectedIndex = 2),
+                    onTap: () => setState(() => _selectedIndex = 3),
                   ),
                   const SizedBox(width: 16),
                   _QuickAction(
                     icon: Icons.notifications_active_rounded,
                     label: 'Check Alerts',
-                    onTap: () => setState(() => _selectedIndex = 3),
+                    onTap: () => setState(() => _selectedIndex = 4),
                   ),
                 ],
               ),
@@ -193,9 +193,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(width: 12),
                       Text(
                         'IskoLinic',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -206,7 +205,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ...List.generate(_navItems.length, (i) {
                   final item = _navItems[i];
                   final isSelected = _selectedIndex == i;
-                  final hasAlert = i == 3 && emergencyProvider.hasActiveAlerts;
+                  final hasAlert = i == 4 && emergencyProvider.hasActiveAlerts;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(
