@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/symptoms.dart';
 import '../formatters/uppercase_text.dart';
+import '../services/queue_service.dart';
 import '../theme/app_theme.dart';
 
 class InputFormScreen extends StatefulWidget {
@@ -12,6 +13,8 @@ class InputFormScreen extends StatefulWidget {
 
 class _InputFormScreenState extends State<InputFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _queueService = QueueService();
+  bool _isSubmitting = false;
 
   // Patient fields
   final _nameCtrl = TextEditingController();
@@ -91,8 +94,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
           ],
         ),
         content: const Text(
-          'Are you sure you want to submit this form? '
-          'Please make sure all information is correct before proceeding.',
+          'By submitting this form, you agree that the information provided is true and correct.',
         ),
         actions: [
           OutlinedButton(
@@ -109,20 +111,38 @@ class _InputFormScreenState extends State<InputFormScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    // Print data to console for now
-    debugPrint('=== FORM SUBMISSION ===');
-    debugPrint('Student Name: ${_nameCtrl.text}');
-    debugPrint('Student Number: ${_numberCtrl.text}');
-    debugPrint('Address: ${_addressCtrl.text}');
-    debugPrint('Guardian Name: ${_guardianNameCtrl.text}');
-    debugPrint('Guardian Contact: ${_guardianContactCtrl.text}');
-    debugPrint('Symptoms: ${_selectedSymptoms.join(', ')}');
-    debugPrint('Treatment: ${_treatmentCtrl.text}');
-    debugPrint('Remarks: ${_remarksCtrl.text}');
-    debugPrint('=======================');
+    setState(() => _isSubmitting = true);
 
-    _resetForm();
-    Navigator.pushReplacementNamed(context, '/confirmation');
+    try {
+      await _queueService.addToQueue(
+        studentName: _nameCtrl.text.trim(),
+        studentNumber: _numberCtrl.text.trim(),
+        address: _addressCtrl.text.trim(),
+        guardianName: _guardianNameCtrl.text.trim(),
+        guardianContact: _guardianContactCtrl.text.trim(),
+        symptoms: _selectedSymptoms.toList(),
+        treatment: _treatmentCtrl.text.trim(),
+        remarks: _remarksCtrl.text.trim(),
+      );
+
+      if (!mounted) return;
+      _resetForm();
+      Navigator.pushReplacementNamed(context, '/confirmation');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit: $e'),
+          backgroundColor: AppTheme.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -288,28 +308,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 18),
-
-              // Treatment
-              TextFormField(
-                controller: _treatmentCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Treatment / Medication',
-                  prefixIcon: Icon(Icons.healing_outlined),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 14),
-
-              // Remarks
-              TextFormField(
-                controller: _remarksCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Remarks',
-                  prefixIcon: Icon(Icons.notes_outlined),
-                ),
-                maxLines: 2,
-              ),
               const SizedBox(height: 32),
 
               // ── Submit button ─────────────────────────────────
@@ -317,9 +315,18 @@ class _InputFormScreenState extends State<InputFormScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: _submit,
-                  icon: const Icon(Icons.send_rounded),
-                  label: const Text('Submit Form'),
+                  onPressed: _isSubmitting ? null : _submit,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.send_rounded),
+                  label: Text(_isSubmitting ? 'Submitting...' : 'Submit Form'),
                 ),
               ),
               const SizedBox(height: 24),
