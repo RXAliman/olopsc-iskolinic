@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../theme/app_theme.dart';
@@ -99,28 +98,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 32),
-
-              // Quick Actions
-              Text(
-                'Quick Actions',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  _QuickAction(
-                    icon: Icons.person_add_rounded,
-                    label: 'Add Patient',
-                    onTap: () => setState(() => _selectedIndex = 1),
-                  ),
-                  const SizedBox(width: 16),
-                  _QuickAction(
-                    icon: Icons.analytics_rounded,
-                    label: 'View Analytics',
-                    onTap: () => setState(() => _selectedIndex = 2),
-                  ),
-                ],
-              ),
             ],
           ),
         );
@@ -236,46 +213,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }),
 
                 const Spacer(),
-
-                // Logout
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 20,
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: () => context.read<AuthProvider>().logout(),
-                      borderRadius: BorderRadius.circular(12),
-                      hoverColor: AppTheme.danger.withValues(alpha: 0.1),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.logout_rounded,
-                              size: 20,
-                              color: AppTheme.textMuted,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Logout',
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -344,48 +281,6 @@ class _SummaryCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _QuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        hoverColor: Colors.white.withValues(alpha: 0.05),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          decoration: AppTheme.glassCard(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: AppTheme.accent, size: 22),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
