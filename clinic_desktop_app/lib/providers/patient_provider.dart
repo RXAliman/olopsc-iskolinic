@@ -6,44 +6,67 @@ import 'package:uuid/uuid.dart';
 
 class PatientProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
+
+  // Paginated patient data
   List<Patient> _patients = [];
-  List<Visitation> _visitations = [];
-  Patient? _selectedPatient;
+  int _totalPatients = 0;
+  int _currentPage = 0;
+  int _pageSize = 10;
   String _searchQuery = '';
   bool _loading = false;
 
-  List<Patient> get patients => _searchQuery.isEmpty
-      ? _patients
-      : _patients
-            .where(
-              (p) =>
-                  p.studentName.toLowerCase().contains(
-                    _searchQuery.toLowerCase(),
-                  ) ||
-                  p.studentNumber.toLowerCase().contains(
-                    _searchQuery.toLowerCase(),
-                  ),
-            )
-            .toList();
+  // Selected patient & visitations
+  List<Visitation> _visitations = [];
+  Patient? _selectedPatient;
 
+  List<Patient> get patients => _patients;
+  int get totalPatients => _totalPatients;
+  int get currentPage => _currentPage;
+  int get pageSize => _pageSize;
+  int get totalPages => (_totalPatients / _pageSize).ceil();
   Patient? get selectedPatient => _selectedPatient;
   List<Visitation> get visitations => _visitations;
   bool get loading => _loading;
   String get searchQuery => _searchQuery;
-  int get totalPatients => _patients.length;
 
   Future<void> loadPatients() async {
     _loading = true;
     notifyListeners();
-    _patients = await _db.getPatients();
+
+    final offset = _currentPage * _pageSize;
+
+    if (_searchQuery.isEmpty) {
+      _totalPatients = await _db.getPatientCount();
+      _patients = await _db.getPatientsPaginated(_pageSize, offset);
+    } else {
+      _totalPatients = await _db.searchPatientCount(_searchQuery);
+      _patients = await _db.searchPatientsPaginated(
+        _searchQuery,
+        _pageSize,
+        offset,
+      );
+    }
+
     _loading = false;
     notifyListeners();
   }
 
   void setSearchQuery(String query) {
     _searchQuery = query;
-    notifyListeners();
+    _currentPage = 0;
+    loadPatients();
   }
+
+  void goToPage(int page) {
+    if (page < 0 || page >= totalPages) return;
+    _currentPage = page;
+    loadPatients();
+  }
+
+  void nextPage() => goToPage(_currentPage + 1);
+  void previousPage() => goToPage(_currentPage - 1);
+  void firstPage() => goToPage(0);
+  void lastPage() => goToPage(totalPages - 1);
 
   Future<void> addPatient(Patient patient) async {
     await _db.insertPatient(patient);
@@ -64,6 +87,10 @@ class PatientProvider extends ChangeNotifier {
     if (_selectedPatient?.id == id) {
       _selectedPatient = null;
       _visitations = [];
+    }
+    // Clamp page if we deleted the last item on the last page
+    if (_currentPage >= totalPages && _currentPage > 0) {
+      _currentPage = totalPages - 1;
     }
     await loadPatients();
   }

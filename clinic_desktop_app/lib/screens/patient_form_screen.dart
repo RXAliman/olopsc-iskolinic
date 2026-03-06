@@ -28,10 +28,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: widget.patient?.studentName ?? '');
-    _numberCtrl = TextEditingController(
-      text: widget.patient?.studentNumber ?? '',
-    );
+    _nameCtrl = TextEditingController(text: widget.patient?.patientName ?? '');
+    _numberCtrl = TextEditingController(text: widget.patient?.idNumber ?? '');
     _addressCtrl = TextEditingController(text: widget.patient?.address ?? '');
     _guardianNameCtrl = TextEditingController(
       text: widget.patient?.guardianName ?? '',
@@ -58,8 +56,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
 
     if (isEditing) {
       final updated = widget.patient!.copyWith(
-        studentName: _nameCtrl.text.trim(),
-        studentNumber: _numberCtrl.text.trim(),
+        patientName: _nameCtrl.text.trim(),
+        idNumber: _numberCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         guardianName: _guardianNameCtrl.text.trim(),
         guardianContact: _guardianContactCtrl.text.trim(),
@@ -68,8 +66,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     } else {
       final patient = Patient(
         id: const Uuid().v4(),
-        studentName: _nameCtrl.text.trim(),
-        studentNumber: _numberCtrl.text.trim(),
+        patientName: _nameCtrl.text.trim(),
+        idNumber: _numberCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         guardianName: _guardianNameCtrl.text.trim(),
         guardianContact: _guardianContactCtrl.text.trim(),
@@ -109,7 +107,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   ),
                   const SizedBox(width: 16),
                   Text(
-                    isEditing ? 'Edit Patient' : 'Add New Patient',
+                    isEditing ? 'Edit Record' : 'Add New Record',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const Spacer(),
@@ -121,11 +119,11 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Student Name
+              // Patient Name
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Student Name *',
+                  labelText: 'Name *',
                   prefixIcon: Icon(Icons.person_outline),
                 ),
                 inputFormatters: [UpperCaseTextFormatter()],
@@ -134,15 +132,15 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Student Number
+              // ID Number
               TextFormField(
                 controller: _numberCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Student Number *',
+                  labelText: 'ID Number *',
                   prefixIcon: Icon(Icons.badge_outlined),
                 ),
                 validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Student number is required'
+                    ? 'ID number is required'
                     : null,
               ),
               const SizedBox(height: 16),

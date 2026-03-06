@@ -6,13 +6,34 @@ import '../theme/app_theme.dart';
 import 'patient_detail_screen.dart';
 import 'patient_form_screen.dart';
 
-class PatientListScreen extends StatelessWidget {
+class PatientListScreen extends StatefulWidget {
   const PatientListScreen({super.key});
+
+  @override
+  State<PatientListScreen> createState() => _PatientListScreenState();
+}
+
+class _PatientListScreenState extends State<PatientListScreen> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<PatientProvider>(
       builder: (context, provider, _) {
+        final currentPage = provider.currentPage;
+        final totalPages = provider.totalPages;
+        final pageSize = provider.pageSize;
+        final totalPatients = provider.totalPatients;
+
+        final start = currentPage * pageSize;
+        final end = (start + provider.patients.length);
+
         return Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -26,12 +47,12 @@ class PatientListScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Patients',
+                          'Records',
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${provider.totalPatients} total patients',
+                          '$totalPatients total records',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
@@ -40,7 +61,7 @@ class PatientListScreen extends StatelessWidget {
                   ElevatedButton.icon(
                     onPressed: () => _showPatientForm(context),
                     icon: const Icon(Icons.person_add_rounded, size: 18),
-                    label: const Text('Add Patient'),
+                    label: const Text('Add Record'),
                   ),
                 ],
               ),
@@ -50,14 +71,18 @@ class PatientListScreen extends StatelessWidget {
               SizedBox(
                 width: 400,
                 child: TextField(
-                  onChanged: provider.setSearchQuery,
+                  controller: _searchController,
+                  onChanged: (query) => provider.setSearchQuery(query),
                   decoration: InputDecoration(
-                    hintText: 'Search by name or student number...',
+                    hintText: 'Search by name or ID number...',
                     prefixIcon: const Icon(Icons.search_rounded, size: 20),
                     suffixIcon: provider.searchQuery.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 18),
-                            onPressed: () => provider.setSearchQuery(''),
+                            onPressed: () {
+                              _searchController.clear();
+                              provider.setSearchQuery('');
+                            },
                           )
                         : null,
                   ),
@@ -71,13 +96,141 @@ class PatientListScreen extends StatelessWidget {
                     ? const Center(child: CircularProgressIndicator())
                     : provider.patients.isEmpty
                     ? _buildEmptyState(context)
-                    : _buildPatientTable(context, provider),
+                    : _buildPatientTable(context, provider.patients),
               ),
+
+              // Pagination
+              if (totalPages > 1) ...[
+                const SizedBox(height: 16),
+                _buildPagination(
+                  provider,
+                  totalPatients,
+                  totalPages,
+                  start,
+                  end,
+                ),
+              ],
             ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildPagination(
+    PatientProvider provider,
+    int totalItems,
+    int totalPages,
+    int start,
+    int end,
+  ) {
+    final currentPage = provider.currentPage;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: AppTheme.glassCard(),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Showing ${start + 1}–$end of $totalItems records',
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: currentPage > 0 ? () => provider.firstPage() : null,
+                icon: const Icon(Icons.first_page_rounded, size: 20),
+                tooltip: 'First page',
+                splashRadius: 18,
+              ),
+              IconButton(
+                onPressed: currentPage > 0
+                    ? () => provider.previousPage()
+                    : null,
+                icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                tooltip: 'Previous',
+                splashRadius: 18,
+              ),
+              const SizedBox(width: 8),
+              ..._buildPageNumbers(provider, totalPages),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: currentPage < totalPages - 1
+                    ? () => provider.nextPage()
+                    : null,
+                icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                tooltip: 'Next',
+                splashRadius: 18,
+              ),
+              IconButton(
+                onPressed: currentPage < totalPages - 1
+                    ? () => provider.lastPage()
+                    : null,
+                icon: const Icon(Icons.last_page_rounded, size: 20),
+                tooltip: 'Last page',
+                splashRadius: 18,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers(PatientProvider provider, int totalPages) {
+    final current = provider.currentPage;
+    final pages = <int>[];
+
+    for (int i = 0; i < totalPages; i++) {
+      if (i == 0 ||
+          i == totalPages - 1 ||
+          (i >= current - 1 && i <= current + 1)) {
+        pages.add(i);
+      }
+    }
+
+    final widgets = <Widget>[];
+    for (int i = 0; i < pages.length; i++) {
+      if (i > 0 && pages[i] - pages[i - 1] > 1) {
+        widgets.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '…',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+            ),
+          ),
+        );
+      }
+
+      final pageNum = pages[i];
+      final isActive = pageNum == current;
+      widgets.add(
+        InkWell(
+          onTap: () => provider.goToPage(pageNum),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: isActive ? AppTheme.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${pageNum + 1}',
+              style: TextStyle(
+                color: isActive ? Colors.white : AppTheme.textSecondary,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return widgets;
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -92,12 +245,12 @@ class PatientListScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'No patients found',
+            'No records found',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Add a new patient to get started',
+            'Add a new record to get started',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
@@ -105,18 +258,18 @@ class PatientListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPatientTable(BuildContext context, PatientProvider provider) {
+  Widget _buildPatientTable(BuildContext context, List<Patient> pagePatients) {
     return Container(
       decoration: AppTheme.glassCard(),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: ListView.separated(
           padding: EdgeInsets.zero,
-          itemCount: provider.patients.length,
+          itemCount: pagePatients.length,
           separatorBuilder: (_, __) =>
               const Divider(height: 1, color: AppTheme.dividerColor),
           itemBuilder: (context, index) {
-            final patient = provider.patients[index];
+            final patient = pagePatients[index];
             return _PatientTile(
               patient: patient,
               onTap: () => _openPatientDetail(context, patient),
@@ -150,7 +303,7 @@ class PatientListScreen extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Patient'),
         content: Text(
-          'Are you sure you want to delete ${patient.studentName}? This will also delete all visitation records.',
+          'Are you sure you want to delete ${patient.patientName}? This will also delete all visitation records.',
         ),
         actions: [
           TextButton(
@@ -217,8 +370,8 @@ class _PatientTileState extends State<_PatientTile> {
                   ),
                   child: Center(
                     child: Text(
-                      widget.patient.studentName.isNotEmpty
-                          ? widget.patient.studentName[0].toUpperCase()
+                      widget.patient.patientName.isNotEmpty
+                          ? widget.patient.patientName[0].toUpperCase()
                           : '?',
                       style: const TextStyle(
                         color: Colors.white,
@@ -236,7 +389,7 @@ class _PatientTileState extends State<_PatientTile> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.patient.studentName,
+                        widget.patient.patientName,
                         style: const TextStyle(
                           color: AppTheme.textPrimary,
                           fontWeight: FontWeight.w600,
@@ -245,7 +398,7 @@ class _PatientTileState extends State<_PatientTile> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        widget.patient.studentNumber,
+                        widget.patient.idNumber,
                         style: const TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 13,

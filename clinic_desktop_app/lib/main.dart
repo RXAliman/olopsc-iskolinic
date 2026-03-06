@@ -4,14 +4,18 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'providers/patient_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'screens/dashboard_screen.dart';
+import 'services/mock_data_generator.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize sqflite FFI for Windows desktop
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
+
+  // Seed mock data (only runs if DB is empty)
+  await MockDataGenerator.seedDatabase();
 
   runApp(const ClinicApp());
 }
