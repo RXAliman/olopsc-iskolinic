@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/database_helper.dart';
 import '../constants/symptoms.dart';
+import '../constants/supplies.dart';
 
 class AnalyticsProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -8,12 +9,14 @@ class AnalyticsProvider extends ChangeNotifier {
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
   Map<String, int> _symptomCounts = {};
+  Map<String, int> _supplyCounts = {};
   bool _loading = false;
   int _totalVisits = 0;
 
   int get selectedYear => _selectedYear;
   int get selectedMonth => _selectedMonth;
   Map<String, int> get symptomCounts => _symptomCounts;
+  Map<String, int> get supplyCounts => _supplyCounts;
   bool get loading => _loading;
   int get totalVisits => _totalVisits;
 
@@ -28,18 +31,33 @@ class AnalyticsProvider extends ChangeNotifier {
     _totalVisits = visitations.length;
 
     // Count each symptom
-    final counts = <String, int>{};
+    final symptomMap = <String, int>{};
     for (final symptom in kSymptomsList) {
-      counts[symptom] = 0;
+      symptomMap[symptom] = 0;
     }
     for (final visit in visitations) {
       for (final symptom in visit.symptoms) {
-        if (counts.containsKey(symptom)) {
-          counts[symptom] = counts[symptom]! + 1;
+        if (symptomMap.containsKey(symptom)) {
+          symptomMap[symptom] = symptomMap[symptom]! + 1;
         }
       }
     }
-    _symptomCounts = counts;
+    _symptomCounts = symptomMap;
+
+    // Count each supply used
+    final supplyMap = <String, int>{};
+    for (final supply in kSuppliesList) {
+      supplyMap[supply] = 0;
+    }
+    for (final visit in visitations) {
+      for (final supply in visit.suppliesUsed) {
+        if (supplyMap.containsKey(supply)) {
+          supplyMap[supply] = supplyMap[supply]! + 1;
+        }
+      }
+    }
+    _supplyCounts = supplyMap;
+
     _loading = false;
     notifyListeners();
   }

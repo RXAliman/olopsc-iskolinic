@@ -77,6 +77,7 @@ class PatientProvider extends ChangeNotifier {
   Future<void> addVisitation({
     required String patientId,
     required List<String> symptoms,
+    List<String> suppliesUsed = const [],
     required String treatment,
     required String remarks,
   }) async {
@@ -84,6 +85,7 @@ class PatientProvider extends ChangeNotifier {
       id: const Uuid().v4(),
       patientId: patientId,
       symptoms: symptoms,
+      suppliesUsed: suppliesUsed,
       treatment: treatment,
       remarks: remarks,
     );

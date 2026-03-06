@@ -3,7 +3,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
-import '../models/emergency_alert.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -25,7 +24,11 @@ class DatabaseHelper {
     final dbPath = p.join(dir.path, 'clinic_app', 'clinic.db');
     return await databaseFactory.openDatabase(
       dbPath,
-      options: OpenDatabaseOptions(version: 1, onCreate: _onCreate),
+      options: OpenDatabaseOptions(
+        version: 2,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      ),
     );
   }
 
@@ -48,21 +51,21 @@ class DatabaseHelper {
         patientId TEXT NOT NULL,
         dateTime TEXT NOT NULL,
         symptoms TEXT,
+        suppliesUsed TEXT,
         treatment TEXT,
         remarks TEXT,
         FOREIGN KEY (patientId) REFERENCES patients (id) ON DELETE CASCADE
       )
     ''');
-    await db.execute('''
-      CREATE TABLE emergency_alerts (
-        id TEXT PRIMARY KEY,
-        studentName TEXT NOT NULL,
-        studentNumber TEXT NOT NULL,
-        message TEXT,
-        timestamp TEXT NOT NULL,
-        acknowledged INTEGER DEFAULT 0
-      )
-    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add suppliesUsed column to visitations
+      await db.execute('ALTER TABLE visitations ADD COLUMN suppliesUsed TEXT');
+      // Drop emergency_alerts table if it exists
+      await db.execute('DROP TABLE IF EXISTS emergency_alerts');
+    }
   }
 
   // ── Patient CRUD ──────────────────────────────────────────────
@@ -158,41 +161,6 @@ class DatabaseHelper {
     final result = await db.rawQuery(
       'SELECT COUNT(*) as count FROM visitations WHERE dateTime >= ? AND dateTime < ?',
       [start, end],
-    );
-    return result.first['count'] as int? ?? 0;
-  }
-
-  // ── Emergency Alerts ──────────────────────────────────────────
-
-  Future<void> insertEmergencyAlert(EmergencyAlert alert) async {
-    final db = await database;
-    await db.insert(
-      'emergency_alerts',
-      alert.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<List<EmergencyAlert>> getEmergencyAlerts() async {
-    final db = await database;
-    final maps = await db.query('emergency_alerts', orderBy: 'timestamp DESC');
-    return maps.map((m) => EmergencyAlert.fromMap(m)).toList();
-  }
-
-  Future<void> acknowledgeAlert(String id) async {
-    final db = await database;
-    await db.update(
-      'emergency_alerts',
-      {'acknowledged': 1},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  Future<int> getUnacknowledgedAlertCount() async {
-    final db = await database;
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM emergency_alerts WHERE acknowledged = 0',
     );
     return result.first['count'] as int? ?? 0;
   }

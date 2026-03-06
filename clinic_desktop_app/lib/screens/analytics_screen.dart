@@ -5,8 +5,28 @@ import 'package:intl/intl.dart';
 import '../providers/analytics_provider.dart';
 import '../theme/app_theme.dart';
 
-class AnalyticsScreen extends StatelessWidget {
+class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
+
+  @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +45,7 @@ class AnalyticsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Symptom Analytics',
+                          'Analytics',
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
                         const SizedBox(height: 4),
@@ -40,48 +60,102 @@ class AnalyticsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Month Picker
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                decoration: AppTheme.glassCard(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () => provider.previousMonth(),
-                      icon: const Icon(Icons.chevron_left_rounded),
-                      splashRadius: 18,
+              // Month Picker + Tabs row
+              Row(
+                children: [
+                  // Month picker
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      DateFormat('MMMM yyyy').format(
-                        DateTime(provider.selectedYear, provider.selectedMonth),
+                    decoration: AppTheme.glassCard(),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => provider.previousMonth(),
+                          icon: const Icon(Icons.chevron_left_rounded),
+                          splashRadius: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          DateFormat('MMMM yyyy').format(
+                            DateTime(
+                              provider.selectedYear,
+                              provider.selectedMonth,
+                            ),
+                          ),
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () => provider.nextMonth(),
+                          icon: const Icon(Icons.chevron_right_rounded),
+                          splashRadius: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+
+                  // Tab bar
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.dividerColor),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      padding: EdgeInsets.zero,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: AppTheme.textSecondary,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: AppTheme.accent,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
+                      dividerColor: Colors.transparent,
+                      splashBorderRadius: BorderRadius.circular(10),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      tabs: const [
+                        Tab(text: 'Symptoms'),
+                        Tab(text: 'Supplies Used'),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () => provider.nextMonth(),
-                      icon: const Icon(Icons.chevron_right_rounded),
-                      splashRadius: 18,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 
-              // Chart
+              // Chart area
               Expanded(
                 child: provider.loading
                     ? const Center(child: CircularProgressIndicator())
-                    : _buildChart(context, provider),
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildChart(
+                            context,
+                            provider.symptomCounts,
+                            'symptom',
+                            'No symptom data for this month',
+                          ),
+                          _buildChart(
+                            context,
+                            provider.supplyCounts,
+                            'supply',
+                            'No supplies data for this month',
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -90,8 +164,13 @@ class AnalyticsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildChart(BuildContext context, AnalyticsProvider provider) {
-    final entries = provider.symptomCounts.entries.toList();
+  Widget _buildChart(
+    BuildContext context,
+    Map<String, int> data,
+    String type,
+    String emptyMessage,
+  ) {
+    final entries = data.entries.toList();
     final maxY = entries
         .fold<int>(0, (max, e) => e.value > max ? e.value : max)
         .toDouble();
@@ -101,12 +180,15 @@ class AnalyticsScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.bar_chart_rounded, size: 64, color: AppTheme.textMuted),
-            const SizedBox(height: 16),
-            Text(
-              'No visit data for this month',
-              style: Theme.of(context).textTheme.titleMedium,
+            Icon(
+              type == 'symptom'
+                  ? Icons.bar_chart_rounded
+                  : Icons.inventory_2_rounded,
+              size: 64,
+              color: AppTheme.textMuted,
             ),
+            const SizedBox(height: 16),
+            Text(emptyMessage, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
               'Record patient visits to see analytics here',
@@ -118,11 +200,12 @@ class AnalyticsScreen extends StatelessWidget {
     }
 
     // Color gradient for bars
+    final baseHue = type == 'symptom' ? 160.0 : 240.0;
     final colors = List.generate(
       entries.length,
       (i) => HSLColor.fromAHSL(
         1,
-        (160 + (i * 7.5)) % 360, // Hue rotation starting from teal
+        (baseHue + (i * 7.5)) % 360,
         0.65,
         0.55,
       ).toColor(),
@@ -152,7 +235,9 @@ class AnalyticsScreen extends StatelessWidget {
                         ),
                         children: [
                           TextSpan(
-                            text: '${rod.toY.toInt()} cases',
+                            text: type == 'symptom'
+                                ? '${rod.toY.toInt()} cases'
+                                : '${rod.toY.toInt()} used',
                             style: const TextStyle(
                               color: AppTheme.accent,
                               fontSize: 12,
@@ -181,7 +266,6 @@ class AnalyticsScreen extends StatelessWidget {
                         if (idx < 0 || idx >= entries.length) {
                           return const SizedBox.shrink();
                         }
-                        // Show abbreviated label
                         final label = entries[idx].key;
                         final abbreviated = label.length > 6
                             ? '${label.substring(0, 5)}.'

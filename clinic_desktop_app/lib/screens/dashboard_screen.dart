@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
-import '../providers/emergency_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../theme/app_theme.dart';
 import 'patient_list_screen.dart';
 import 'analytics_screen.dart';
-import 'emergency_screen.dart';
-import 'queue_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,10 +20,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.format_list_numbered_rounded, 'Queue'),
     _NavItem(Icons.people_rounded, 'Patients'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
-    _NavItem(Icons.warning_amber_rounded, 'Emergency'),
   ];
 
   @override
@@ -39,11 +34,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     final patientProvider = context.read<PatientProvider>();
-    final emergencyProvider = context.read<EmergencyProvider>();
     final analyticsProvider = context.read<AnalyticsProvider>();
 
     await patientProvider.loadPatients();
-    emergencyProvider.startListening();
     await analyticsProvider.loadAnalytics();
     final visits = await patientProvider.getTodayVisitCount();
     if (mounted) setState(() => _todayVisits = visits);
@@ -54,21 +47,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0:
         return _buildDashboardHome();
       case 1:
-        return const QueueScreen();
-      case 2:
         return const PatientListScreen();
-      case 3:
+      case 2:
         return const AnalyticsScreen();
-      case 4:
-        return const EmergencyScreen();
       default:
         return _buildDashboardHome();
     }
   }
 
   Widget _buildDashboardHome() {
-    return Consumer2<PatientProvider, EmergencyProvider>(
-      builder: (context, patients, emergency, _) {
+    return Consumer<PatientProvider>(
+      builder: (context, patients, _) {
         return Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -107,19 +96,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: _SummaryCard(
-                      icon: Icons.warning_amber_rounded,
-                      label: 'Active Alerts',
-                      value: '${emergency.unacknowledgedCount}',
-                      gradient: emergency.hasActiveAlerts
-                          ? AppTheme.dangerGradient
-                          : const LinearGradient(
-                              colors: [Color(0xFF475569), Color(0xFF64748B)],
-                            ),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 32),
@@ -135,19 +111,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _QuickAction(
                     icon: Icons.person_add_rounded,
                     label: 'Add Patient',
-                    onTap: () => setState(() => _selectedIndex = 2),
+                    onTap: () => setState(() => _selectedIndex = 1),
                   ),
                   const SizedBox(width: 16),
                   _QuickAction(
                     icon: Icons.analytics_rounded,
                     label: 'View Analytics',
-                    onTap: () => setState(() => _selectedIndex = 3),
-                  ),
-                  const SizedBox(width: 16),
-                  _QuickAction(
-                    icon: Icons.notifications_active_rounded,
-                    label: 'Check Alerts',
-                    onTap: () => setState(() => _selectedIndex = 4),
+                    onTap: () => setState(() => _selectedIndex = 2),
                   ),
                 ],
               ),
@@ -160,8 +130,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final emergencyProvider = context.watch<EmergencyProvider>();
-
     return Scaffold(
       body: Row(
         children: [
@@ -205,7 +173,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ...List.generate(_navItems.length, (i) {
                   final item = _navItems[i];
                   final isSelected = _selectedIndex == i;
-                  final hasAlert = i == 4 && emergencyProvider.hasActiveAlerts;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(
@@ -260,17 +227,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   fontSize: 14,
                                 ),
                               ),
-                              if (hasAlert) ...[
-                                const Spacer(),
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.danger,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ),

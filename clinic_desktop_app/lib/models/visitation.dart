@@ -3,6 +3,7 @@ class Visitation {
   final String patientId;
   final DateTime dateTime;
   final List<String> symptoms;
+  final List<String> suppliesUsed;
   final String treatment;
   final String remarks;
 
@@ -11,6 +12,7 @@ class Visitation {
     required this.patientId,
     DateTime? dateTime,
     this.symptoms = const [],
+    this.suppliesUsed = const [],
     this.treatment = '',
     this.remarks = '',
   }) : dateTime = dateTime ?? DateTime.now();
@@ -21,6 +23,7 @@ class Visitation {
       'patientId': patientId,
       'dateTime': dateTime.toIso8601String(),
       'symptoms': symptoms.join('|'),
+      'suppliesUsed': suppliesUsed.join('|'),
       'treatment': treatment,
       'remarks': remarks,
     };
@@ -28,11 +31,13 @@ class Visitation {
 
   factory Visitation.fromMap(Map<String, dynamic> map) {
     final symptomsStr = map['symptoms'] as String? ?? '';
+    final suppliesStr = map['suppliesUsed'] as String? ?? '';
     return Visitation(
       id: map['id'] as String,
       patientId: map['patientId'] as String,
       dateTime: DateTime.parse(map['dateTime'] as String),
       symptoms: symptomsStr.isEmpty ? [] : symptomsStr.split('|'),
+      suppliesUsed: suppliesStr.isEmpty ? [] : suppliesStr.split('|'),
       treatment: map['treatment'] as String? ?? '',
       remarks: map['remarks'] as String? ?? '',
     );
