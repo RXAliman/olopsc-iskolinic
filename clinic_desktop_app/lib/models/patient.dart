@@ -1,7 +1,7 @@
 class Patient {
   final String id;
-  final String studentName;
-  final String studentNumber;
+  final String patientName;
+  final String idNumber;
   final String address;
   final String guardianName;
   final String guardianContact;
@@ -10,8 +10,8 @@ class Patient {
 
   Patient({
     required this.id,
-    required this.studentName,
-    required this.studentNumber,
+    required this.patientName,
+    required this.idNumber,
     this.address = '',
     this.guardianName = '',
     this.guardianContact = '',
@@ -23,8 +23,8 @@ class Patient {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'studentName': studentName,
-      'studentNumber': studentNumber,
+      'patientName': patientName,
+      'idNumber': idNumber,
       'address': address,
       'guardianName': guardianName,
       'guardianContact': guardianContact,
@@ -36,8 +36,8 @@ class Patient {
   factory Patient.fromMap(Map<String, dynamic> map) {
     return Patient(
       id: map['id'] as String,
-      studentName: map['studentName'] as String,
-      studentNumber: map['studentNumber'] as String,
+      patientName: map['patientName'] as String,
+      idNumber: map['idNumber'] as String,
       address: map['address'] as String? ?? '',
       guardianName: map['guardianName'] as String? ?? '',
       guardianContact: map['guardianContact'] as String? ?? '',
@@ -47,16 +47,16 @@ class Patient {
   }
 
   Patient copyWith({
-    String? studentName,
-    String? studentNumber,
+    String? patientName,
+    String? idNumber,
     String? address,
     String? guardianName,
     String? guardianContact,
   }) {
     return Patient(
       id: id,
-      studentName: studentName ?? this.studentName,
-      studentNumber: studentNumber ?? this.studentNumber,
+      patientName: patientName ?? this.patientName,
+      idNumber: idNumber ?? this.idNumber,
       address: address ?? this.address,
       guardianName: guardianName ?? this.guardianName,
       guardianContact: guardianContact ?? this.guardianContact,

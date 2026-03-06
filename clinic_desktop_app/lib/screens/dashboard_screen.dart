@@ -19,7 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.people_rounded, 'Patients'),
+    _NavItem(Icons.people_rounded, 'Records'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
   ];
 
@@ -79,7 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: _SummaryCard(
                       icon: Icons.people_rounded,
-                      label: 'Total Patients',
+                      label: 'Total Recorded',
                       value: '${patients.totalPatients}',
                       gradient: AppTheme.accentGradient,
                     ),

@@ -42,7 +42,7 @@ class PatientDetailScreen extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          patient.studentName[0].toUpperCase(),
+                          patient.patientName[0].toUpperCase(),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -57,11 +57,11 @@ class PatientDetailScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            patient.studentName,
+                            patient.patientName,
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           Text(
-                            patient.studentNumber,
+                            patient.idNumber,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],

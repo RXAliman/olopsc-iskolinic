@@ -36,8 +36,8 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE patients (
         id TEXT PRIMARY KEY,
-        studentName TEXT NOT NULL,
-        studentNumber TEXT NOT NULL,
+        patientName TEXT NOT NULL,
+        idNumber TEXT NOT NULL,
         address TEXT,
         guardianName TEXT,
         guardianContact TEXT,
@@ -81,8 +81,51 @@ class DatabaseHelper {
 
   Future<List<Patient>> getPatients() async {
     final db = await database;
-    final maps = await db.query('patients', orderBy: 'studentName ASC');
+    final maps = await db.query('patients', orderBy: 'patientName ASC');
     return maps.map((m) => Patient.fromMap(m)).toList();
+  }
+
+  Future<List<Patient>> getPatientsPaginated(int limit, int offset) async {
+    final db = await database;
+    final maps = await db.query(
+      'patients',
+      orderBy: 'patientName ASC',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((m) => Patient.fromMap(m)).toList();
+  }
+
+  Future<int> getPatientCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM patients');
+    return result.first['count'] as int? ?? 0;
+  }
+
+  Future<List<Patient>> searchPatientsPaginated(
+    String query,
+    int limit,
+    int offset,
+  ) async {
+    final db = await database;
+    final maps = await db.query(
+      'patients',
+      where: 'patientName LIKE ? OR idNumber LIKE ?',
+      whereArgs: ['%$query%', '%$query%'],
+      orderBy: 'patientName ASC',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((m) => Patient.fromMap(m)).toList();
+  }
+
+  Future<int> searchPatientCount(String query) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM patients WHERE patientName LIKE ? OR idNumber LIKE ?',
+      ['%$query%', '%$query%'],
+    );
+    return result.first['count'] as int? ?? 0;
   }
 
   Future<Patient?> getPatient(String id) async {
@@ -112,9 +155,9 @@ class DatabaseHelper {
     final db = await database;
     final maps = await db.query(
       'patients',
-      where: 'studentName LIKE ? OR studentNumber LIKE ?',
+      where: 'patientName LIKE ? OR idNumber LIKE ?',
       whereArgs: ['%$query%', '%$query%'],
-      orderBy: 'studentName ASC',
+      orderBy: 'patientName ASC',
     );
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
