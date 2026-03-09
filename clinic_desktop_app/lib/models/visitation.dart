@@ -7,6 +7,11 @@ class Visitation {
   final String treatment;
   final String remarks;
 
+  // CRDT fields
+  final String hlc;
+  final String nodeId;
+  final bool isDeleted;
+
   Visitation({
     required this.id,
     required this.patientId,
@@ -15,6 +20,9 @@ class Visitation {
     this.suppliesUsed = const [],
     this.treatment = '',
     this.remarks = '',
+    this.hlc = '',
+    this.nodeId = '',
+    this.isDeleted = false,
   }) : dateTime = dateTime ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
@@ -26,6 +34,9 @@ class Visitation {
       'suppliesUsed': suppliesUsed.join('|'),
       'treatment': treatment,
       'remarks': remarks,
+      'hlc': hlc,
+      'nodeId': nodeId,
+      'isDeleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -40,6 +51,16 @@ class Visitation {
       suppliesUsed: suppliesStr.isEmpty ? [] : suppliesStr.split('|'),
       treatment: map['treatment'] as String? ?? '',
       remarks: map['remarks'] as String? ?? '',
+      hlc: map['hlc'] as String? ?? '',
+      nodeId: map['nodeId'] as String? ?? '',
+      isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
     );
   }
+
+  /// Converts this visitation to a JSON-compatible map for WebSocket sync.
+  Map<String, dynamic> toSyncMap() => toMap();
+
+  /// Creates a Visitation from a sync payload received over WebSocket.
+  factory Visitation.fromSyncMap(Map<String, dynamic> map) =>
+      Visitation.fromMap(map);
 }

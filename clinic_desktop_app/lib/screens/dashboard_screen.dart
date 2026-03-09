@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/sync_provider.dart';
 import '../theme/app_theme.dart';
 import 'patient_list_screen.dart';
 import 'analytics_screen.dart';
@@ -81,7 +82,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icons.people_rounded,
                       label: 'Total Recorded',
                       value: '${patients.totalPatients}',
-                      gradient: AppTheme.accentGradient,
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFFF59E0B),
+                          Color(0xFFFBBF24),
+                        ], // Yellow gradient
+                      ),
                     ),
                   ),
                   const SizedBox(width: 20),
@@ -91,7 +97,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       label: "Today's Visits",
                       value: '$_todayVisits',
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        colors: [
+                          Color(0xFF3B82F6),
+                          Color(0xFF60A5FA),
+                        ], // Blue gradient
                       ),
                     ),
                   ),
@@ -213,6 +222,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }),
 
                 const Spacer(),
+
+                // Sync Status
+                Consumer<SyncProvider>(
+                  builder: (context, sync, _) {
+                    final isConnected = sync.isConnected;
+                    final isConnecting = sync.isConnecting;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 20,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isConnected
+                                  ? Colors.greenAccent
+                                  : isConnecting
+                                  ? Colors.orangeAccent
+                                  : AppTheme.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isConnected
+                                ? 'Synced'
+                                : isConnecting
+                                ? 'Connecting...'
+                                : 'Offline',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),

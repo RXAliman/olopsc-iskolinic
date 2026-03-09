@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "clinic_desktop_app" "\0"
+            VALUE "CompanyName", "com.olopsc" "\0"
+            VALUE "FileDescription", "OLOPSC Iskolinic" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "clinic_desktop_app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "clinic_desktop_app.exe" "\0"
-            VALUE "ProductName", "clinic_desktop_app" "\0"
+            VALUE "InternalName", "olopsc-iskolinic" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Rovic Aliman. All rights reserved." "\0"
+            VALUE "OriginalFilename", "olopsc-iskolinic.exe" "\0"
+            VALUE "ProductName", "OLOPSC Iskolinic" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

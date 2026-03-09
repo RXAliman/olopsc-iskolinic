@@ -8,6 +8,11 @@ class Patient {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // CRDT fields
+  final String hlc;
+  final String nodeId;
+  final bool isDeleted;
+
   Patient({
     required this.id,
     required this.patientName,
@@ -17,6 +22,9 @@ class Patient {
     this.guardianContact = '',
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.hlc = '',
+    this.nodeId = '',
+    this.isDeleted = false,
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -30,6 +38,9 @@ class Patient {
       'guardianContact': guardianContact,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'hlc': hlc,
+      'nodeId': nodeId,
+      'isDeleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -43,6 +54,9 @@ class Patient {
       guardianContact: map['guardianContact'] as String? ?? '',
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
+      hlc: map['hlc'] as String? ?? '',
+      nodeId: map['nodeId'] as String? ?? '',
+      isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
     );
   }
 
@@ -52,6 +66,9 @@ class Patient {
     String? address,
     String? guardianName,
     String? guardianContact,
+    String? hlc,
+    String? nodeId,
+    bool? isDeleted,
   }) {
     return Patient(
       id: id,
@@ -62,6 +79,15 @@ class Patient {
       guardianContact: guardianContact ?? this.guardianContact,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
+      hlc: hlc ?? this.hlc,
+      nodeId: nodeId ?? this.nodeId,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
+
+  /// Converts this patient to a JSON-compatible map for WebSocket sync.
+  Map<String, dynamic> toSyncMap() => toMap();
+
+  /// Creates a Patient from a sync payload received over WebSocket.
+  factory Patient.fromSyncMap(Map<String, dynamic> map) => Patient.fromMap(map);
 }

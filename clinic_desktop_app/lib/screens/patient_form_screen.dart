@@ -107,7 +107,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   ),
                   const SizedBox(width: 16),
                   Text(
-                    isEditing ? 'Edit Record' : 'Add New Record',
+                    isEditing ? 'Edit Record' : 'New Record',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const Spacer(),
@@ -139,6 +139,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   labelText: 'ID Number *',
                   prefixIcon: Icon(Icons.badge_outlined),
                 ),
+                inputFormatters: [UpperCaseTextFormatter()],
                 validator: (v) => v == null || v.trim().isEmpty
                     ? 'ID number is required'
                     : null,
@@ -151,8 +152,12 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Address',
                   prefixIcon: Icon(Icons.home_outlined),
+                  alignLabelWithHint: true,
                 ),
-                maxLines: 2,
+                inputFormatters: [UpperCaseTextFormatter()],
+                minLines: 1,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
               ),
               const SizedBox(height: 16),
 
@@ -188,7 +193,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: _save,
-                    child: Text(isEditing ? 'Save Changes' : 'Add Patient'),
+                    child: Text(isEditing ? 'Save' : 'Add'),
                   ),
                 ],
               ),
