@@ -30,6 +30,9 @@ void main() async {
     wsUrl: 'wss://olopsc-iskolinic.onrender.com/ws',
   );
 
+  // Wire auto-push: every local write triggers an immediate sync push
+  patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());
+
   runApp(
     ClinicApp(patientProvider: patientProvider, syncProvider: syncProvider),
   );

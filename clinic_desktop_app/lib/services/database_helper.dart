@@ -357,34 +357,45 @@ class DatabaseHelper {
     return false;
   }
 
-  /// CRDT merge: upsert a remote visitation only if its HLC > local HLC.
-  /// Returns true if a change was applied.
   Future<bool> upsertVisitationFromRemote(Visitation remote) async {
     final db = await database;
-    final existing = await db.query(
-      'visitations',
-      where: 'id = ?',
-      whereArgs: [remote.id],
-    );
-
-    if (existing.isEmpty) {
-      await db.insert('visitations', remote.toMap());
-      return true;
-    }
-
-    final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
-    final remoteHlc = HLC.unpack(remote.hlc);
-
-    if (remoteHlc > localHlc) {
-      await db.update(
+    try {
+      final existing = await db.query(
         'visitations',
-        remote.toMap(),
         where: 'id = ?',
         whereArgs: [remote.id],
       );
-      return true;
+
+      if (existing.isEmpty) {
+        await db.insert('visitations', remote.toMap());
+        return true;
+      }
+
+      final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
+      final remoteHlc = HLC.unpack(remote.hlc);
+
+      if (remoteHlc > localHlc) {
+        await db.update(
+          'visitations',
+          remote.toMap(),
+          where: 'id = ?',
+          whereArgs: [remote.id],
+        );
+        return true;
+      }
+      return false;
+    } catch (e) {
+      if (e is DatabaseException &&
+          e.isUniqueConstraintError() == false &&
+          e.toString().contains('FOREIGN KEY')) {
+        // Orphaned visitation (synced before its parent patient record arrived).
+        // Since we chunk patients first, this is rare, but if it happens, we
+        // skip inserting to prevent the isolate from crashing. The sync protocol
+        // will naturally resolve this if we eventually get the patient record.
+        return false;
+      }
+      rethrow;
     }
-    return false;
   }
 
   // ── Data Compaction ─────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
@@ -8,6 +9,14 @@ import 'package:uuid/uuid.dart';
 
 class PatientProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
+
+  /// Reference to SyncProvider for auto-push after writes.
+  /// Set via [setOnLocalWrite] after both providers are created.
+  VoidCallback? _onLocalWrite;
+
+  /// Debounce timer — collapses rapid writes into a single push.
+  Timer? _pushDebounce;
+  static const _pushDebounceDelay = Duration(milliseconds: 200);
 
   // Current HLC state (loaded once on init)
   HLC _clock = const HLC(timestamp: 0, counter: 0, nodeId: '');
@@ -39,6 +48,11 @@ class PatientProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   Set<String> get lastSyncChangedIds => _lastSyncChangedIds;
 
+  /// Register a callback that fires after every local write (used for auto-push sync).
+  void setOnLocalWrite(VoidCallback callback) {
+    _onLocalWrite = callback;
+  }
+
   /// Initialize CRDT state — call once on startup.
   Future<void> initCrdt() async {
     _nodeId = await NodeId.get();
@@ -49,6 +63,15 @@ class PatientProvider extends ChangeNotifier {
   String _tick() {
     _clock = _clock.send();
     return _clock.pack();
+  }
+
+  /// Debounced push — waits 200ms after the last write before pushing.
+  /// This collapses rapid writes (e.g. bulk imports) into a single sync push.
+  void _autoPush() {
+    _pushDebounce?.cancel();
+    _pushDebounce = Timer(_pushDebounceDelay, () {
+      _onLocalWrite?.call();
+    });
   }
 
   Future<void> loadPatients() async {
@@ -106,6 +129,7 @@ class PatientProvider extends ChangeNotifier {
     );
     await _db.insertPatient(withCrdt);
     await loadPatients();
+    _autoPush();
   }
 
   Future<void> updatePatient(Patient patient) async {
@@ -117,6 +141,7 @@ class PatientProvider extends ChangeNotifier {
       _selectedPatient = withCrdt;
       notifyListeners();
     }
+    _autoPush();
   }
 
   /// Soft-delete: sets isDeleted = 1 with a new HLC.
@@ -134,6 +159,7 @@ class PatientProvider extends ChangeNotifier {
       _currentPage = newTotalPages - 1;
     }
     await loadPatients();
+    _autoPush();
   }
 
   Future<void> selectPatient(Patient patient) async {
@@ -165,6 +191,7 @@ class PatientProvider extends ChangeNotifier {
       _visitations = await _db.getVisitationsForPatient(patientId);
     }
     notifyListeners();
+    _autoPush();
   }
 
   Future<int> getTodayVisitCount() async {

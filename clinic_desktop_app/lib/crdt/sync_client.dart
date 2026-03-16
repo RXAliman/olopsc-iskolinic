@@ -37,7 +37,10 @@ class SyncClient {
 
   static const int _batchSize = 50;
   static const Duration _heartbeatInterval = Duration(minutes: 3);
-  static const Duration _reconnectDelay = Duration(seconds: 5);
+
+  // Exponential backoff for reconnect (1s → 2s → 4s → ... → max 30s)
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectDelaySec = 30;
 
   SyncClient({required this.wsUrl, required this.nodeId});
 
@@ -56,6 +59,7 @@ class SyncClient {
       await _channel!.ready;
 
       _setState(SyncConnectionState.connected);
+      _reconnectAttempts = 0; // Reset backoff on successful connect
       _startHeartbeat();
 
       _subscription = _channel!.stream.listen(
@@ -92,7 +96,13 @@ class SyncClient {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(_reconnectDelay, connect);
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s, 30s, ...
+    final delaySec = (1 << _reconnectAttempts).clamp(1, _maxReconnectDelaySec);
+    _reconnectAttempts++;
+    debugPrint(
+      'SyncClient: reconnecting in ${delaySec}s (attempt $_reconnectAttempts)',
+    );
+    _reconnectTimer = Timer(Duration(seconds: delaySec), connect);
   }
 
   void _setState(SyncConnectionState newState) {
