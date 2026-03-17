@@ -6,6 +6,7 @@ import '../providers/sync_provider.dart';
 import '../theme/app_theme.dart';
 import 'patient_list_screen.dart';
 import 'analytics_screen.dart';
+import 'inventory_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,6 +22,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
     _NavItem(Icons.people_rounded, 'Records'),
+    _NavItem(Icons.inventory_2_rounded, 'Inventory'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
   ];
 
@@ -49,6 +51,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return const PatientListScreen();
       case 2:
+        return const InventoryScreen();
+      case 3:
         return const AnalyticsScreen();
       default:
         return _buildDashboardHome();

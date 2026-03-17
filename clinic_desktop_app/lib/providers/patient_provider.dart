@@ -5,6 +5,7 @@ import '../models/visitation.dart';
 import '../services/database_helper.dart';
 import '../crdt/hlc.dart';
 import '../crdt/node_id.dart';
+import '../providers/inventory_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class PatientProvider extends ChangeNotifier {
@@ -13,6 +14,9 @@ class PatientProvider extends ChangeNotifier {
   /// Reference to SyncProvider for auto-push after writes.
   /// Set via [setOnLocalWrite] after both providers are created.
   VoidCallback? _onLocalWrite;
+
+  /// Reference to InventoryProvider for auto-deduction on visitation.
+  InventoryProvider? _inventoryProvider;
 
   /// Debounce timer — collapses rapid writes into a single push.
   Timer? _pushDebounce;
@@ -51,6 +55,11 @@ class PatientProvider extends ChangeNotifier {
   /// Register a callback that fires after every local write (used for auto-push sync).
   void setOnLocalWrite(VoidCallback callback) {
     _onLocalWrite = callback;
+  }
+
+  /// Set reference to InventoryProvider for auto-deduction.
+  void setInventoryProvider(InventoryProvider provider) {
+    _inventoryProvider = provider;
   }
 
   /// Initialize CRDT state — call once on startup.
@@ -187,6 +196,12 @@ class PatientProvider extends ChangeNotifier {
       nodeId: _nodeId,
     );
     await _db.insertVisitation(visit);
+
+    // Auto-deduct supplies from inventory (1 unit per supply, FEFO)
+    for (final supply in suppliesUsed) {
+      await _inventoryProvider?.deductStock(supply, 1);
+    }
+
     if (_selectedPatient?.id == patientId) {
       _visitations = await _db.getVisitationsForPatient(patientId);
     }

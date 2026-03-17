@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'providers/patient_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/sync_provider.dart';
+import 'providers/inventory_provider.dart';
 import 'screens/dashboard_screen.dart';
 // import 'services/mock_data_generator.dart';
 import 'theme/app_theme.dart';
@@ -33,19 +34,32 @@ void main() async {
   // Wire auto-push: every local write triggers an immediate sync push
   patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());
 
+  // Initialize inventory
+  final inventoryProvider = InventoryProvider();
+  await inventoryProvider.loadInventory();
+
+  // Wire auto-deduct: visitation supplies auto-deduct from inventory
+  patientProvider.setInventoryProvider(inventoryProvider);
+
   runApp(
-    ClinicApp(patientProvider: patientProvider, syncProvider: syncProvider),
+    ClinicApp(
+      patientProvider: patientProvider,
+      syncProvider: syncProvider,
+      inventoryProvider: inventoryProvider,
+    ),
   );
 }
 
 class ClinicApp extends StatelessWidget {
   final PatientProvider patientProvider;
   final SyncProvider syncProvider;
+  final InventoryProvider inventoryProvider;
 
   const ClinicApp({
     super.key,
     required this.patientProvider,
     required this.syncProvider,
+    required this.inventoryProvider,
   });
 
   @override
@@ -55,6 +69,7 @@ class ClinicApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: patientProvider),
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider.value(value: syncProvider),
+        ChangeNotifierProvider.value(value: inventoryProvider),
       ],
       child: MaterialApp(
         title: 'IskoLinic App',

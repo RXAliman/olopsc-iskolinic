@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
+import '../models/stock_batch.dart';
 import '../crdt/hlc.dart';
 
 class DatabaseHelper {
@@ -26,7 +27,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -77,6 +78,19 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_visitations_hlc ON visitations (hlc)',
     );
+    // Stock batches table for inventory
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS stock_batches (
+        id TEXT PRIMARY KEY,
+        itemName TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        expirationDate TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_batches (itemName, expirationDate)',
+    );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -118,6 +132,20 @@ class DatabaseHelper {
       );
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_visitations_hlc ON visitations (hlc)',
+      );
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS stock_batches (
+          id TEXT PRIMARY KEY,
+          itemName TEXT NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 0,
+          expirationDate TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_batches (itemName, expirationDate)',
       );
     }
   }
@@ -423,5 +451,81 @@ class DatabaseHelper {
       whereArgs: [cutoff],
     );
     return removed;
+  }
+
+  // ── Inventory (Stock Batches) ────────────────────────────────────
+
+  /// Insert a new stock batch.
+  Future<void> insertStockBatch(StockBatch batch) async {
+    final db = await database;
+    await db.insert('stock_batches', batch.toMap());
+  }
+
+  /// Get all batches for a specific item, sorted by earliest expiration first.
+  Future<List<StockBatch>> getStockBatchesForItem(String itemName) async {
+    final db = await database;
+    final maps = await db.query(
+      'stock_batches',
+      where: 'itemName = ? AND quantity > 0',
+      whereArgs: [itemName],
+      orderBy: 'expirationDate ASC',
+    );
+    return maps.map((m) => StockBatch.fromMap(m)).toList();
+  }
+
+  /// Get aggregated inventory summary: {itemName: totalQuantity}.
+  Future<Map<String, int>> getInventorySummary() async {
+    final db = await database;
+    final maps = await db.rawQuery(
+      'SELECT itemName, SUM(quantity) as total FROM stock_batches WHERE quantity > 0 GROUP BY itemName ORDER BY itemName',
+    );
+    final summary = <String, int>{};
+    for (final row in maps) {
+      summary[row['itemName'] as String] = (row['total'] as int?) ?? 0;
+    }
+    return summary;
+  }
+
+  /// Get all batches with quantity > 0, sorted by item then expiry.
+  Future<List<StockBatch>> getAllStockBatches() async {
+    final db = await database;
+    final maps = await db.query(
+      'stock_batches',
+      where: 'quantity > 0',
+      orderBy: 'itemName ASC, expirationDate ASC',
+    );
+    return maps.map((m) => StockBatch.fromMap(m)).toList();
+  }
+
+  /// Deduct [qty] units from [itemName] using FEFO (First-Expired, First-Out).
+  /// Returns the number of units actually deducted.
+  Future<int> deductStock(String itemName, int qty) async {
+    final db = await database;
+    final batches = await getStockBatchesForItem(itemName);
+
+    int remaining = qty;
+    for (final batch in batches) {
+      if (remaining <= 0) break;
+
+      final deduct = remaining > batch.quantity ? batch.quantity : remaining;
+      final newQty = batch.quantity - deduct;
+      remaining -= deduct;
+
+      if (newQty <= 0) {
+        await db.delete(
+          'stock_batches',
+          where: 'id = ?',
+          whereArgs: [batch.id],
+        );
+      } else {
+        await db.update(
+          'stock_batches',
+          {'quantity': newQty},
+          where: 'id = ?',
+          whereArgs: [batch.id],
+        );
+      }
+    }
+    return qty - remaining;
   }
 }
