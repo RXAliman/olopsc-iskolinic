@@ -5,10 +5,14 @@ import '../constants/supplies.dart';
 import '../providers/patient_provider.dart';
 import '../theme/app_theme.dart';
 
-class VisitationFormScreen extends StatefulWidget {
-  final String patientId;
+import '../models/patient.dart';
+import 'patient_form_screen.dart';
+import '../services/database_helper.dart';
 
-  const VisitationFormScreen({super.key, required this.patientId});
+class VisitationFormScreen extends StatefulWidget {
+  final String? patientId;
+
+  const VisitationFormScreen({super.key, this.patientId});
 
   @override
   State<VisitationFormScreen> createState() => _VisitationFormScreenState();
@@ -21,10 +25,25 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   final Set<String> _selectedSymptoms = {};
   final Set<String> _selectedSupplies = {};
 
+  Patient? _selectedPatient;
+
   bool _showAllTraumatic = true;
   bool _showAllMedical = true;
   bool _showAllBehavioral = true;
   bool _showAllSupplies = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.patientId != null) {
+      final provider = context.read<PatientProvider>();
+      try {
+        _selectedPatient = provider.patients.firstWhere(
+          (p) => p.id == widget.patientId,
+        );
+      } catch (_) {}
+    }
+  }
 
   @override
   void dispose() {
@@ -35,6 +54,15 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedPatient == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a patient'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
     if (_selectedSymptoms.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -46,7 +74,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     }
 
     await context.read<PatientProvider>().addVisitation(
-      patientId: widget.patientId,
+      patientId: _selectedPatient!.id,
       symptoms: _selectedSymptoms.toList(),
       suppliesUsed: _selectedSupplies.toList(),
       treatment: _treatmentCtrl.text.trim(),
@@ -107,107 +135,221 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Symptoms label
-                      Text(
-                        'Chief Complaints / Symptoms *',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Symptom chips - Traumatic
-                      _buildSection(
-                        title: 'Traumatic',
-                        allItems: kTraumaticSymptoms,
-                        selectedItems: _selectedSymptoms,
-                        showAll: _showAllTraumatic,
-                        onToggle: () => setState(
-                          () => _showAllTraumatic = !_showAllTraumatic,
+                      const SizedBox(height: 8),
+                      // Patient Search (Autocomplete)
+                      Autocomplete<Patient>(
+                        initialValue: TextEditingValue(
+                          text: _selectedPatient?.patientName ?? '',
                         ),
+                        displayStringForOption: (option) => option.patientName,
+                        optionsBuilder: (textEditingValue) async {
+                          if (textEditingValue.text.isEmpty) {
+                            return const Iterable<Patient>.empty();
+                          }
+                          final query = textEditingValue.text;
+                          return await DatabaseHelper.instance.searchPatientsPaginated(
+                            query,
+                            10, // top 10 matches
+                            0,  // offset 0
+                          );
+                        },
+                        onSelected: (selection) {
+                          setState(() {
+                            _selectedPatient = selection;
+                          });
+                        },
+                        fieldViewBuilder:
+                            (
+                              context,
+                              controller,
+                              focusNode,
+                              onEditingComplete,
+                            ) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: controller,
+                                      focusNode: focusNode,
+                                      readOnly: widget.patientId != null,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Patient Name *',
+                                        prefixIcon: Icon(
+                                          Icons.person_search_rounded,
+                                        ),
+                                      ),
+                                      onEditingComplete: onEditingComplete,
+                                    ),
+                                  ),
+                                  if (widget.patientId == null &&
+                                      _selectedPatient == null) ...[
+                                    const SizedBox(width: 16),
+                                    ElevatedButton.icon(
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) =>
+                                              const PatientFormScreen(),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.accent,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.all(16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.person_add_rounded,
+                                        size: 16,
+                                      ),
+                                      label: const Text('Add Patient'),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: 400,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).cardColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (context, index) {
+                                    final option = options.elementAt(index);
+                                    return ListTile(
+                                      title: Text(option.patientName),
+                                      subtitle: Text(option.idNumber),
+                                      onTap: () => onSelected(option),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 12),
-
-                      // Symptom chips - Medical
-                      _buildSection(
-                        title: 'Medical',
-                        allItems: kMedicalSymptoms,
-                        selectedItems: _selectedSymptoms,
-                        showAll: _showAllMedical,
-                        onToggle: () =>
-                            setState(() => _showAllMedical = !_showAllMedical),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Symptom chips - Behavioral
-                      _buildSection(
-                        title: 'Behavioral',
-                        allItems: kBehavioralSymptoms,
-                        selectedItems: _selectedSymptoms,
-                        showAll: _showAllBehavioral,
-                        onToggle: () => setState(
-                          () => _showAllBehavioral = !_showAllBehavioral,
+                      if (_selectedPatient != null) ...[
+                        const SizedBox(height: 24),
+                        // Symptoms label
+                        Text(
+                          'Chief Complaints / Symptoms *',
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 12),
 
-                      // Supplies Used
-                      Text(
-                        'Supplies Used',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-
-                      _buildSection(
-                        title: 'Clinic Supplies',
-                        allItems: kSuppliesList,
-                        selectedItems: _selectedSupplies,
-                        showAll: _showAllSupplies,
-                        onToggle: () => setState(
-                          () => _showAllSupplies = !_showAllSupplies,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Treatment
-                      TextFormField(
-                        controller: _treatmentCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Treatment / Medication',
-                          prefixIcon: Icon(Icons.healing_outlined),
-                          alignLabelWithHint: true,
-                        ),
-                        maxLines: null,
-                        keyboardType: TextInputType.multiline,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Remarks
-                      TextFormField(
-                        controller: _remarksCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Remarks',
-                          prefixIcon: Icon(Icons.notes_outlined),
-                          alignLabelWithHint: true,
-                        ),
-                        maxLines: null,
-                        keyboardType: TextInputType.multiline,
-                      ),
-                      const SizedBox(height: 28),
-
-                      // Buttons
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
+                        // Symptom chips - Traumatic
+                        _buildSection(
+                          title: 'Traumatic',
+                          allItems: kTraumaticSymptoms,
+                          selectedItems: _selectedSymptoms,
+                          showAll: _showAllTraumatic,
+                          onToggle: () => setState(
+                            () => _showAllTraumatic = !_showAllTraumatic,
                           ),
-                          const SizedBox(width: 12),
-                          ElevatedButton(
-                            onPressed: _save,
-                            child: const Text('Save Visit'),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Symptom chips - Medical
+                        _buildSection(
+                          title: 'Medical',
+                          allItems: kMedicalSymptoms,
+                          selectedItems: _selectedSymptoms,
+                          showAll: _showAllMedical,
+                          onToggle: () => setState(
+                            () => _showAllMedical = !_showAllMedical,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Symptom chips - Behavioral
+                        _buildSection(
+                          title: 'Behavioral',
+                          allItems: kBehavioralSymptoms,
+                          selectedItems: _selectedSymptoms,
+                          showAll: _showAllBehavioral,
+                          onToggle: () => setState(
+                            () => _showAllBehavioral = !_showAllBehavioral,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Supplies Used
+                        Text(
+                          'Supplies Used',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 12),
+
+                        _buildSection(
+                          title: 'Clinic Supplies',
+                          allItems: kSuppliesList,
+                          selectedItems: _selectedSupplies,
+                          showAll: _showAllSupplies,
+                          onToggle: () => setState(
+                            () => _showAllSupplies = !_showAllSupplies,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Treatment
+                        TextFormField(
+                          controller: _treatmentCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Treatment / Medication',
+                            prefixIcon: Icon(Icons.healing_outlined),
+                            alignLabelWithHint: true,
+                          ),
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Remarks
+                        TextFormField(
+                          controller: _remarksCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Remarks',
+                            prefixIcon: Icon(Icons.notes_outlined),
+                            alignLabelWithHint: true,
+                          ),
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                        ),
+                        const SizedBox(height: 28),
+
+                        // Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton(
+                              onPressed: _save,
+                              child: const Text('Save Visit'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

@@ -281,8 +281,9 @@ class PatientProvider extends ChangeNotifier {
 
   void goToDashboardVisitPage(int page) {
     if (page < 0 ||
-        (totalDashboardVisitPages > 0 && page >= totalDashboardVisitPages))
+        (totalDashboardVisitPages > 0 && page >= totalDashboardVisitPages)) {
       return;
+    }
     _dashboardVisitPage = page;
     loadDashboardVisits();
   }
