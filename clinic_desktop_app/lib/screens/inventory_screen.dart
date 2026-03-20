@@ -78,7 +78,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
                 // Item dropdown
                 DropdownButtonFormField<String>(
-                  value: selectedItem,
+                  initialValue: selectedItem,
                   decoration: const InputDecoration(
                     labelText: 'Supply Item *',
                     prefixIcon: Icon(Icons.medical_services_outlined),

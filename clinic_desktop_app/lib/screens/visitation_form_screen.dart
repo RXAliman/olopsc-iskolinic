@@ -21,6 +21,11 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   final Set<String> _selectedSymptoms = {};
   final Set<String> _selectedSupplies = {};
 
+  bool _showAllTraumatic = true;
+  bool _showAllMedical = true;
+  bool _showAllBehavioral = true;
+  bool _showAllSupplies = true;
+
   @override
   void dispose() {
     _treatmentCtrl.dispose();
@@ -60,161 +65,248 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
           maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
         padding: const EdgeInsets.all(32),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
               children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.accentGradient,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.medical_services_rounded,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Record Visitation',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Symptoms label
-                Text(
-                  'Chief Complaints / Symptoms *',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-
-                // Symptom chips
-                _buildChipSelector(
-                  items: kSymptomsList,
-                  selected: _selectedSymptoms,
-                ),
-                const SizedBox(height: 24),
-
-                // Supplies label
-                Text(
-                  'Supplies Used',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-
-                // Supply chips
-                _buildChipSelector(
-                  items: kSuppliesList,
-                  selected: _selectedSupplies,
-                  accentColor: const Color(0xFF6366F1),
-                ),
-                const SizedBox(height: 20),
-
-                // Treatment
-                TextFormField(
-                  controller: _treatmentCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Treatment / Medication',
-                    prefixIcon: Icon(Icons.healing_outlined),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.accentGradient,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-
-                // Remarks
-                TextFormField(
-                  controller: _remarksCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Remarks',
-                    prefixIcon: Icon(Icons.notes_outlined),
+                  child: const Icon(
+                    Icons.medical_services_rounded,
+                    size: 20,
+                    color: Colors.white,
                   ),
-                  maxLines: 2,
                 ),
-                const SizedBox(height: 28),
-
-                // Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _save,
-                      child: const Text('Save Visit'),
-                    ),
-                  ],
+                const SizedBox(width: 16),
+                Text(
+                  'Record Visitation',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 24),
+
+            // Scrollable Form Area
+            Flexible(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Symptoms label
+                      Text(
+                        'Chief Complaints / Symptoms *',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Symptom chips - Traumatic
+                      _buildSection(
+                        title: 'Traumatic',
+                        allItems: kTraumaticSymptoms,
+                        selectedItems: _selectedSymptoms,
+                        showAll: _showAllTraumatic,
+                        onToggle: () => setState(
+                          () => _showAllTraumatic = !_showAllTraumatic,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Symptom chips - Medical
+                      _buildSection(
+                        title: 'Medical',
+                        allItems: kMedicalSymptoms,
+                        selectedItems: _selectedSymptoms,
+                        showAll: _showAllMedical,
+                        onToggle: () =>
+                            setState(() => _showAllMedical = !_showAllMedical),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Symptom chips - Behavioral
+                      _buildSection(
+                        title: 'Behavioral',
+                        allItems: kBehavioralSymptoms,
+                        selectedItems: _selectedSymptoms,
+                        showAll: _showAllBehavioral,
+                        onToggle: () => setState(
+                          () => _showAllBehavioral = !_showAllBehavioral,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Supplies Used
+                      Text(
+                        'Supplies Used',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+
+                      _buildSection(
+                        title: 'Clinic Supplies',
+                        allItems: kSuppliesList,
+                        selectedItems: _selectedSupplies,
+                        showAll: _showAllSupplies,
+                        onToggle: () => setState(
+                          () => _showAllSupplies = !_showAllSupplies,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Treatment
+                      TextFormField(
+                        controller: _treatmentCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Treatment / Medication',
+                          prefixIcon: Icon(Icons.healing_outlined),
+                          alignLabelWithHint: true,
+                        ),
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Remarks
+                      TextFormField(
+                        controller: _remarksCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Remarks',
+                          prefixIcon: Icon(Icons.notes_outlined),
+                          alignLabelWithHint: true,
+                        ),
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                      ),
+                      const SizedBox(height: 28),
+
+                      // Buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: _save,
+                            child: const Text('Save Visit'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildChipSelector({
-    required List<String> items,
-    required Set<String> selected,
+  Widget _buildSection({
+    required String title,
+    required List<String> allItems,
+    required Set<String> selectedItems,
+    required bool showAll,
+    required VoidCallback onToggle,
     Color accentColor = AppTheme.accent,
   }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 180),
-      child: SingleChildScrollView(
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: items.map((item) {
-            final isSelected = selected.contains(item);
-            return FilterChip(
-              label: Text(
-                item,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+    final displayItems = showAll
+        ? allItems
+        : allItems.where((item) => selectedItems.contains(item)).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border.all(color: AppTheme.dividerColor),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textSecondary,
                 ),
               ),
-              selected: isSelected,
-              onSelected: (sel) {
-                setState(() {
-                  if (sel) {
-                    selected.add(item);
-                  } else {
-                    selected.remove(item);
-                  }
-                });
-              },
-              selectedColor: accentColor,
-              checkmarkColor: Colors.white,
-              backgroundColor: AppTheme.cardLight,
-              side: BorderSide(
-                color: isSelected ? accentColor : AppTheme.dividerColor,
+              TextButton(
+                onPressed: onToggle,
+                style: TextButton.styleFrom(
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  showAll ? 'Hide Options' : 'Show Options',
+                  style: TextStyle(fontSize: 12, color: accentColor),
+                ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            );
-          }).toList(),
-        ),
+            ],
+          ),
+          if (displayItems.isNotEmpty) const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: displayItems.map((item) {
+              final isSelected = selectedItems.contains(item);
+              return FilterChip(
+                showCheckmark: false,
+                label: Text(
+                  item,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : AppTheme.textSecondary,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+                selected: isSelected,
+                onSelected: (sel) {
+                  setState(() {
+                    if (sel) {
+                      selectedItems.add(item);
+                    } else {
+                      selectedItems.remove(item);
+                    }
+                  });
+                },
+                selectedColor: accentColor,
+                backgroundColor: AppTheme.cardLight,
+                side: BorderSide(
+                  color: isSelected ? accentColor : AppTheme.dividerColor,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import '../models/visitation.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/sync_provider.dart';
@@ -17,11 +19,10 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
-  int _todayVisits = 0;
 
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.people_rounded, 'Records'),
+    _NavItem(Icons.people_rounded, 'Patients'),
     _NavItem(Icons.inventory_2_rounded, 'Inventory'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
   ];
@@ -40,8 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     await patientProvider.loadPatients();
     await analyticsProvider.loadAnalytics();
-    final visits = await patientProvider.getTodayVisitCount();
-    if (mounted) setState(() => _todayVisits = visits);
+    await patientProvider.loadTodayVisits();
   }
 
   Widget _buildBody() {
@@ -62,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildDashboardHome() {
     return Consumer<PatientProvider>(
       builder: (context, patients, _) {
-        return Padding(
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Welcome back, Admin',
+                'Welcome back!',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 32),
@@ -84,7 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: _SummaryCard(
                       icon: Icons.people_rounded,
-                      label: 'Total Recorded',
+                      label: 'Total Patients Recorded',
                       value: '${patients.totalPatients}',
                       gradient: const LinearGradient(
                         colors: [
@@ -98,8 +98,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Expanded(
                     child: _SummaryCard(
                       icon: Icons.calendar_today_rounded,
-                      label: "Today's Visits",
-                      value: '$_todayVisits',
+                      label: "Patient Visits Today",
+                      value: '${patients.todayVisits}',
                       gradient: const LinearGradient(
                         colors: [
                           Color(0xFF3B82F6),
@@ -111,6 +111,143 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 32),
+
+              Text(
+                "Today's Visitations",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+
+              if (patients.dashboardVisits.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  decoration: AppTheme.glassCard(),
+                  alignment: Alignment.center,
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.inbox_rounded,
+                        size: 48,
+                        color: AppTheme.textMuted,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No visitations recorded today yet.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  decoration: AppTheme.glassCard(),
+                  child: Column(
+                    children: [
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: patients.dashboardVisits.length,
+                        separatorBuilder: (_, __) => const Divider(
+                          height: 1,
+                          color: AppTheme.dividerColor,
+                        ),
+                        itemBuilder: (context, index) {
+                          final data = patients.dashboardVisits[index];
+                          final patientName =
+                              data['patientName'] as String? ?? '';
+                          final firstName = data['firstName'] as String? ?? '';
+                          final visit = Visitation.fromMap(data);
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            leading: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.accentGradient,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  firstName.isNotEmpty
+                                      ? firstName[0].toUpperCase()
+                                      : (patientName.isNotEmpty
+                                            ? patientName[0].toUpperCase()
+                                            : '?'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  patientName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  DateFormat('hh:mm a').format(visit.dateTime),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (visit.symptoms.isNotEmpty)
+                                    Text(
+                                      'Symptoms: ${visit.symptoms.join(', ')}',
+                                      style: const TextStyle(fontSize: 13),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  if (visit.treatment.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Treatment: ${visit.treatment}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      if (patients.totalDashboardVisitPages > 1)
+                        _buildPagination(
+                          patients,
+                          patients.todayVisits,
+                          patients.totalDashboardVisitPages,
+                          patients.dashboardVisitPage *
+                              patients.dashboardVisitPageSize,
+                          (patients.dashboardVisitPage *
+                                  patients.dashboardVisitPageSize) +
+                              patients.dashboardVisits.length,
+                        ),
+                    ],
+                  ),
+                ),
             ],
           ),
         );
@@ -118,10 +255,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildPagination(
+    PatientProvider provider,
+    int totalItems,
+    int totalPages,
+    int start,
+    int end,
+  ) {
+    final currentPage = provider.dashboardVisitPage;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: AppTheme.dividerColor, width: 1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Showing ${start + 1}–$end of $totalItems visits',
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: currentPage > 0
+                    ? () => provider.firstDashboardVisitPage()
+                    : null,
+                icon: const Icon(Icons.first_page_rounded, size: 20),
+                tooltip: 'First page',
+                splashRadius: 18,
+              ),
+              IconButton(
+                onPressed: currentPage > 0
+                    ? () => provider.prevDashboardVisitPage()
+                    : null,
+                icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                tooltip: 'Previous',
+                splashRadius: 18,
+              ),
+              const SizedBox(width: 8),
+              ..._buildPageNumbers(provider, totalPages),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: currentPage < totalPages - 1
+                    ? () => provider.nextDashboardVisitPage()
+                    : null,
+                icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                tooltip: 'Next',
+                splashRadius: 18,
+              ),
+              IconButton(
+                onPressed: currentPage < totalPages - 1
+                    ? () => provider.lastDashboardVisitPage()
+                    : null,
+                icon: const Icon(Icons.last_page_rounded, size: 20),
+                tooltip: 'Last page',
+                splashRadius: 18,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers(PatientProvider provider, int totalPages) {
+    final current = provider.dashboardVisitPage;
+    return [
+      Container(
+        width: 64,
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: AppTheme.accent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '${current + 1}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Sidebar ──
           Container(

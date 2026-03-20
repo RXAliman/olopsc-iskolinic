@@ -106,9 +106,12 @@ class HLC implements Comparable<HLC> {
 
   @override
   int compareTo(HLC other) {
-    if (timestamp != other.timestamp)
+    if (timestamp != other.timestamp) {
       return timestamp.compareTo(other.timestamp);
-    if (counter != other.counter) return counter.compareTo(other.counter);
+    }
+    if (counter != other.counter) {
+      return counter.compareTo(other.counter);
+    }
     return nodeId.compareTo(other.nodeId);
   }
 

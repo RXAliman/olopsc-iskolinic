@@ -1,5 +1,9 @@
 class Patient {
   final String id;
+  final String firstName;
+  final String lastName;
+  final String middleName;
+  final String extension;
   final String patientName;
   final String idNumber;
   final String address;
@@ -15,6 +19,10 @@ class Patient {
 
   Patient({
     required this.id,
+    required this.firstName,
+    required this.lastName,
+    this.middleName = '',
+    this.extension = '',
     required this.patientName,
     required this.idNumber,
     this.address = '',
@@ -31,6 +39,10 @@ class Patient {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'firstName': firstName,
+      'lastName': lastName,
+      'middleName': middleName,
+      'extension': extension,
       'patientName': patientName,
       'idNumber': idNumber,
       'address': address,
@@ -47,6 +59,10 @@ class Patient {
   factory Patient.fromMap(Map<String, dynamic> map) {
     return Patient(
       id: map['id'] as String,
+      firstName: map['firstName'] as String? ?? '',
+      lastName: map['lastName'] as String? ?? '',
+      middleName: map['middleName'] as String? ?? '',
+      extension: map['extension'] as String? ?? '',
       patientName: map['patientName'] as String,
       idNumber: map['idNumber'] as String,
       address: map['address'] as String? ?? '',
@@ -61,6 +77,10 @@ class Patient {
   }
 
   Patient copyWith({
+    String? firstName,
+    String? lastName,
+    String? middleName,
+    String? extension,
     String? patientName,
     String? idNumber,
     String? address,
@@ -72,6 +92,10 @@ class Patient {
   }) {
     return Patient(
       id: id,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      middleName: middleName ?? this.middleName,
+      extension: extension ?? this.extension,
       patientName: patientName ?? this.patientName,
       idNumber: idNumber ?? this.idNumber,
       address: address ?? this.address,

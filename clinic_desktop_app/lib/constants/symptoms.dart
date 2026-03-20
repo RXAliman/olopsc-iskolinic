@@ -1,9 +1,18 @@
-const List<String> kSymptomsList = [
+const List<String> kTraumaticSymptoms = [
+  'Wound',
+  'Sprain',
+  'Burn',
+  'Sunburn',
+  'Nose Bleed',
+  'Callus',
+  'Deltoid',
+];
+
+const List<String> kMedicalSymptoms = [
   'Headache',
   'Abdominal Pain',
   'General Pain',
   'NFW/Dizzy',
-  'Wound',
   'Menstrual Pain',
   'Fever',
   'Asthma',
@@ -14,17 +23,20 @@ const List<String> kSymptomsList = [
   'Cold',
   'Vomit',
   'Sore Throat',
-  'Sprain',
-  'Due Meds Given',
-  'Burn',
   'Eczema',
-  'Sunburn',
   'Hypogastric Pain',
-  'Nose Bleed',
   'Allergy',
-  'Callus',
   'Rashes',
   'Acidic',
+  'Due Meds Given',
+];
+
+const List<String> kBehavioralSymptoms = [
   'Panic Attacks',
-  'Deltoid',
+];
+
+const List<String> kSymptomsList = [
+  ...kTraumaticSymptoms,
+  ...kMedicalSymptoms,
+  ...kBehavioralSymptoms,
 ];

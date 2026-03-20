@@ -27,7 +27,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -38,6 +38,10 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE patients (
         id TEXT PRIMARY KEY,
+        firstName TEXT NOT NULL,
+        lastName TEXT NOT NULL,
+        middleName TEXT NOT NULL DEFAULT '',
+        extension TEXT NOT NULL DEFAULT '',
         patientName TEXT NOT NULL,
         idNumber TEXT NOT NULL,
         address TEXT,
@@ -148,6 +152,24 @@ class DatabaseHelper {
         'CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_batches (itemName, expirationDate)',
       );
     }
+    if (oldVersion < 5) {
+      // Add the 4 new name fields to patients
+      await db.execute(
+        "ALTER TABLE patients ADD COLUMN firstName TEXT NOT NULL DEFAULT ''",
+      );
+      await db.execute(
+        "ALTER TABLE patients ADD COLUMN lastName TEXT NOT NULL DEFAULT ''",
+      );
+      await db.execute(
+        "ALTER TABLE patients ADD COLUMN middleName TEXT NOT NULL DEFAULT ''",
+      );
+      await db.execute(
+        "ALTER TABLE patients ADD COLUMN extension TEXT NOT NULL DEFAULT ''",
+      );
+
+      // Basic migration: move existing patientName to firstName to avoid empty required fields
+      await db.execute("UPDATE patients SET firstName = patientName");
+    }
   }
 
   // ── Meta (key-value store) ──────────────────────────────────────
@@ -216,8 +238,9 @@ class DatabaseHelper {
     final db = await database;
     final maps = await db.query(
       'patients',
-      where: 'isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ?)',
-      whereArgs: ['%$query%', '%$query%'],
+      where:
+          'isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
+      whereArgs: ['%$query%', '%$query%', '%$query%', '%$query%'],
       orderBy: 'patientName ASC',
       limit: limit,
       offset: offset,
@@ -228,8 +251,8 @@ class DatabaseHelper {
   Future<int> searchPatientCount(String query) async {
     final db = await database;
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ?)',
-      ['%$query%', '%$query%'],
+      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
+      ['%$query%', '%$query%', '%$query%', '%$query%'],
     );
     return result.first['count'] as int? ?? 0;
   }
@@ -305,6 +328,32 @@ class DatabaseHelper {
     return maps.map((m) => Visitation.fromMap(m)).toList();
   }
 
+  Future<List<Visitation>> getVisitationsPaginated(
+    String patientId,
+    int limit,
+    int offset,
+  ) async {
+    final db = await database;
+    final maps = await db.query(
+      'visitations',
+      where: 'patientId = ? AND isDeleted = 0',
+      whereArgs: [patientId],
+      orderBy: 'dateTime DESC',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((m) => Visitation.fromMap(m)).toList();
+  }
+
+  Future<int> getVisitationCountForPatient(String patientId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM visitations WHERE patientId = ? AND isDeleted = 0',
+      [patientId],
+    );
+    return result.first['count'] as int? ?? 0;
+  }
+
   Future<List<Visitation>> getVisitationsForMonth(int year, int month) async {
     final db = await database;
     final start = DateTime(year, month, 1).toIso8601String();
@@ -327,6 +376,30 @@ class DatabaseHelper {
       [start, end],
     );
     return result.first['count'] as int? ?? 0;
+  }
+
+  /// Gets today's visitations along with the patient's name, paginated.
+  Future<List<Map<String, dynamic>>> getTodayVisitationsPaginated(int limit, int offset) async {
+    final db = await database;
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).toIso8601String();
+    final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
+    
+    final maps = await db.rawQuery(
+      '''
+      SELECT v.*, p.patientName, p.firstName 
+      FROM visitations v 
+      JOIN patients p ON v.patientId = p.id 
+      WHERE v.isDeleted = 0 
+        AND v.dateTime >= ? 
+        AND v.dateTime < ?
+      ORDER BY v.dateTime DESC
+      LIMIT ? OFFSET ?
+      ''',
+      [start, end, limit, offset],
+    );
+    
+    return maps;
   }
 
   // ── CRDT Sync Methods ──────────────────────────────────────────
@@ -527,5 +600,17 @@ class DatabaseHelper {
       }
     }
     return qty - remaining;
+  }
+
+  // TODO: Delete this after testing
+  /// Clears all tables in the database.
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('visitations');
+      await txn.delete('patients');
+      await txn.delete('stock_batches');
+      await txn.delete('meta');
+    });
   }
 }

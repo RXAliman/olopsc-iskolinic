@@ -47,7 +47,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Records',
+                          'Patient Records',
                           style: Theme.of(context).textTheme.headlineLarge,
                         ),
                         const SizedBox(height: 4),
@@ -61,7 +61,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   ElevatedButton.icon(
                     onPressed: () => _showPatientForm(context),
                     icon: const Icon(Icons.person_add_rounded, size: 18),
-                    label: const Text('Add Record'),
+                    label: const Text('Add Patient'),
                   ),
                 ],
               ),
@@ -179,58 +179,27 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
   List<Widget> _buildPageNumbers(PatientProvider provider, int totalPages) {
     final current = provider.currentPage;
-    final pages = <int>[];
 
-    for (int i = 0; i < totalPages; i++) {
-      if (i == 0 ||
-          i == totalPages - 1 ||
-          (i >= current - 1 && i <= current + 1)) {
-        pages.add(i);
-      }
-    }
-
-    final widgets = <Widget>[];
-    for (int i = 0; i < pages.length; i++) {
-      if (i > 0 && pages[i] - pages[i - 1] > 1) {
-        widgets.add(
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              '…',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
-            ),
-          ),
-        );
-      }
-
-      final pageNum = pages[i];
-      final isActive = pageNum == current;
-      widgets.add(
-        InkWell(
-          onTap: () => provider.goToPage(pageNum),
+    return [
+      Container(
+        width: 64,
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: AppTheme.accent,
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 32,
-            height: 32,
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            decoration: BoxDecoration(
-              color: isActive ? AppTheme.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '${pageNum + 1}',
-              style: TextStyle(
-                color: isActive ? Colors.white : AppTheme.textSecondary,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                fontSize: 13,
-              ),
-            ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '${current + 1}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
           ),
         ),
-      );
-    }
-    return widgets;
+      ),
+    ];
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -370,9 +339,11 @@ class _PatientTileState extends State<_PatientTile> {
                   ),
                   child: Center(
                     child: Text(
-                      widget.patient.patientName.isNotEmpty
-                          ? widget.patient.patientName[0].toUpperCase()
-                          : '?',
+                      widget.patient.firstName.isNotEmpty
+                          ? widget.patient.firstName[0].toUpperCase()
+                          : (widget.patient.patientName.isNotEmpty
+                                ? widget.patient.patientName[0].toUpperCase()
+                                : '?'),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,

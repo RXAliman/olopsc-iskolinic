@@ -49,8 +49,9 @@ class SyncClient {
   /// Connect to the relay server.
   Future<void> connect() async {
     if (_state == SyncConnectionState.connecting ||
-        _state == SyncConnectionState.connected)
+        _state == SyncConnectionState.connected) {
       return;
+    }
 
     _setState(SyncConnectionState.connecting);
 

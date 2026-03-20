@@ -224,6 +224,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 barTouchData: BarTouchData(
                   enabled: true,
                   touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => AppTheme.cardLight,
+                    tooltipBorder: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                    tooltipPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     tooltipRoundedRadius: 10,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(

@@ -7,6 +7,7 @@ import 'providers/sync_provider.dart';
 import 'providers/inventory_provider.dart';
 import 'screens/dashboard_screen.dart';
 // import 'services/mock_data_generator.dart';
+// import 'services/database_helper.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -16,8 +17,12 @@ void main() async {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
+  // TODO: Delete this after testing
+  // Clear the database
+  // await DatabaseHelper.instance.clearAllData();
+
   // Seed mock data (only runs if DB is empty)
-  // await MockDataGenerator.seedDatabase();
+  // await MockDataGenerator.seedDatabase(count: 100, visitationsPerPatient: 20);
 
   // Initialize CRDT node identity
   final patientProvider = PatientProvider();

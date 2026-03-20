@@ -17,7 +17,11 @@ class PatientFormScreen extends StatefulWidget {
 
 class _PatientFormScreenState extends State<PatientFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameCtrl;
+  late TextEditingController _firstNameCtrl;
+  late TextEditingController _lastNameCtrl;
+  late TextEditingController _middleNameCtrl;
+  late TextEditingController _customExtensionCtrl;
+  String _selectedExtension = 'None';
   late TextEditingController _numberCtrl;
   late TextEditingController _addressCtrl;
   late TextEditingController _guardianNameCtrl;
@@ -28,7 +32,25 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController(text: widget.patient?.patientName ?? '');
+    _firstNameCtrl = TextEditingController(
+      text: widget.patient?.firstName ?? '',
+    );
+    _lastNameCtrl = TextEditingController(text: widget.patient?.lastName ?? '');
+    _middleNameCtrl = TextEditingController(
+      text: widget.patient?.middleName ?? '',
+    );
+
+    final ext = widget.patient?.extension ?? '';
+    if (ext.isEmpty || ext == 'None') {
+      _selectedExtension = 'None';
+      _customExtensionCtrl = TextEditingController();
+    } else if (['Jr.', 'Sr.', 'I', 'II', 'III'].contains(ext)) {
+      _selectedExtension = ext;
+      _customExtensionCtrl = TextEditingController();
+    } else {
+      _selectedExtension = 'Others';
+      _customExtensionCtrl = TextEditingController(text: ext);
+    }
     _numberCtrl = TextEditingController(text: widget.patient?.idNumber ?? '');
     _addressCtrl = TextEditingController(text: widget.patient?.address ?? '');
     _guardianNameCtrl = TextEditingController(
@@ -41,7 +63,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _middleNameCtrl.dispose();
+    _customExtensionCtrl.dispose();
     _numberCtrl.dispose();
     _addressCtrl.dispose();
     _guardianNameCtrl.dispose();
@@ -54,9 +79,28 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
 
     final provider = context.read<PatientProvider>();
 
+    final firstName = _firstNameCtrl.text.trim();
+    final lastName = _lastNameCtrl.text.trim();
+    final middleName = _middleNameCtrl.text.trim();
+
+    String ext = '';
+    if (_selectedExtension == 'Others') {
+      ext = _customExtensionCtrl.text.trim();
+    } else if (_selectedExtension != 'None') {
+      ext = _selectedExtension;
+    }
+
+    final patientName = '$lastName, $firstName $middleName $ext'
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+
     if (isEditing) {
       final updated = widget.patient!.copyWith(
-        patientName: _nameCtrl.text.trim(),
+        firstName: firstName,
+        lastName: lastName,
+        middleName: middleName,
+        extension: ext,
+        patientName: patientName,
         idNumber: _numberCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         guardianName: _guardianNameCtrl.text.trim(),
@@ -66,7 +110,11 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     } else {
       final patient = Patient(
         id: const Uuid().v4(),
-        patientName: _nameCtrl.text.trim(),
+        firstName: firstName,
+        lastName: lastName,
+        middleName: middleName,
+        extension: ext,
+        patientName: patientName,
         idNumber: _numberCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         guardianName: _guardianNameCtrl.text.trim(),
@@ -82,7 +130,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   Widget build(BuildContext context) {
     return Dialog(
       child: Container(
-        width: 500,
+        width: 700,
         padding: const EdgeInsets.all(32),
         child: Form(
           key: _formKey,
@@ -119,16 +167,89 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Patient Name
-              TextFormField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Name *',
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-                inputFormatters: [UpperCaseTextFormatter()],
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Name is required' : null,
+              // Name Row 1: First Name & Last Name
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _firstNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'First Name *',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      inputFormatters: [UpperCaseTextFormatter()],
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _lastNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Last Name *',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      inputFormatters: [UpperCaseTextFormatter()],
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Name Row 2: Middle Name & Extension
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _middleNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Middle Name',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      inputFormatters: [UpperCaseTextFormatter()],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: _selectedExtension == 'Others' ? 1 : 2,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedExtension,
+                      decoration: const InputDecoration(
+                        labelText: 'Extension',
+                        prefixIcon: Icon(Icons.badge_outlined),
+                      ),
+                      items: ['None', 'JR.', 'SR.', 'I', 'II', 'III', 'Others']
+                          .map((e) {
+                            return DropdownMenuItem(value: e, child: Text(e));
+                          })
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedExtension = val);
+                        }
+                      },
+                    ),
+                  ),
+                  if (_selectedExtension == 'Others') ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 1,
+                      child: TextFormField(
+                        controller: _customExtensionCtrl,
+                        decoration: const InputDecoration(labelText: 'Specify'),
+                        inputFormatters: [UpperCaseTextFormatter()],
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(height: 16),
 

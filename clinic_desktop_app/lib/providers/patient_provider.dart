@@ -37,6 +37,15 @@ class PatientProvider extends ChangeNotifier {
   // Selected patient & visitations
   List<Visitation> _visitations = [];
   Patient? _selectedPatient;
+  int _currentVisitPage = 0;
+  int _totalVisitations = 0;
+  final int _visitPageSize = 10;
+  int _todayVisits = 0;
+
+  // Dashboard Visitations list state
+  int _dashboardVisitPage = 0;
+  final int _dashboardVisitPageSize = 3;
+  List<Map<String, dynamic>> _dashboardVisits = [];
 
   // IDs of records changed by the last sync (for granular rebuild)
   Set<String> _lastSyncChangedIds = {};
@@ -48,6 +57,18 @@ class PatientProvider extends ChangeNotifier {
   int get totalPages => (_totalPatients / _pageSize).ceil();
   Patient? get selectedPatient => _selectedPatient;
   List<Visitation> get visitations => _visitations;
+  int get currentVisitPage => _currentVisitPage;
+  int get totalVisitPages => (_totalVisitations / _visitPageSize).ceil();
+  int get totalVisitations => _totalVisitations;
+  int get visitPageSize => _visitPageSize;
+  int get todayVisits => _todayVisits;
+
+  List<Map<String, dynamic>> get dashboardVisits => _dashboardVisits;
+  int get dashboardVisitPage => _dashboardVisitPage;
+  int get dashboardVisitPageSize => _dashboardVisitPageSize;
+  int get totalDashboardVisitPages =>
+      (_todayVisits / _dashboardVisitPageSize).ceil();
+
   bool get loading => _loading;
   String get searchQuery => _searchQuery;
   Set<String> get lastSyncChangedIds => _lastSyncChangedIds;
@@ -126,6 +147,10 @@ class PatientProvider extends ChangeNotifier {
     final hlc = _tick();
     final withCrdt = Patient(
       id: patient.id,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      middleName: patient.middleName,
+      extension: patient.extension,
       patientName: patient.patientName,
       idNumber: patient.idNumber,
       address: patient.address,
@@ -173,9 +198,36 @@ class PatientProvider extends ChangeNotifier {
 
   Future<void> selectPatient(Patient patient) async {
     _selectedPatient = patient;
-    _visitations = await _db.getVisitationsForPatient(patient.id);
+    _currentVisitPage = 0;
+    await loadVisitations();
     notifyListeners();
   }
+
+  Future<void> loadVisitations() async {
+    if (_selectedPatient == null) return;
+    final offset = _currentVisitPage * _visitPageSize;
+    _totalVisitations = await _db.getVisitationCountForPatient(
+      _selectedPatient!.id,
+    );
+    _visitations = await _db.getVisitationsPaginated(
+      _selectedPatient!.id,
+      _visitPageSize,
+      offset,
+    );
+    notifyListeners();
+  }
+
+  void goToVisitPage(int page) {
+    if (page < 0 || (totalVisitPages > 0 && page >= totalVisitPages)) return;
+    _currentVisitPage = page;
+    loadVisitations();
+  }
+
+  void nextVisitPage() => goToVisitPage(_currentVisitPage + 1);
+  void prevVisitPage() => goToVisitPage(_currentVisitPage - 1);
+  void firstVisitPage() => goToVisitPage(0);
+  void lastVisitPage() =>
+      goToVisitPage((totalVisitPages > 0 ? totalVisitPages : 1) - 1);
 
   Future<void> addVisitation({
     required String patientId,
@@ -202,16 +254,47 @@ class PatientProvider extends ChangeNotifier {
       await _inventoryProvider?.deductStock(supply, 1);
     }
 
+    await loadTodayVisits();
+
     if (_selectedPatient?.id == patientId) {
-      _visitations = await _db.getVisitationsForPatient(patientId);
+      _currentVisitPage = 0;
+      await loadVisitations();
+    } else {
+      notifyListeners();
     }
-    notifyListeners();
     _autoPush();
   }
 
-  Future<int> getTodayVisitCount() async {
-    return await _db.getTodayVisitCount();
+  Future<void> loadTodayVisits() async {
+    _todayVisits = await _db.getTodayVisitCount();
+    await loadDashboardVisits();
   }
+
+  Future<void> loadDashboardVisits() async {
+    final offset = _dashboardVisitPage * _dashboardVisitPageSize;
+    _dashboardVisits = await _db.getTodayVisitationsPaginated(
+      _dashboardVisitPageSize,
+      offset,
+    );
+    notifyListeners();
+  }
+
+  void goToDashboardVisitPage(int page) {
+    if (page < 0 ||
+        (totalDashboardVisitPages > 0 && page >= totalDashboardVisitPages))
+      return;
+    _dashboardVisitPage = page;
+    loadDashboardVisits();
+  }
+
+  void nextDashboardVisitPage() =>
+      goToDashboardVisitPage(_dashboardVisitPage + 1);
+  void prevDashboardVisitPage() =>
+      goToDashboardVisitPage(_dashboardVisitPage - 1);
+  void firstDashboardVisitPage() => goToDashboardVisitPage(0);
+  void lastDashboardVisitPage() => goToDashboardVisitPage(
+    (totalDashboardVisitPages > 0 ? totalDashboardVisitPages : 1) - 1,
+  );
 
   // ── Granular sync refresh ────────────────────────────────────────
 
