@@ -7,6 +7,7 @@ import '../providers/analytics_provider.dart';
 import '../providers/sync_provider.dart';
 import '../theme/app_theme.dart';
 import 'patient_list_screen.dart';
+import 'visitation_form_screen.dart';
 import 'analytics_screen.dart';
 import 'inventory_screen.dart';
 
@@ -67,14 +68,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Dashboard',
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Welcome back!',
-                style: Theme.of(context).textTheme.bodyMedium,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dashboard',
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Welcome back!',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 32),
 
@@ -111,7 +122,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 32),
-
+              Text(
+                "Quick Actions",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => const VisitationFormScreen(),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                ),
+                icon: const Icon(Icons.medical_services_rounded, size: 18),
+                label: const Text('Add Visitation'),
+              ),
+              const SizedBox(height: 32),
               Text(
                 "Today's Visitations",
                 style: Theme.of(context).textTheme.titleLarge,
