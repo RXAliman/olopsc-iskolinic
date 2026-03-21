@@ -335,6 +335,95 @@ class PatientDetailScreen extends StatelessWidget {
                                                       fontSize: 13,
                                                     ),
                                                   ),
+                                                  const Spacer(),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.edit_rounded,
+                                                      size: 16,
+                                                    ),
+                                                    color: AppTheme.textMuted,
+                                                    padding: EdgeInsets.all(8),
+                                                    constraints:
+                                                        const BoxConstraints(),
+                                                    onPressed: () {
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (_) =>
+                                                            VisitationFormScreen(
+                                                              patientId:
+                                                                  patient.id,
+                                                              visitation: visit,
+                                                            ),
+                                                      );
+                                                    },
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons
+                                                          .delete_outline_rounded,
+                                                      size: 16,
+                                                    ),
+                                                    color: AppTheme.danger,
+                                                    padding: EdgeInsets.all(8),
+                                                    constraints:
+                                                        const BoxConstraints(),
+                                                    onPressed: () async {
+                                                      final confirm = await showDialog<bool>(
+                                                        context: context,
+                                                        builder: (ctx) => AlertDialog(
+                                                          title: const Text(
+                                                            'Delete Visitation',
+                                                          ),
+                                                          content: const Text(
+                                                            'Are you sure you want to delete this visitation record?',
+                                                          ),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                    ctx,
+                                                                    false,
+                                                                  ),
+                                                              child: const Text(
+                                                                'Cancel',
+                                                              ),
+                                                            ),
+                                                            ElevatedButton(
+                                                              style: ElevatedButton.styleFrom(
+                                                                backgroundColor:
+                                                                    AppTheme
+                                                                        .danger,
+                                                              ),
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                    ctx,
+                                                                    true,
+                                                                  ),
+                                                              child: const Text(
+                                                                'Delete',
+                                                                style: TextStyle(
+                                                                  color: Colors
+                                                                      .white,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+
+                                                      if (confirm == true &&
+                                                          context.mounted) {
+                                                        context
+                                                            .read<
+                                                              PatientProvider
+                                                            >()
+                                                            .deleteVisitation(
+                                                              visit,
+                                                            );
+                                                      }
+                                                    },
+                                                  ),
                                                 ],
                                               ),
                                               const SizedBox(height: 12),
@@ -378,9 +467,7 @@ class PatientDetailScreen extends StatelessWidget {
                                                       )
                                                       .toList(),
                                                 ),
-                                              if (visit
-                                                  .treatment
-                                                  .isNotEmpty) ...[
+                                              if (visit.treatment.isNotEmpty || visit.suppliesUsed.isNotEmpty) ...[
                                                 const SizedBox(height: 10),
                                                 Row(
                                                   crossAxisAlignment:
@@ -396,7 +483,7 @@ class PatientDetailScreen extends StatelessWidget {
                                                     ),
                                                     Expanded(
                                                       child: Text(
-                                                        visit.treatment,
+                                                        [...visit.suppliesUsed, if (visit.treatment.isNotEmpty) visit.treatment].join(', '),
                                                         style: const TextStyle(
                                                           color: AppTheme
                                                               .textPrimary,

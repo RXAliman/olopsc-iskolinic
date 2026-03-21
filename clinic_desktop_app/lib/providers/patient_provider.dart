@@ -229,6 +229,37 @@ class PatientProvider extends ChangeNotifier {
   void lastVisitPage() =>
       goToVisitPage((totalVisitPages > 0 ? totalVisitPages : 1) - 1);
 
+  Future<void> updateVisitation(Visitation visit) async {
+    final updatedVisit = visit.copyWith(hlc: _tick());
+    await _db.updateVisitation(updatedVisit);
+    
+    await loadTodayVisits();
+    if (_selectedPatient?.id == visit.patientId) {
+      await loadVisitations();
+    } else {
+      notifyListeners();
+    }
+    _autoPush();
+  }
+
+  Future<void> deleteVisitation(Visitation visit) async {
+    final deletedVisit = visit.copyWith(isDeleted: true, hlc: _tick());
+    await _db.updateVisitation(deletedVisit);
+    
+    // Inventory restocking is complex due to FEFO, omitted for now.
+    
+    await loadTodayVisits();
+    if (_selectedPatient?.id == visit.patientId) {
+      if (_visitations.length == 1 && _currentVisitPage > 0) {
+        _currentVisitPage--;
+      }
+      await loadVisitations();
+    } else {
+      notifyListeners();
+    }
+    _autoPush();
+  }
+
   Future<void> addVisitation({
     required String patientId,
     required List<String> symptoms,

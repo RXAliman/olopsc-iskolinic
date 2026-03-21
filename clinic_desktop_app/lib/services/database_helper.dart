@@ -317,6 +317,16 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> updateVisitation(Visitation visit) async {
+    final db = await database;
+    await db.update(
+      'visitations',
+      visit.toMap(),
+      where: 'id = ?',
+      whereArgs: [visit.id],
+    );
+  }
+
   Future<List<Visitation>> getVisitationsForPatient(String patientId) async {
     final db = await database;
     final maps = await db.query(

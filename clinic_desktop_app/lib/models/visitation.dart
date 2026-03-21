@@ -25,6 +25,32 @@ class Visitation {
     this.isDeleted = false,
   }) : dateTime = dateTime ?? DateTime.now();
 
+  Visitation copyWith({
+    String? id,
+    String? patientId,
+    DateTime? dateTime,
+    List<String>? symptoms,
+    List<String>? suppliesUsed,
+    String? treatment,
+    String? remarks,
+    String? hlc,
+    String? nodeId,
+    bool? isDeleted,
+  }) {
+    return Visitation(
+      id: id ?? this.id,
+      patientId: patientId ?? this.patientId,
+      dateTime: dateTime ?? this.dateTime,
+      symptoms: symptoms ?? this.symptoms,
+      suppliesUsed: suppliesUsed ?? this.suppliesUsed,
+      treatment: treatment ?? this.treatment,
+      remarks: remarks ?? this.remarks,
+      hlc: hlc ?? this.hlc,
+      nodeId: nodeId ?? this.nodeId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

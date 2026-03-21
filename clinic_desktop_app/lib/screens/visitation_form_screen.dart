@@ -6,13 +6,15 @@ import '../providers/patient_provider.dart';
 import '../theme/app_theme.dart';
 
 import '../models/patient.dart';
+import '../models/visitation.dart';
 import 'patient_form_screen.dart';
 import '../services/database_helper.dart';
 
 class VisitationFormScreen extends StatefulWidget {
   final String? patientId;
+  final Visitation? visitation;
 
-  const VisitationFormScreen({super.key, this.patientId});
+  const VisitationFormScreen({super.key, this.patientId, this.visitation});
 
   @override
   State<VisitationFormScreen> createState() => _VisitationFormScreenState();
@@ -35,13 +37,25 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.patientId != null) {
+    if (widget.visitation != null) {
+      _treatmentCtrl.text = widget.visitation!.treatment;
+      _remarksCtrl.text = widget.visitation!.remarks;
+      _selectedSymptoms.addAll(widget.visitation!.symptoms);
+      _selectedSupplies.addAll(widget.visitation!.suppliesUsed);
+    }
+    
+    final pId = widget.visitation?.patientId ?? widget.patientId;
+    if (pId != null) {
       final provider = context.read<PatientProvider>();
-      try {
-        _selectedPatient = provider.patients.firstWhere(
-          (p) => p.id == widget.patientId,
-        );
-      } catch (_) {}
+      if (provider.selectedPatient?.id == pId) {
+        _selectedPatient = provider.selectedPatient;
+      } else {
+        try {
+          _selectedPatient = provider.patients.firstWhere(
+            (p) => p.id == pId,
+          );
+        } catch (_) {}
+      }
     }
   }
 
@@ -73,13 +87,23 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       return;
     }
 
-    await context.read<PatientProvider>().addVisitation(
-      patientId: _selectedPatient!.id,
-      symptoms: _selectedSymptoms.toList(),
-      suppliesUsed: _selectedSupplies.toList(),
-      treatment: _treatmentCtrl.text.trim(),
-      remarks: _remarksCtrl.text.trim(),
-    );
+    if (widget.visitation != null) {
+      final updated = widget.visitation!.copyWith(
+        symptoms: _selectedSymptoms.toList(),
+        suppliesUsed: _selectedSupplies.toList(),
+        treatment: _treatmentCtrl.text.trim(),
+        remarks: _remarksCtrl.text.trim(),
+      );
+      await context.read<PatientProvider>().updateVisitation(updated);
+    } else {
+      await context.read<PatientProvider>().addVisitation(
+        patientId: _selectedPatient!.id,
+        symptoms: _selectedSymptoms.toList(),
+        suppliesUsed: _selectedSupplies.toList(),
+        treatment: _treatmentCtrl.text.trim(),
+        remarks: _remarksCtrl.text.trim(),
+      );
+    }
 
     if (mounted) Navigator.pop(context);
   }
@@ -114,7 +138,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  'Record Visitation',
+                  widget.visitation != null ? 'Edit Visitation' : 'Record Visitation',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const Spacer(),
@@ -219,13 +243,10 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                             alignment: Alignment.topLeft,
                             child: Material(
                               elevation: 4,
+                              color: Theme.of(context).cardColor,
                               borderRadius: BorderRadius.circular(12),
-                              child: Container(
+                              child: SizedBox(
                                 width: 400,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).cardColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
                                 child: ListView.builder(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 8,
@@ -234,10 +255,37 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                                   itemCount: options.length,
                                   itemBuilder: (context, index) {
                                     final option = options.elementAt(index);
-                                    return ListTile(
-                                      title: Text(option.patientName),
-                                      subtitle: Text(option.idNumber),
-                                      onTap: () => onSelected(option),
+                                    return Builder(
+                                      builder: (context) {
+                                        final bool highlight =
+                                            AutocompleteHighlightedOption.of(
+                                              context,
+                                            ) ==
+                                            index;
+                                        if (highlight) {
+                                          WidgetsBinding.instance
+                                              .addPostFrameCallback((_) {
+                                                if (context.mounted) {
+                                                  Scrollable.ensureVisible(
+                                                    context,
+                                                    alignment: 0.5,
+                                                  );
+                                                }
+                                              });
+                                        }
+                                        return Container(
+                                          color: highlight
+                                              ? AppTheme.accent.withValues(
+                                                  alpha: 0.1,
+                                                )
+                                              : Colors.transparent,
+                                          child: ListTile(
+                                            title: Text(option.patientName),
+                                            subtitle: Text(option.idNumber),
+                                            onTap: () => onSelected(option),
+                                          ),
+                                        );
+                                      },
                                     );
                                   },
                                 ),

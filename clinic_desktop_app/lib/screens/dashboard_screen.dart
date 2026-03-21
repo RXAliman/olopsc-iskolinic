@@ -6,7 +6,9 @@ import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/sync_provider.dart';
 import '../theme/app_theme.dart';
+import '../services/database_helper.dart';
 import 'patient_list_screen.dart';
+import 'patient_detail_screen.dart';
 import 'visitation_form_screen.dart';
 import 'analytics_screen.dart';
 import 'inventory_screen.dart';
@@ -188,6 +190,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final visit = Visitation.fromMap(data);
 
                           return ListTile(
+                            onTap: () async {
+                              final provider = context.read<PatientProvider>();
+                              final patient = await DatabaseHelper.instance
+                                  .getPatient(visit.patientId);
+                              if (patient != null) {
+                                await provider.selectPatient(patient);
+                                if (context.mounted) {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => const PatientDetailScreen(),
+                                  );
+                                }
+                              }
+                            },
+                            shape: RoundedRectangleBorder(
+                              borderRadius: index == 0
+                                  ? BorderRadius.only(
+                                      topLeft: Radius.circular(16),
+                                      topRight: Radius.circular(16),
+                                    )
+                                  : index ==
+                                            patients.dashboardVisitPageSize -
+                                                1 &&
+                                        patients.todayVisits ==
+                                            patients.dashboardVisitPageSize
+                                  ? BorderRadius.only(
+                                      bottomLeft: Radius.circular(16),
+                                      bottomRight: Radius.circular(16),
+                                    )
+                                  : BorderRadius.zero,
+                            ),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 24,
                               vertical: 12,
@@ -245,10 +278,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                  if (visit.treatment.isNotEmpty) ...[
+                                  if (visit.treatment.isNotEmpty || visit.suppliesUsed.isNotEmpty) ...[
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Treatment: ${visit.treatment}',
+                                      'Treatment: ${[...visit.suppliesUsed, if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',
                                       style: const TextStyle(
                                         fontSize: 13,
                                         color: AppTheme.textSecondary,
