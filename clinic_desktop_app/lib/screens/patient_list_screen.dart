@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/patient.dart';
 import '../providers/patient_provider.dart';
+import '../providers/sync_provider.dart';
 import '../theme/app_theme.dart';
 import 'patient_detail_screen.dart';
 import 'patient_form_screen.dart';
@@ -58,10 +59,35 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       ],
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _showPatientForm(context),
-                    icon: const Icon(Icons.person_add_rounded, size: 18),
-                    label: const Text('Add Patient'),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () async {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Refreshing...'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                          await context.read<PatientProvider>().refreshAll();
+                          if (context.mounted) {
+                            context.read<SyncProvider>().forceSync();
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.sync_rounded,
+                          color: AppTheme.accent,
+                        ),
+                        tooltip: 'Refresh',
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _showPatientForm(context),
+                        icon: const Icon(Icons.person_add_rounded, size: 18),
+                        label: const Text('Add Patient'),
+                      ),
+                    ],
                   ),
                 ],
               ),

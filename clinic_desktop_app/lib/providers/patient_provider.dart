@@ -132,6 +132,15 @@ class PatientProvider extends ChangeNotifier {
     loadPatients();
   }
 
+  /// Reloads patients, today's visits, and patient-specific visits if any.
+  Future<void> refreshAll() async {
+    await loadPatients();
+    await loadTodayVisits();
+    if (_selectedPatient != null) {
+      await loadVisitations();
+    }
+  }
+
   void goToPage(int page) {
     if (page < 0 || page >= totalPages) return;
     _currentPage = page;

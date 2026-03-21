@@ -336,15 +336,28 @@ class PatientDetailScreen extends StatelessWidget {
                                                     ),
                                                   ),
                                                   const Spacer(),
-                                                  IconButton(
-                                                    icon: const Icon(
-                                                      Icons.edit_rounded,
-                                                      size: 16,
+                                                  ElevatedButton(
+                                                    style: ElevatedButton.styleFrom(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
+                                                      backgroundColor:
+                                                          Colors.white,
+                                                      foregroundColor:
+                                                          AppTheme.accent,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                        side: BorderSide(
+                                                          color:
+                                                              AppTheme.accent,
+                                                        ),
+                                                      ),
                                                     ),
-                                                    color: AppTheme.textMuted,
-                                                    padding: EdgeInsets.all(8),
-                                                    constraints:
-                                                        const BoxConstraints(),
                                                     onPressed: () {
                                                       showDialog(
                                                         context: context,
@@ -356,6 +369,12 @@ class PatientDetailScreen extends StatelessWidget {
                                                             ),
                                                       );
                                                     },
+                                                    child: const Text(
+                                                      'Edit/View',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
                                                   ),
                                                   const SizedBox(width: 4),
                                                   IconButton(
@@ -467,7 +486,10 @@ class PatientDetailScreen extends StatelessWidget {
                                                       )
                                                       .toList(),
                                                 ),
-                                              if (visit.treatment.isNotEmpty || visit.suppliesUsed.isNotEmpty) ...[
+                                              if (visit.treatment.isNotEmpty ||
+                                                  visit
+                                                      .suppliesUsed
+                                                      .isNotEmpty) ...[
                                                 const SizedBox(height: 10),
                                                 Row(
                                                   crossAxisAlignment:
@@ -483,7 +505,13 @@ class PatientDetailScreen extends StatelessWidget {
                                                     ),
                                                     Expanded(
                                                       child: Text(
-                                                        [...visit.suppliesUsed, if (visit.treatment.isNotEmpty) visit.treatment].join(', '),
+                                                        [
+                                                          ...visit.suppliesUsed,
+                                                          if (visit
+                                                              .treatment
+                                                              .isNotEmpty)
+                                                            visit.treatment,
+                                                        ].join(', '),
                                                         style: const TextStyle(
                                                           color: AppTheme
                                                               .textPrimary,

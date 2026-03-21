@@ -260,7 +260,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         }).toList();
 
         return Padding(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -279,7 +279,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 'Track and manage clinic supplies',
                 style: Theme.of(context).textTheme.bodyMedium,

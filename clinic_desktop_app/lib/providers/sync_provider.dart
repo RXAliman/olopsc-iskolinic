@@ -56,6 +56,13 @@ class SyncProvider extends ChangeNotifier {
   void disconnect() {
     _client?.disconnect();
   }
+  
+  /// Force a manual sync by reconnecting
+  Future<void> forceSync() async {
+    disconnect();
+    await Future.delayed(const Duration(milliseconds: 50));
+    await connect();
+  }
 
   /// Push local changes after a write.
   Future<void> pushChanges() async {

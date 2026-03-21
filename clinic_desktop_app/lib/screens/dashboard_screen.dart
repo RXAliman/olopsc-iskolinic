@@ -80,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Dashboard',
                         style: Theme.of(context).textTheme.headlineLarge,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       Text(
                         'Welcome back!',
                         style: Theme.of(context).textTheme.bodyMedium,
@@ -129,18 +129,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => const VisitationFormScreen(),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                ),
-                icon: const Icon(Icons.medical_services_rounded, size: 18),
-                label: const Text('Add Visitation'),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const VisitationFormScreen(),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                    ),
+                    icon: const Icon(Icons.medical_services_rounded, size: 18),
+                    label: const Text('Add Visitation'),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Refreshing...'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                      await context.read<PatientProvider>().refreshAll();
+                      if (context.mounted) {
+                        context.read<SyncProvider>().forceSync();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppTheme.accent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: AppTheme.accent),
+                      ),
+                    ),
+                    icon: const Icon(Icons.sync_rounded, size: 18),
+                    label: const Text('Refresh'),
+                  ),
+                ],
               ),
               const SizedBox(height: 32),
               Text(
@@ -278,7 +308,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                  if (visit.treatment.isNotEmpty || visit.suppliesUsed.isNotEmpty) ...[
+                                  if (visit.treatment.isNotEmpty ||
+                                      visit.suppliesUsed.isNotEmpty) ...[
                                     const SizedBox(height: 2),
                                     Text(
                                       'Treatment: ${[...visit.suppliesUsed, if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',

@@ -153,22 +153,17 @@ class DatabaseHelper {
       );
     }
     if (oldVersion < 5) {
-      // Add the 4 new name fields to patients
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN firstName TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN lastName TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN middleName TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN extension TEXT NOT NULL DEFAULT ''",
-      );
+      // Add the 4 new name fields to patients (safely wrap in try-catch in case they already exist)
+      for (final col in ['firstName', 'lastName', 'middleName', 'extension']) {
+        try {
+          await db.execute("ALTER TABLE patients ADD COLUMN $col TEXT NOT NULL DEFAULT ''");
+        } catch (_) {}
+      }
 
       // Basic migration: move existing patientName to firstName to avoid empty required fields
-      await db.execute("UPDATE patients SET firstName = patientName");
+      try {
+        await db.execute("UPDATE patients SET firstName = patientName WHERE firstName = ''");
+      } catch (_) {}
     }
   }
 
