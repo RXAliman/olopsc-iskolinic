@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants/symptoms.dart';
 import '../constants/supplies.dart';
@@ -382,11 +383,14 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                         // Treatment
                         TextFormField(
                           controller: _treatmentCtrl,
+                          maxLength: 150,
                           decoration: const InputDecoration(
                             labelText: 'Other Intervention Details',
                             prefixIcon: Icon(Icons.healing_outlined),
                             alignLabelWithHint: true,
+                            counterText: '',
                           ),
+                          inputFormatters: [LengthLimitingTextInputFormatter(150)],
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                         ),
@@ -395,11 +399,14 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                         // Remarks
                         TextFormField(
                           controller: _remarksCtrl,
+                          maxLength: 150,
                           decoration: const InputDecoration(
                             labelText: 'Remarks',
                             prefixIcon: Icon(Icons.notes_outlined),
                             alignLabelWithHint: true,
+                            counterText: '',
                           ),
+                          inputFormatters: [LengthLimitingTextInputFormatter(150)],
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../formatters/uppercase_text.dart';
@@ -174,11 +175,13 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _firstNameCtrl,
+                      maxLength: 30,
                       decoration: const InputDecoration(
                         labelText: 'First Name *',
                         prefixIcon: Icon(Icons.person_outline),
+                        counterText: '',
                       ),
-                      inputFormatters: [UpperCaseTextFormatter()],
+                      inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(30)],
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
@@ -187,11 +190,13 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _lastNameCtrl,
+                      maxLength: 30,
                       decoration: const InputDecoration(
                         labelText: 'Last Name *',
                         prefixIcon: Icon(Icons.person_outline),
+                        counterText: '',
                       ),
-                      inputFormatters: [UpperCaseTextFormatter()],
+                      inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(30)],
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
@@ -208,11 +213,13 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                     flex: 2,
                     child: TextFormField(
                       controller: _middleNameCtrl,
+                      maxLength: 30,
                       decoration: const InputDecoration(
                         labelText: 'Middle Name',
                         prefixIcon: Icon(Icons.person_outline),
+                        counterText: '',
                       ),
-                      inputFormatters: [UpperCaseTextFormatter()],
+                      inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(30)],
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -242,8 +249,12 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                       flex: 1,
                       child: TextFormField(
                         controller: _customExtensionCtrl,
-                        decoration: const InputDecoration(labelText: 'Specify'),
-                        inputFormatters: [UpperCaseTextFormatter()],
+                        maxLength: 5,
+                        decoration: const InputDecoration(
+                          labelText: 'Specify',
+                          counterText: '',
+                        ),
+                        inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(5)],
                         validator: (v) =>
                             v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
@@ -256,11 +267,13 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               // ID Number
               TextFormField(
                 controller: _numberCtrl,
+                maxLength: 16,
                 decoration: const InputDecoration(
                   labelText: 'ID Number *',
                   prefixIcon: Icon(Icons.badge_outlined),
+                  counterText: '',
                 ),
-                inputFormatters: [UpperCaseTextFormatter()],
+                inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(16)],
                 validator: (v) => v == null || v.trim().isEmpty
                     ? 'ID number is required'
                     : null,
@@ -270,12 +283,14 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               // Address
               TextFormField(
                 controller: _addressCtrl,
+                maxLength: 150,
                 decoration: const InputDecoration(
                   labelText: 'Address',
                   prefixIcon: Icon(Icons.home_outlined),
                   alignLabelWithHint: true,
+                  counterText: '',
                 ),
-                inputFormatters: [UpperCaseTextFormatter()],
+                inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(150)],
                 minLines: 1,
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
@@ -285,21 +300,26 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               // Guardian Name
               TextFormField(
                 controller: _guardianNameCtrl,
+                maxLength: 65,
                 decoration: const InputDecoration(
                   labelText: 'Guardian / Parent Name',
                   prefixIcon: Icon(Icons.family_restroom_outlined),
+                  counterText: '',
                 ),
-                inputFormatters: [UpperCaseTextFormatter()],
+                inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(65)],
               ),
               const SizedBox(height: 16),
 
               // Guardian Contact
               TextFormField(
                 controller: _guardianContactCtrl,
+                maxLength: 20,
                 decoration: const InputDecoration(
                   labelText: 'Guardian / Parent Contact',
                   prefixIcon: Icon(Icons.phone_outlined),
+                  counterText: '',
                 ),
+                inputFormatters: [LengthLimitingTextInputFormatter(20)],
               ),
               const SizedBox(height: 28),
 
