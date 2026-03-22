@@ -243,11 +243,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       topLeft: Radius.circular(16),
                                       topRight: Radius.circular(16),
                                     )
-                                  : index ==
-                                            patients.dashboardVisitPageSize -
-                                                1 &&
-                                        patients.todayVisits ==
-                                            patients.dashboardVisitPageSize
+                                  : (index ==
+                                                patients.dashboardVisitPageSize -
+                                                    1 &&
+                                            patients.todayVisits ==
+                                                patients
+                                                    .dashboardVisitPageSize) ||
+                                        (index == 1 &&
+                                            patients.todayVisits == 2)
                                   ? BorderRadius.only(
                                       bottomLeft: Radius.circular(16),
                                       bottomRight: Radius.circular(16),
@@ -255,8 +258,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   : BorderRadius.zero,
                             ),
                             contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
+                              horizontal: 18,
+                              vertical: 10,
                             ),
                             leading: Container(
                               width: 42,
@@ -340,14 +343,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         size: 14,
                                       ),
                                       label: const Text(
-                                        'Add Missing Treatment Details',
+                                        'Add Missing Intervention Details',
                                       ),
                                       style: TextButton.styleFrom(
-                                        padding: EdgeInsets.zero,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 0,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
                                         alignment: Alignment.centerLeft,
-                                        minimumSize: const Size(0, 24),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
                                         textStyle: const TextStyle(
                                           fontSize: 12,
                                         ),

@@ -44,7 +44,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       _selectedSymptoms.addAll(widget.visitation!.symptoms);
       _selectedSupplies.addAll(widget.visitation!.suppliesUsed);
     }
-    
+
     final pId = widget.visitation?.patientId ?? widget.patientId;
     if (pId != null) {
       final provider = context.read<PatientProvider>();
@@ -52,9 +52,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         _selectedPatient = provider.selectedPatient;
       } else {
         try {
-          _selectedPatient = provider.patients.firstWhere(
-            (p) => p.id == pId,
-          );
+          _selectedPatient = provider.patients.firstWhere((p) => p.id == pId);
         } catch (_) {
           _isLoadingPatient = true;
           DatabaseHelper.instance.getPatient(pId).then((p) {
@@ -126,9 +124,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         child: SizedBox(
           width: 600,
           height: 200,
-          child: Center(
-            child: CircularProgressIndicator(),
-          ),
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
@@ -161,7 +157,9 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  widget.visitation != null ? 'Edit Visitation' : 'Record Visitation',
+                  widget.visitation != null
+                      ? 'Edit Visitation'
+                      : 'Record Visitation',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const Spacer(),
@@ -360,17 +358,18 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                             () => _showAllBehavioral = !_showAllBehavioral,
                           ),
                         ),
-                        const SizedBox(height: 20),
-
-                        // Supplies Used
+                        const SizedBox(height: 10),
+                        const Divider(),
+                        const SizedBox(height: 10),
+                        // Interventions
                         Text(
-                          'Supplies Used',
+                          'Interventions',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 12),
 
                         _buildSection(
-                          title: 'Clinic Supplies',
+                          title: 'Clinic Supplies Used',
                           allItems: kSuppliesList,
                           selectedItems: _selectedSupplies,
                           showAll: _showAllSupplies,
@@ -384,7 +383,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                         TextFormField(
                           controller: _treatmentCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'Treatment / Medication',
+                            labelText: 'Other Intervention Details',
                             prefixIcon: Icon(Icons.healing_outlined),
                             alignLabelWithHint: true,
                           ),

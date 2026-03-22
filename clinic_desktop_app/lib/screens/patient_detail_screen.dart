@@ -496,7 +496,7 @@ class PatientDetailScreen extends StatelessWidget {
                                                       CrossAxisAlignment.start,
                                                   children: [
                                                     const Text(
-                                                      'Treatment: ',
+                                                      'Intervention/s: ',
                                                       style: TextStyle(
                                                         color:
                                                             AppTheme.textMuted,
