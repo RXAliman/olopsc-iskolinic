@@ -235,7 +235,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               }
                             },
                             shape: RoundedRectangleBorder(
-                              borderRadius: index == 0
+                              borderRadius:
+                                  index == 0 && patients.todayVisits == 1
+                                  ? BorderRadius.circular(16)
+                                  : index == 0
                                   ? BorderRadius.only(
                                       topLeft: Radius.circular(16),
                                       topRight: Radius.circular(16),
@@ -319,6 +322,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ] else ...[
+                                    const SizedBox(height: 4),
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => VisitationFormScreen(
+                                            patientId: visit.patientId,
+                                            visitation: visit,
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(
+                                        Icons.add_circle_outline_rounded,
+                                        size: 14,
+                                      ),
+                                      label: const Text(
+                                        'Add Missing Treatment Details',
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        alignment: Alignment.centerLeft,
+                                        minimumSize: const Size(0, 24),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        textStyle: const TextStyle(
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ],

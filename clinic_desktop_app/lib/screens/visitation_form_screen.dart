@@ -28,6 +28,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   final Set<String> _selectedSupplies = {};
 
   Patient? _selectedPatient;
+  bool _isLoadingPatient = false;
 
   bool _showAllTraumatic = true;
   bool _showAllMedical = true;
@@ -54,7 +55,17 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
           _selectedPatient = provider.patients.firstWhere(
             (p) => p.id == pId,
           );
-        } catch (_) {}
+        } catch (_) {
+          _isLoadingPatient = true;
+          DatabaseHelper.instance.getPatient(pId).then((p) {
+            if (mounted) {
+              setState(() {
+                _selectedPatient = p;
+                _isLoadingPatient = false;
+              });
+            }
+          });
+        }
       }
     }
   }
@@ -110,6 +121,18 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingPatient) {
+      return const Dialog(
+        child: SizedBox(
+          width: 600,
+          height: 200,
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     return Dialog(
       child: Container(
         width: 600,
