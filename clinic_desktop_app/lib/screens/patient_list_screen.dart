@@ -59,60 +59,67 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       ],
                     ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        onPressed: () async {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Refreshing...'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                          await context.read<PatientProvider>().refreshAll();
-                          if (context.mounted) {
-                            context.read<SyncProvider>().forceSync();
-                          }
-                        },
-                        icon: const Icon(
-                          Icons.sync_rounded,
-                          color: AppTheme.accent,
-                        ),
-                        tooltip: 'Refresh',
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => _showPatientForm(context),
-                        icon: const Icon(Icons.person_add_rounded, size: 18),
-                        label: const Text('Add Patient'),
-                      ),
-                    ],
+                  ElevatedButton.icon(
+                    onPressed: () => _showPatientForm(context),
+                    icon: const Icon(Icons.person_add_rounded, size: 18),
+                    label: const Text('Add Patient'),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Search Bar
-              SizedBox(
-                width: 400,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (query) => provider.setSearchQuery(query),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or ID number...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                    suffixIcon: provider.searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              provider.setSearchQuery('');
-                            },
-                          )
-                        : null,
+              Row(
+                children: [
+                  // Search Bar
+                  SizedBox(
+                    width: 400,
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (query) => provider.setSearchQuery(query),
+                      decoration: InputDecoration(
+                        hintText: 'Search by name or ID number...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        suffixIcon: provider.searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  provider.setSearchQuery('');
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryLight,
+                      foregroundColor: AppTheme.accent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: AppTheme.accent),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                    onPressed: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Reloading...'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                      await context.read<PatientProvider>().refreshAll();
+                      if (context.mounted) {
+                        context.read<SyncProvider>().forceSync();
+                      }
+                    },
+                    icon: const Icon(Icons.sync_rounded),
+                    label: const Text('Reload'),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 

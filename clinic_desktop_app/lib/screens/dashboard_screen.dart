@@ -149,7 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onPressed: () async {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Refreshing...'),
+                          content: Text('Reloading...'),
                           duration: Duration(seconds: 1),
                         ),
                       );
@@ -168,7 +168,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     icon: const Icon(Icons.sync_rounded, size: 18),
-                    label: const Text('Refresh'),
+                    label: const Text('Reload'),
                   ),
                 ],
               ),
