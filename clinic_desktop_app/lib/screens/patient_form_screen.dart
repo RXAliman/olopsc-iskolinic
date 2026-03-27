@@ -108,6 +108,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         guardianContact: _guardianContactCtrl.text.trim(),
       );
       await provider.updatePatient(updated);
+      if (mounted) Navigator.pop(context);
     } else {
       final patient = Patient(
         id: const Uuid().v4(),
@@ -122,9 +123,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         guardianContact: _guardianContactCtrl.text.trim(),
       );
       await provider.addPatient(patient);
+      if (mounted) Navigator.pop(context, patient);
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override

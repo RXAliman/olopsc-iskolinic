@@ -233,12 +233,20 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                                       _selectedPatient == null) ...[
                                     const SizedBox(width: 16),
                                     ElevatedButton.icon(
-                                      onPressed: () {
-                                        showDialog(
+                                      onPressed: () async {
+                                        final newPatient =
+                                            await showDialog<Patient>(
                                           context: context,
                                           builder: (_) =>
                                               const PatientFormScreen(),
                                         );
+                                        if (newPatient != null && mounted) {
+                                          setState(() {
+                                            _selectedPatient = newPatient;
+                                          });
+                                          controller.text =
+                                              newPatient.patientName;
+                                        }
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.accent,
