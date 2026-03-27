@@ -181,7 +181,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         prefixIcon: Icon(Icons.person_outline),
                         counterText: '',
                       ),
-                      inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(30)],
+                      inputFormatters: [
+                        UpperCaseTextFormatter(),
+                        LengthLimitingTextInputFormatter(30),
+                      ],
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
@@ -196,7 +199,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         prefixIcon: Icon(Icons.person_outline),
                         counterText: '',
                       ),
-                      inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(30)],
+                      inputFormatters: [
+                        UpperCaseTextFormatter(),
+                        LengthLimitingTextInputFormatter(30),
+                      ],
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
@@ -219,7 +225,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         prefixIcon: Icon(Icons.person_outline),
                         counterText: '',
                       ),
-                      inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(30)],
+                      inputFormatters: [
+                        UpperCaseTextFormatter(),
+                        LengthLimitingTextInputFormatter(30),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -254,7 +263,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                           labelText: 'Specify',
                           counterText: '',
                         ),
-                        inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(5)],
+                        inputFormatters: [
+                          UpperCaseTextFormatter(),
+                          LengthLimitingTextInputFormatter(5),
+                        ],
                         validator: (v) =>
                             v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
@@ -273,7 +285,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   prefixIcon: Icon(Icons.badge_outlined),
                   counterText: '',
                 ),
-                inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(16)],
+                inputFormatters: [
+                  UpperCaseTextFormatter(),
+                  LengthLimitingTextInputFormatter(16),
+                ],
                 validator: (v) => v == null || v.trim().isEmpty
                     ? 'ID number is required'
                     : null,
@@ -290,7 +305,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   alignLabelWithHint: true,
                   counterText: '',
                 ),
-                inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(150)],
+                inputFormatters: [
+                  UpperCaseTextFormatter(),
+                  LengthLimitingTextInputFormatter(150),
+                ],
                 minLines: 1,
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
@@ -306,7 +324,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   prefixIcon: Icon(Icons.family_restroom_outlined),
                   counterText: '',
                 ),
-                inputFormatters: [UpperCaseTextFormatter(), LengthLimitingTextInputFormatter(65)],
+                inputFormatters: [
+                  UpperCaseTextFormatter(),
+                  LengthLimitingTextInputFormatter(65),
+                ],
               ),
               const SizedBox(height: 16),
 

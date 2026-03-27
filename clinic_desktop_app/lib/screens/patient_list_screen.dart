@@ -18,6 +18,13 @@ class _PatientListScreenState extends State<PatientListScreen> {
   final _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    final query = context.read<PatientProvider>().searchQuery;
+    _searchController.text = query;
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -53,7 +60,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$totalPatients total records',
+                          provider.searchQuery.isNotEmpty
+                              ? '$totalPatients search results'
+                              : '$totalPatients total records',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],

@@ -195,7 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: _SummaryCard(
                       icon: Icons.people_rounded,
                       label: 'Total Patients Recorded',
-                      value: '${patients.totalPatients}',
+                      value: '${patients.allPatientsCount}',
                       gradient: const LinearGradient(
                         colors: [
                           Color(0xFFF59E0B),
@@ -609,8 +609,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         'ISKOLINIC',
                         style: GoogleFonts.audiowide(
-                          textStyle: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF1B6B7D),
+                              ),
                         ),
                       ),
                     ],

@@ -29,6 +29,7 @@ class PatientProvider extends ChangeNotifier {
   // Paginated patient data
   List<Patient> _patients = [];
   int _totalPatients = 0;
+  int _allPatientsCount = 0;
   int _currentPage = 0;
   final int _pageSize = 10;
   String _searchQuery = '';
@@ -52,6 +53,7 @@ class PatientProvider extends ChangeNotifier {
 
   List<Patient> get patients => _patients;
   int get totalPatients => _totalPatients;
+  int get allPatientsCount => _allPatientsCount;
   int get currentPage => _currentPage;
   int get pageSize => _pageSize;
   int get totalPages => (_totalPatients / _pageSize).ceil();
@@ -110,8 +112,10 @@ class PatientProvider extends ChangeNotifier {
 
     final offset = _currentPage * _pageSize;
 
+    _allPatientsCount = await _db.getPatientCount();
+
     if (_searchQuery.isEmpty) {
-      _totalPatients = await _db.getPatientCount();
+      _totalPatients = _allPatientsCount;
       _patients = await _db.getPatientsPaginated(_pageSize, offset);
     } else {
       _totalPatients = await _db.searchPatientCount(_searchQuery);

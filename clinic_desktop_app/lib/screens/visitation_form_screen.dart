@@ -221,7 +221,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                                       focusNode: focusNode,
                                       readOnly: widget.patientId != null,
                                       decoration: const InputDecoration(
-                                        labelText: 'Patient Name *',
+                                        labelText: 'Patient Name / ID Number *',
                                         prefixIcon: Icon(
                                           Icons.person_search_rounded,
                                         ),
@@ -390,7 +390,9 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                             alignLabelWithHint: true,
                             counterText: '',
                           ),
-                          inputFormatters: [LengthLimitingTextInputFormatter(150)],
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(150),
+                          ],
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                         ),
@@ -406,7 +408,9 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                             alignLabelWithHint: true,
                             counterText: '',
                           ),
-                          inputFormatters: [LengthLimitingTextInputFormatter(150)],
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(150),
+                          ],
                           maxLines: null,
                           keyboardType: TextInputType.multiline,
                         ),
