@@ -9,6 +9,16 @@ import 'patient_form_screen.dart';
 class PatientDetailScreen extends StatelessWidget {
   const PatientDetailScreen({super.key});
 
+  int _calculateAge(DateTime birthDate) {
+    final today = DateTime.now();
+    int age = today.year - birthDate.year;
+    if (today.month < birthDate.month ||
+        (today.month == birthDate.month && today.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<PatientProvider>(
@@ -86,7 +96,7 @@ class PatientDetailScreen extends StatelessWidget {
                     children: [
                       // --- Left Column: Patient Info ---
                       Expanded(
-                        flex: 1,
+                        flex: 2,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -94,145 +104,195 @@ class PatientDetailScreen extends StatelessWidget {
                               'Patient Information',
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: AppTheme.glassCard(),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _InfoCell(
-                                    icon: Icons.home_outlined,
-                                    label: 'Address',
-                                    value: patient.address.isNotEmpty
-                                        ? patient.address
-                                        : '—',
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _InfoCell(
-                                    icon: Icons.family_restroom_outlined,
-                                    label: 'Guardian',
-                                    value: patient.guardianName.isNotEmpty
-                                        ? patient.guardianName
-                                        : '—',
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _InfoCell(
-                                    icon: Icons.phone_outlined,
-                                    label: 'Contact',
-                                    value: patient.guardianContact.isNotEmpty
-                                        ? patient.guardianContact
-                                        : '—',
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    children: [
-                                      TextButton.icon(
-                                        onPressed: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (_) => PatientFormScreen(
-                                              patient: patient,
-                                            ),
-                                          );
-                                        },
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: AppTheme.accent,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            side: const BorderSide(
-                                              color: AppTheme.accent,
-                                            ),
-                                          ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.edit_rounded,
-                                          size: 18,
-                                          color: AppTheme.accent,
-                                        ),
-                                        label: const Text(
-                                          'Edit',
-                                          style: TextStyle(
-                                            color: AppTheme.accent,
-                                          ),
-                                        ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) =>
+                                          PatientFormScreen(patient: patient),
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppTheme.accent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: const BorderSide(
+                                        color: AppTheme.accent,
                                       ),
-                                      const SizedBox(width: 16),
-                                      TextButton.icon(
-                                        onPressed: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: const Text(
-                                                'Delete Patient',
-                                              ),
-                                              content: Text(
-                                                'Are you sure you want to delete ${patient.patientName}? This will also delete all visitation records.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(ctx),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                        backgroundColor:
-                                                            AppTheme.danger,
-                                                      ),
-                                                  onPressed: () {
-                                                    context
-                                                        .read<PatientProvider>()
-                                                        .deletePatient(
-                                                          patient.id,
-                                                        );
-                                                    Navigator.pop(
-                                                      ctx,
-                                                    ); // close dialog
-                                                    Navigator.pop(
-                                                      context,
-                                                    ); // close details screen
-                                                  },
-                                                  child: const Text(
-                                                    'Delete',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.edit_rounded,
+                                    size: 18,
+                                    color: AppTheme.accent,
+                                  ),
+                                  label: const Text(
+                                    'Edit',
+                                    style: TextStyle(color: AppTheme.accent),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Delete Patient'),
+                                        content: Text(
+                                          'Are you sure you want to delete ${patient.patientName}? This will also delete all visitation records.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppTheme.danger,
                                             ),
-                                          );
-                                        },
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: AppTheme.danger,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            side: const BorderSide(
-                                              color: AppTheme.danger,
+                                            onPressed: () {
+                                              context
+                                                  .read<PatientProvider>()
+                                                  .deletePatient(patient.id);
+                                              Navigator.pop(
+                                                ctx,
+                                              ); // close dialog
+                                              Navigator.pop(
+                                                context,
+                                              ); // close details screen
+                                            },
+                                            child: const Text(
+                                              'Delete',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.delete_outline_rounded,
-                                          size: 18,
-                                          color: AppTheme.danger,
-                                        ),
-                                        label: const Text(
-                                          'Delete',
-                                          style: TextStyle(
-                                            color: AppTheme.danger,
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppTheme.danger,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: const BorderSide(
+                                        color: AppTheme.danger,
+                                      ),
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 18,
+                                    color: AppTheme.danger,
+                                  ),
+                                  label: const Text(
+                                    'Delete',
+                                    style: TextStyle(color: AppTheme.danger),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: AppTheme.glassCard(),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _InfoCell(
+                                              icon: Icons.cake_outlined,
+                                              label: 'Birthdate',
+                                              value: patient.birthdate != null
+                                                  ? DateFormat(
+                                                      'MMM dd, yyyy',
+                                                    ).format(patient.birthdate!)
+                                                  : '—',
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(height: 4),
+                                          Expanded(
+                                            child: _InfoCell(
+                                              icon: Icons
+                                                  .accessibility_new_outlined,
+                                              label: 'Age',
+                                              value: patient.birthdate != null
+                                                  ? '${_calculateAge(patient.birthdate!)} years old'
+                                                  : '—',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _InfoCell(
+                                        icon: Icons.wc_outlined,
+                                        label: 'Sex',
+                                        value: patient.sex.isNotEmpty
+                                            ? patient.sex
+                                            : '—',
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _InfoCell(
+                                        icon: Icons.phone_outlined,
+                                        label: 'Contact',
+                                        value: patient.contactNumber.isNotEmpty
+                                            ? patient.contactNumber
+                                            : '—',
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _InfoCell(
+                                        icon: Icons.home_outlined,
+                                        label: 'Address',
+                                        value: patient.address.isNotEmpty
+                                            ? patient.address
+                                            : '—',
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _InfoCell(
+                                        icon: Icons.family_restroom_outlined,
+                                        label: 'Guardian 1',
+                                        value: patient.guardianName.isNotEmpty
+                                            ? patient.guardianName
+                                            : '—',
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _InfoCell(
+                                        icon: Icons.phone_outlined,
+                                        label: 'Guardian 1 Contact',
+                                        value:
+                                            patient.guardianContact.isNotEmpty
+                                            ? patient.guardianContact
+                                            : '—',
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _InfoCell(
+                                        icon: Icons.family_restroom_outlined,
+                                        label: 'Guardian 2',
+                                        value: patient.guardian2Name.isNotEmpty
+                                            ? patient.guardian2Name
+                                            : '—',
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _InfoCell(
+                                        icon: Icons.phone_outlined,
+                                        label: 'Guardian 2 Contact',
+                                        value:
+                                            patient.guardian2Contact.isNotEmpty
+                                            ? patient.guardian2Contact
+                                            : '—',
                                       ),
                                     ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ],
@@ -250,34 +310,29 @@ class PatientDetailScreen extends StatelessWidget {
 
                       // --- Right Column: Visitation History ---
                       Expanded(
-                        flex: 2,
+                        flex: 3,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Visitation Header
-                            Row(
-                              children: [
-                                Text(
-                                  'Visitation History',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                                const Spacer(),
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => VisitationFormScreen(
-                                        patientId: patient.id,
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add_rounded, size: 18),
-                                  label: const Text('Add Visit'),
-                                ),
-                              ],
+                            Text(
+                              'Visitation History',
+                              style: Theme.of(context).textTheme.titleLarge,
                             ),
-                            const SizedBox(height: 16),
-
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => VisitationFormScreen(
+                                    patientId: patient.id,
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text('Add Visit'),
+                            ),
+                            const SizedBox(height: 24),
                             // Visitation List
                             Expanded(
                               child: provider.visitations.isEmpty

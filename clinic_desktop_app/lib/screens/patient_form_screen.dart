@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
 import '../formatters/uppercase_text.dart';
 import '../models/patient.dart';
 import '../providers/patient_provider.dart';
@@ -27,6 +28,13 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   late TextEditingController _addressCtrl;
   late TextEditingController _guardianNameCtrl;
   late TextEditingController _guardianContactCtrl;
+
+  DateTime? _selectedBirthdate;
+  String _selectedSex = 'Female';
+  late TextEditingController _customSexCtrl;
+  late TextEditingController _contactCtrl;
+  late TextEditingController _guardian2NameCtrl;
+  late TextEditingController _guardian2ContactCtrl;
 
   bool get isEditing => widget.patient != null;
 
@@ -60,6 +68,27 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _guardianContactCtrl = TextEditingController(
       text: widget.patient?.guardianContact ?? '',
     );
+    _selectedBirthdate = widget.patient?.birthdate;
+    final sex = widget.patient?.sex ?? '';
+    if (sex.isEmpty) {
+      _selectedSex = 'Female';
+      _customSexCtrl = TextEditingController();
+    } else if (['Male', 'Female'].contains(sex)) {
+      _selectedSex = sex;
+      _customSexCtrl = TextEditingController();
+    } else {
+      _selectedSex = 'Others';
+      _customSexCtrl = TextEditingController(text: sex);
+    }
+    _contactCtrl = TextEditingController(
+      text: widget.patient?.contactNumber ?? '',
+    );
+    _guardian2NameCtrl = TextEditingController(
+      text: widget.patient?.guardian2Name ?? '',
+    );
+    _guardian2ContactCtrl = TextEditingController(
+      text: widget.patient?.guardian2Contact ?? '',
+    );
   }
 
   @override
@@ -72,11 +101,21 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _addressCtrl.dispose();
     _guardianNameCtrl.dispose();
     _guardianContactCtrl.dispose();
+    _customSexCtrl.dispose();
+    _contactCtrl.dispose();
+    _guardian2NameCtrl.dispose();
+    _guardian2ContactCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Check custom required validation for Birthdate
+    bool isValid = _formKey.currentState!.validate();
+    if (_selectedBirthdate == null) {
+      setState(() {}); // trigger rebuild to show error text
+      isValid = false;
+    }
+    if (!isValid) return;
 
     final provider = context.read<PatientProvider>();
 
@@ -95,6 +134,13 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         .trim()
         .replaceAll(RegExp(r'\s+'), ' ');
 
+    String finalSex = '';
+    if (_selectedSex == 'Others') {
+      finalSex = _customSexCtrl.text.trim();
+    } else {
+      finalSex = _selectedSex;
+    }
+
     if (isEditing) {
       final updated = widget.patient!.copyWith(
         firstName: firstName,
@@ -103,9 +149,14 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         extension: ext,
         patientName: patientName,
         idNumber: _numberCtrl.text.trim(),
+        birthdate: _selectedBirthdate,
+        sex: finalSex,
+        contactNumber: _contactCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         guardianName: _guardianNameCtrl.text.trim(),
         guardianContact: _guardianContactCtrl.text.trim(),
+        guardian2Name: _guardian2NameCtrl.text.trim(),
+        guardian2Contact: _guardian2ContactCtrl.text.trim(),
       );
       await provider.updatePatient(updated);
       if (mounted) Navigator.pop(context);
@@ -118,9 +169,14 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         extension: ext,
         patientName: patientName,
         idNumber: _numberCtrl.text.trim(),
+        birthdate: _selectedBirthdate,
+        sex: finalSex,
+        contactNumber: _contactCtrl.text.trim(),
         address: _addressCtrl.text.trim(),
         guardianName: _guardianNameCtrl.text.trim(),
         guardianContact: _guardianContactCtrl.text.trim(),
+        guardian2Name: _guardian2NameCtrl.text.trim(),
+        guardian2Contact: _guardian2ContactCtrl.text.trim(),
       );
       await provider.addPatient(patient);
       if (mounted) Navigator.pop(context, patient);
@@ -166,183 +222,359 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              // Name Row 1: First Name & Last Name
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _firstNameCtrl,
-                      maxLength: 30,
-                      decoration: const InputDecoration(
-                        labelText: 'First Name *',
-                        prefixIcon: Icon(Icons.person_outline),
-                        counterText: '',
-                      ),
-                      inputFormatters: [
-                        UpperCaseTextFormatter(),
-                        LengthLimitingTextInputFormatter(30),
-                      ],
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _lastNameCtrl,
-                      maxLength: 30,
-                      decoration: const InputDecoration(
-                        labelText: 'Last Name *',
-                        prefixIcon: Icon(Icons.person_outline),
-                        counterText: '',
-                      ),
-                      inputFormatters: [
-                        UpperCaseTextFormatter(),
-                        LengthLimitingTextInputFormatter(30),
-                      ],
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Name Row 2: Middle Name & Extension
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _middleNameCtrl,
-                      maxLength: 30,
-                      decoration: const InputDecoration(
-                        labelText: 'Middle Name',
-                        prefixIcon: Icon(Icons.person_outline),
-                        counterText: '',
-                      ),
-                      inputFormatters: [
-                        UpperCaseTextFormatter(),
-                        LengthLimitingTextInputFormatter(30),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: _selectedExtension == 'Others' ? 1 : 2,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selectedExtension,
-                      decoration: const InputDecoration(
-                        labelText: 'Extension',
-                        prefixIcon: Icon(Icons.badge_outlined),
-                      ),
-                      items: ['None', 'JR.', 'SR.', 'I', 'II', 'III', 'Others']
-                          .map((e) {
-                            return DropdownMenuItem(value: e, child: Text(e));
-                          })
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedExtension = val);
-                        }
-                      },
-                    ),
-                  ),
-                  if (_selectedExtension == 'Others') ...[
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 1,
-                      child: TextFormField(
-                        controller: _customExtensionCtrl,
-                        maxLength: 5,
-                        decoration: const InputDecoration(
-                          labelText: 'Specify',
-                          counterText: '',
+              // Scrollable Fields
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        // Name Row 1: First Name & Last Name
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _firstNameCtrl,
+                                maxLength: 30,
+                                decoration: const InputDecoration(
+                                  labelText: 'First Name *',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  UpperCaseTextFormatter(),
+                                  LengthLimitingTextInputFormatter(30),
+                                ],
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? 'Required'
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _lastNameCtrl,
+                                maxLength: 30,
+                                decoration: const InputDecoration(
+                                  labelText: 'Last Name *',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  UpperCaseTextFormatter(),
+                                  LengthLimitingTextInputFormatter(30),
+                                ],
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? 'Required'
+                                    : null,
+                              ),
+                            ),
+                          ],
                         ),
-                        inputFormatters: [
-                          UpperCaseTextFormatter(),
-                          LengthLimitingTextInputFormatter(5),
+                        const SizedBox(height: 16),
+
+                        // Name Row 2: Middle Name & Extension
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                controller: _middleNameCtrl,
+                                maxLength: 30,
+                                decoration: const InputDecoration(
+                                  labelText: 'Middle Name',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  UpperCaseTextFormatter(),
+                                  LengthLimitingTextInputFormatter(30),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: _selectedExtension == 'Others' ? 1 : 2,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _selectedExtension,
+                                decoration: const InputDecoration(
+                                  labelText: 'Extension',
+                                  prefixIcon: Icon(Icons.badge_outlined),
+                                ),
+                                items:
+                                    [
+                                      'None',
+                                      'JR.',
+                                      'SR.',
+                                      'I',
+                                      'II',
+                                      'III',
+                                      'Others',
+                                    ].map((e) {
+                                      return DropdownMenuItem(
+                                        value: e,
+                                        child: Text(e),
+                                      );
+                                    }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() => _selectedExtension = val);
+                                  }
+                                },
+                              ),
+                            ),
+                            if (_selectedExtension == 'Others') ...[
+                              const SizedBox(width: 16),
+                              Expanded(
+                                flex: 1,
+                                child: TextFormField(
+                                  controller: _customExtensionCtrl,
+                                  maxLength: 5,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Specify',
+                                    counterText: '',
+                                  ),
+                                  inputFormatters: [
+                                    UpperCaseTextFormatter(),
+                                    LengthLimitingTextInputFormatter(5),
+                                  ],
+                                  validator: (v) =>
+                                      v == null || v.trim().isEmpty
+                                      ? 'Required'
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ID Number
+                        TextFormField(
+                          controller: _numberCtrl,
+                          maxLength: 16,
+                          decoration: const InputDecoration(
+                            labelText: 'ID Number *',
+                            prefixIcon: Icon(Icons.badge_outlined),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            UpperCaseTextFormatter(),
+                            LengthLimitingTextInputFormatter(16),
+                          ],
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'ID number is required'
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Birthdate & Sex
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate:
+                                        _selectedBirthdate ?? DateTime.now(),
+                                    firstDate: DateTime(1900),
+                                    lastDate: DateTime.now(),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => _selectedBirthdate = picked);
+                                  }
+                                },
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Birthdate *',
+                                    prefixIcon: Icon(Icons.cake_outlined),
+                                  ),
+                                  child: Text(
+                                    _selectedBirthdate != null
+                                        ? DateFormat(
+                                            'MMM dd, yyyy',
+                                          ).format(_selectedBirthdate!)
+                                        : 'Select Date',
+                                    style: TextStyle(
+                                      color: _selectedBirthdate != null
+                                          ? AppTheme.textPrimary
+                                          : AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: _selectedSex == 'Others' ? 1 : 1,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _selectedSex,
+                                decoration: const InputDecoration(
+                                  labelText: 'Sex *',
+                                  prefixIcon: Icon(Icons.wc_outlined),
+                                ),
+                                items: ['Male', 'Female', 'Others'].map((s) {
+                                  return DropdownMenuItem(
+                                    value: s,
+                                    child: Text(s),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() => _selectedSex = val);
+                                  }
+                                },
+                              ),
+                            ),
+                            if (_selectedSex == 'Others') ...[
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _customSexCtrl,
+                                  maxLength: 20,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Specify',
+                                    counterText: '',
+                                  ),
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(20),
+                                  ],
+                                  validator: (v) =>
+                                      v == null || v.trim().isEmpty
+                                      ? 'Required'
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (_selectedBirthdate == null) ...[
+                          const SizedBox(height: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 14),
+                            child: Text(
+                              'Birthdate is required',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                         ],
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Required' : null,
-                      ),
+                        const SizedBox(height: 16),
+
+                        // Contact Number
+                        TextFormField(
+                          controller: _contactCtrl,
+                          maxLength: 20,
+                          decoration: const InputDecoration(
+                            labelText: 'Contact Number',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(20),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Address
+                        TextFormField(
+                          controller: _addressCtrl,
+                          maxLength: 150,
+                          decoration: const InputDecoration(
+                            labelText: 'Address',
+                            prefixIcon: Icon(Icons.home_outlined),
+                            alignLabelWithHint: true,
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            UpperCaseTextFormatter(),
+                            LengthLimitingTextInputFormatter(150),
+                          ],
+                          minLines: 1,
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Guardian Name
+                        TextFormField(
+                          controller: _guardianNameCtrl,
+                          maxLength: 65,
+                          decoration: const InputDecoration(
+                            labelText: 'Guardian / Parent Name',
+                            prefixIcon: Icon(Icons.family_restroom_outlined),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            UpperCaseTextFormatter(),
+                            LengthLimitingTextInputFormatter(65),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Guardian Contact
+                        TextFormField(
+                          controller: _guardianContactCtrl,
+                          maxLength: 20,
+                          decoration: const InputDecoration(
+                            labelText: 'Guardian / Parent Contact',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(20),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Guardian 2 Name
+                        TextFormField(
+                          controller: _guardian2NameCtrl,
+                          maxLength: 65,
+                          decoration: const InputDecoration(
+                            labelText: 'Guardian 2 Name',
+                            prefixIcon: Icon(Icons.family_restroom_outlined),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            UpperCaseTextFormatter(),
+                            LengthLimitingTextInputFormatter(65),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Guardian 2 Contact
+                        TextFormField(
+                          controller: _guardian2ContactCtrl,
+                          maxLength: 20,
+                          decoration: const InputDecoration(
+                            labelText: 'Guardian 2 Contact',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(20),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                      ],
                     ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // ID Number
-              TextFormField(
-                controller: _numberCtrl,
-                maxLength: 16,
-                decoration: const InputDecoration(
-                  labelText: 'ID Number *',
-                  prefixIcon: Icon(Icons.badge_outlined),
-                  counterText: '',
+                  ),
                 ),
-                inputFormatters: [
-                  UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(16),
-                ],
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'ID number is required'
-                    : null,
               ),
-              const SizedBox(height: 16),
 
-              // Address
-              TextFormField(
-                controller: _addressCtrl,
-                maxLength: 150,
-                decoration: const InputDecoration(
-                  labelText: 'Address',
-                  prefixIcon: Icon(Icons.home_outlined),
-                  alignLabelWithHint: true,
-                  counterText: '',
-                ),
-                inputFormatters: [
-                  UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(150),
-                ],
-                minLines: 1,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-              ),
-              const SizedBox(height: 16),
-
-              // Guardian Name
-              TextFormField(
-                controller: _guardianNameCtrl,
-                maxLength: 65,
-                decoration: const InputDecoration(
-                  labelText: 'Guardian / Parent Name',
-                  prefixIcon: Icon(Icons.family_restroom_outlined),
-                  counterText: '',
-                ),
-                inputFormatters: [
-                  UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(65),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Guardian Contact
-              TextFormField(
-                controller: _guardianContactCtrl,
-                maxLength: 20,
-                decoration: const InputDecoration(
-                  labelText: 'Guardian / Parent Contact',
-                  prefixIcon: Icon(Icons.phone_outlined),
-                  counterText: '',
-                ),
-                inputFormatters: [LengthLimitingTextInputFormatter(20)],
-              ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Buttons
               Row(

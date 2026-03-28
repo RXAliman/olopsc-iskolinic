@@ -498,12 +498,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           // ── Top Bar ──
           Container(
-            decoration: const BoxDecoration(
-              color: AppTheme.sidebarBg,
-              border: Border(
-                bottom: BorderSide(color: AppTheme.dividerColor, width: 0.5),
-              ),
-            ),
+            decoration: const BoxDecoration(color: AppTheme.sidebarBg),
             padding: const EdgeInsets.symmetric(vertical: 0),
             child: Row(
               children: [

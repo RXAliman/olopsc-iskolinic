@@ -158,22 +158,7 @@ class PatientProvider extends ChangeNotifier {
 
   Future<void> addPatient(Patient patient) async {
     final hlc = _tick();
-    final withCrdt = Patient(
-      id: patient.id,
-      firstName: patient.firstName,
-      lastName: patient.lastName,
-      middleName: patient.middleName,
-      extension: patient.extension,
-      patientName: patient.patientName,
-      idNumber: patient.idNumber,
-      address: patient.address,
-      guardianName: patient.guardianName,
-      guardianContact: patient.guardianContact,
-      createdAt: patient.createdAt,
-      updatedAt: patient.updatedAt,
-      hlc: hlc,
-      nodeId: _nodeId,
-    );
+    final withCrdt = patient.copyWith(hlc: hlc, nodeId: _nodeId);
     await _db.insertPatient(withCrdt);
     await loadPatients();
     _autoPush();

@@ -6,9 +6,14 @@ class Patient {
   final String extension;
   final String patientName;
   final String idNumber;
+  final DateTime? birthdate;
+  final String sex;
+  final String contactNumber;
   final String address;
   final String guardianName;
   final String guardianContact;
+  final String guardian2Name;
+  final String guardian2Contact;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -25,9 +30,14 @@ class Patient {
     this.extension = '',
     required this.patientName,
     required this.idNumber,
+    this.birthdate,
+    this.sex = '',
+    this.contactNumber = '',
     this.address = '',
     this.guardianName = '',
     this.guardianContact = '',
+    this.guardian2Name = '',
+    this.guardian2Contact = '',
     DateTime? createdAt,
     DateTime? updatedAt,
     this.hlc = '',
@@ -45,9 +55,14 @@ class Patient {
       'extension': extension,
       'patientName': patientName,
       'idNumber': idNumber,
+      'birthdate': birthdate?.toIso8601String(),
+      'sex': sex,
+      'contactNumber': contactNumber,
       'address': address,
       'guardianName': guardianName,
       'guardianContact': guardianContact,
+      'guardian2Name': guardian2Name,
+      'guardian2Contact': guardian2Contact,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'hlc': hlc,
@@ -65,9 +80,14 @@ class Patient {
       extension: map['extension'] as String? ?? '',
       patientName: map['patientName'] as String,
       idNumber: map['idNumber'] as String,
+      birthdate: map['birthdate'] != null ? DateTime.parse(map['birthdate'] as String) : null,
+      sex: map['sex'] as String? ?? '',
+      contactNumber: map['contactNumber'] as String? ?? '',
       address: map['address'] as String? ?? '',
       guardianName: map['guardianName'] as String? ?? '',
       guardianContact: map['guardianContact'] as String? ?? '',
+      guardian2Name: map['guardian2Name'] as String? ?? '',
+      guardian2Contact: map['guardian2Contact'] as String? ?? '',
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
       hlc: map['hlc'] as String? ?? '',
@@ -83,9 +103,14 @@ class Patient {
     String? extension,
     String? patientName,
     String? idNumber,
+    DateTime? birthdate,
+    String? sex,
+    String? contactNumber,
     String? address,
     String? guardianName,
     String? guardianContact,
+    String? guardian2Name,
+    String? guardian2Contact,
     String? hlc,
     String? nodeId,
     bool? isDeleted,
@@ -98,9 +123,14 @@ class Patient {
       extension: extension ?? this.extension,
       patientName: patientName ?? this.patientName,
       idNumber: idNumber ?? this.idNumber,
+      birthdate: birthdate ?? this.birthdate,
+      sex: sex ?? this.sex,
+      contactNumber: contactNumber ?? this.contactNumber,
       address: address ?? this.address,
       guardianName: guardianName ?? this.guardianName,
       guardianContact: guardianContact ?? this.guardianContact,
+      guardian2Name: guardian2Name ?? this.guardian2Name,
+      guardian2Contact: guardian2Contact ?? this.guardian2Contact,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       hlc: hlc ?? this.hlc,

@@ -27,7 +27,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 5,
+        version: 6,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -44,9 +44,14 @@ class DatabaseHelper {
         extension TEXT NOT NULL DEFAULT '',
         patientName TEXT NOT NULL,
         idNumber TEXT NOT NULL,
+        birthdate TEXT,
+        sex TEXT NOT NULL DEFAULT '',
+        contactNumber TEXT NOT NULL DEFAULT '',
         address TEXT,
         guardianName TEXT,
         guardianContact TEXT,
+        guardian2Name TEXT NOT NULL DEFAULT '',
+        guardian2Contact TEXT NOT NULL DEFAULT '',
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         hlc TEXT NOT NULL DEFAULT '',
@@ -164,6 +169,14 @@ class DatabaseHelper {
       try {
         await db.execute("UPDATE patients SET firstName = patientName WHERE firstName = ''");
       } catch (_) {}
+    }
+    if (oldVersion < 6) {
+      // Add the 5 new fields to patients
+      await db.execute("ALTER TABLE patients ADD COLUMN birthdate TEXT");
+      await db.execute("ALTER TABLE patients ADD COLUMN sex TEXT NOT NULL DEFAULT ''");
+      await db.execute("ALTER TABLE patients ADD COLUMN contactNumber TEXT NOT NULL DEFAULT ''");
+      await db.execute("ALTER TABLE patients ADD COLUMN guardian2Name TEXT NOT NULL DEFAULT ''");
+      await db.execute("ALTER TABLE patients ADD COLUMN guardian2Contact TEXT NOT NULL DEFAULT ''");
     }
   }
 
