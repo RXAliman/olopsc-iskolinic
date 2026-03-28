@@ -284,8 +284,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
             return _PatientTile(
               patient: patient,
               onTap: () => _openPatientDetail(context, patient),
-              onEdit: () => _showPatientForm(context, patient: patient),
-              onDelete: () => _confirmDelete(context, patient),
             );
           },
         ),
@@ -307,46 +305,13 @@ class _PatientListScreenState extends State<PatientListScreen> {
       showDialog(context: context, builder: (_) => const PatientDetailScreen());
     }
   }
-
-  void _confirmDelete(BuildContext context, Patient patient) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Patient'),
-        content: Text(
-          'Are you sure you want to delete ${patient.patientName}? This will also delete all visitation records.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
-            onPressed: () {
-              context.read<PatientProvider>().deletePatient(patient.id);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _PatientTile extends StatefulWidget {
   final Patient patient;
   final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
-  const _PatientTile({
-    required this.patient,
-    required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
-  });
+  const _PatientTile({required this.patient, required this.onTap});
 
   @override
   State<_PatientTile> createState() => _PatientTileState();
@@ -435,28 +400,6 @@ class _PatientTileState extends State<_PatientTile> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-
-                // Actions
-                if (_isHovered) ...[
-                  IconButton(
-                    icon: const Icon(
-                      Icons.edit_rounded,
-                      size: 18,
-                      color: AppTheme.accent,
-                    ),
-                    onPressed: widget.onEdit,
-                    tooltip: 'Edit',
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline_rounded,
-                      size: 18,
-                      color: AppTheme.danger,
-                    ),
-                    onPressed: widget.onDelete,
-                    tooltip: 'Delete',
-                  ),
-                ],
               ],
             ),
           ),

@@ -494,7 +494,6 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Address',
                             prefixIcon: Icon(Icons.home_outlined),
-                            alignLabelWithHint: true,
                             counterText: '',
                           ),
                           inputFormatters: [

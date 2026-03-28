@@ -236,10 +236,10 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                                       onPressed: () async {
                                         final newPatient =
                                             await showDialog<Patient>(
-                                          context: context,
-                                          builder: (_) =>
-                                              const PatientFormScreen(),
-                                        );
+                                              context: context,
+                                              builder: (_) =>
+                                                  const PatientFormScreen(),
+                                            );
                                         if (newPatient != null && mounted) {
                                           setState(() {
                                             _selectedPatient = newPatient;
@@ -395,7 +395,6 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Other Intervention Details',
                             prefixIcon: Icon(Icons.healing_outlined),
-                            alignLabelWithHint: true,
                             counterText: '',
                           ),
                           inputFormatters: [
@@ -413,7 +412,6 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Remarks',
                             prefixIcon: Icon(Icons.notes_outlined),
-                            alignLabelWithHint: true,
                             counterText: '',
                           ),
                           inputFormatters: [
