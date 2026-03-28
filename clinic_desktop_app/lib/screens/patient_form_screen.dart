@@ -506,64 +506,78 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Guardian Name
-                        TextFormField(
-                          controller: _guardianNameCtrl,
-                          maxLength: 65,
-                          decoration: const InputDecoration(
-                            labelText: 'Guardian / Parent Name',
-                            prefixIcon: Icon(Icons.family_restroom_outlined),
-                            counterText: '',
-                          ),
-                          inputFormatters: [
-                            UpperCaseTextFormatter(),
-                            LengthLimitingTextInputFormatter(65),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _guardianNameCtrl,
+                                maxLength: 65,
+                                decoration: const InputDecoration(
+                                  labelText: 'Parent / Guardian Name',
+                                  prefixIcon: Icon(
+                                    Icons.family_restroom_outlined,
+                                  ),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  UpperCaseTextFormatter(),
+                                  LengthLimitingTextInputFormatter(65),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _guardianContactCtrl,
+                                maxLength: 20,
+                                decoration: const InputDecoration(
+                                  labelText: 'Parent / Guardian Contact',
+                                  prefixIcon: Icon(Icons.phone_outlined),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(20),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
 
-                        // Guardian Contact
-                        TextFormField(
-                          controller: _guardianContactCtrl,
-                          maxLength: 20,
-                          decoration: const InputDecoration(
-                            labelText: 'Guardian / Parent Contact',
-                            prefixIcon: Icon(Icons.phone_outlined),
-                            counterText: '',
-                          ),
-                          inputFormatters: [
-                            LengthLimitingTextInputFormatter(20),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Guardian 2 Name
-                        TextFormField(
-                          controller: _guardian2NameCtrl,
-                          maxLength: 65,
-                          decoration: const InputDecoration(
-                            labelText: 'Guardian 2 Name',
-                            prefixIcon: Icon(Icons.family_restroom_outlined),
-                            counterText: '',
-                          ),
-                          inputFormatters: [
-                            UpperCaseTextFormatter(),
-                            LengthLimitingTextInputFormatter(65),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Guardian 2 Contact
-                        TextFormField(
-                          controller: _guardian2ContactCtrl,
-                          maxLength: 20,
-                          decoration: const InputDecoration(
-                            labelText: 'Guardian 2 Contact',
-                            prefixIcon: Icon(Icons.phone_outlined),
-                            counterText: '',
-                          ),
-                          inputFormatters: [
-                            LengthLimitingTextInputFormatter(20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _guardian2NameCtrl,
+                                maxLength: 65,
+                                decoration: const InputDecoration(
+                                  labelText: 'Second Guardian Name',
+                                  prefixIcon: Icon(
+                                    Icons.family_restroom_outlined,
+                                  ),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  UpperCaseTextFormatter(),
+                                  LengthLimitingTextInputFormatter(65),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _guardian2ContactCtrl,
+                                maxLength: 20,
+                                decoration: const InputDecoration(
+                                  labelText: 'Second Guardian Contact',
+                                  prefixIcon: Icon(Icons.phone_outlined),
+                                  counterText: '',
+                                ),
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(20),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 4),

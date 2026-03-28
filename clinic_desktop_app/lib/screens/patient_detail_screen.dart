@@ -108,7 +108,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _SidebarItem(
-                              title: 'Patient Information',
+                              title: 'Basic Information',
                               icon: Icons.person_outline_rounded,
                               isSelected: _selectedIndex == 0,
                               onTap: () => setState(() => _selectedIndex = 0),
