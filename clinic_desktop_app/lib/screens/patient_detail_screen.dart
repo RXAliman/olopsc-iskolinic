@@ -383,6 +383,7 @@ class PatientDetailScreen extends StatelessWidget {
                                                           .delete_outline_rounded,
                                                       size: 16,
                                                     ),
+                                                    tooltip: 'Delete',
                                                     color: AppTheme.danger,
                                                     padding: EdgeInsets.all(8),
                                                     constraints:

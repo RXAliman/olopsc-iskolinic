@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -99,90 +100,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // School Info Card + Date/Time
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.dividerColor),
-                      ),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.asset(
-                              'assets/OLOPSC.png',
-                              width: 52,
-                              height: 52,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'OUR LADY OF PERPETUAL SUCCOR COLLEGE',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Marikina City, Philippines',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: AppTheme.textMuted),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.dividerColor),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          DateFormat('MMM. dd, yyyy').format(_now),
-                          style: GoogleFonts.chivoMono(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          DateFormat('hh:mm:ss a').format(_now),
-                          style: GoogleFonts.chivoMono(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),
@@ -577,167 +494,302 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
         children: [
-          // ── Sidebar ──
+          // ── Top Bar ──
           Container(
-            width: 240,
             decoration: const BoxDecoration(
               color: AppTheme.sidebarBg,
               border: Border(
-                right: BorderSide(color: AppTheme.dividerColor, width: 0.5),
+                bottom: BorderSide(color: AppTheme.dividerColor, width: 0.5),
               ),
             ),
-            child: Column(
+            padding: const EdgeInsets.symmetric(vertical: 0),
+            child: Row(
               children: [
-                const SizedBox(height: 24),
-                // App Logo
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                // Left: App Logo + Name (same width as sidebar)
+                Container(
+                  width: 250,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 0,
+                    vertical: 18,
+                  ),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: AppTheme.dividerColor,
+                        width: 0.5,
+                      ),
+                    ),
+                  ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.asset(
                           'assets/app-icon-colored.png',
-                          width: 40,
-                          height: 40,
+                          height: 44,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Text(
                         'ISKOLINIC',
                         style: GoogleFonts.audiowide(
-                          textStyle: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
+                          textStyle: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: const Color(0xFF1B6B7D),
+                                color: const Color(0xFF1B4697),
                               ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 36),
 
-                // Nav Items
-                ...List.generate(_navItems.length, (i) {
-                  final item = _navItems[i];
-                  final isSelected = _selectedIndex == i;
-
-                  return Padding(
+                // Right portion: School Info + Date/Time + Sync
+                Expanded(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 2,
+                      horizontal: 20,
+                      vertical: 16,
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        onTap: () => setState(() => _selectedIndex = i),
-                        borderRadius: BorderRadius.circular(12),
-                        hoverColor: Colors.white.withValues(alpha: 0.05),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: isSelected
-                                ? AppTheme.accent.withValues(alpha: 0.12)
-                                : Colors.transparent,
-                            border: isSelected
-                                ? Border.all(
-                                    color: AppTheme.accent.withValues(
-                                      alpha: 0.3,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                item.icon,
-                                size: 20,
-                                color: isSelected
-                                    ? AppTheme.accent
-                                    : AppTheme.textMuted,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                item.label,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? AppTheme.accent
-                                      : AppTheme.textSecondary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
+                    child: Row(
+                      children: [
+                        // School Info
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset(
+                            'assets/OLOPSC.png',
+                            width: 36,
+                            height: 36,
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'OUR LADY OF PERPETUAL SUCCOR COLLEGE',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.3,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Marikina City, Philippines',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppTheme.textMuted),
+                            ),
+                          ],
+                        ),
+
+                        const Spacer(),
+
+                        // Date/Time
+                        Text(
+                          DateFormat('MMM. dd, yyyy').format(_now),
+                          style: GoogleFonts.chivoMono(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Text(
+                          DateFormat('hh:mm:ss a').format(_now),
+                          style: GoogleFonts.chivoMono(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Container(
+                            width: 1,
+                            height: 28,
+                            color: AppTheme.dividerColor,
+                          ),
+                        ),
+
+                        // Sync Status
+                        Consumer<SyncProvider>(
+                          builder: (context, sync, _) {
+                            final isConnected = sync.isConnected;
+                            final isConnecting = sync.isConnecting;
+                            return SizedBox(
+                              width: 120,
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isConnected)
+                                      SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            const SpinKitPulse(
+                                              color: Colors.greenAccent,
+                                              size: 18,
+                                              duration: Duration(
+                                                milliseconds: 2000,
+                                              ),
+                                            ),
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: const BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.greenAccent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: isConnecting
+                                              ? Colors.orangeAccent
+                                              : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isConnected
+                                          ? 'Online'
+                                          : isConnecting
+                                          ? 'Connecting...'
+                                          : 'Offline',
+                                      style: TextStyle(
+                                        color: isConnected
+                                            ? Colors.green
+                                            : isConnecting
+                                            ? Colors.orange
+                                            : AppTheme.textMuted,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                  );
-                }),
-
-                const Spacer(),
-
-                // Sync Status
-                Consumer<SyncProvider>(
-                  builder: (context, sync, _) {
-                    final isConnected = sync.isConnected;
-                    final isConnecting = sync.isConnecting;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 20,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isConnected
-                                  ? Colors.greenAccent
-                                  : isConnecting
-                                  ? Colors.orangeAccent
-                                  : AppTheme.textMuted,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isConnected
-                                ? 'Synced'
-                                : isConnecting
-                                ? 'Connecting...'
-                                : 'Offline',
-                            style: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                  ),
                 ),
               ],
             ),
           ),
 
-          // ── Main Content ──
-          Expanded(child: _buildBody()),
+          // ── Main Area: Sidebar + Content ──
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Sidebar (nav only) ──
+                Container(
+                  width: 250,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.sidebarBg,
+                    border: Border(
+                      right: BorderSide(
+                        color: AppTheme.dividerColor,
+                        width: 0.5,
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 16),
+                      // Nav Items
+                      ...List.generate(_navItems.length, (i) {
+                        final item = _navItems[i];
+                        final isSelected = _selectedIndex == i;
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 2,
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              onTap: () => setState(() => _selectedIndex = i),
+                              borderRadius: BorderRadius.circular(12),
+                              hoverColor: Colors.white.withValues(alpha: 0.05),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: isSelected
+                                      ? AppTheme.accent.withValues(alpha: 0.12)
+                                      : Colors.transparent,
+                                  border: isSelected
+                                      ? Border.all(
+                                          color: AppTheme.accent.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      item.icon,
+                                      size: 20,
+                                      color: isSelected
+                                          ? AppTheme.accent
+                                          : AppTheme.textMuted,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      item.label,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? AppTheme.accent
+                                            : AppTheme.textSecondary,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+
+                // ── Main Content ──
+                Expanded(child: _buildBody()),
+              ],
+            ),
+          ),
         ],
       ),
     );
