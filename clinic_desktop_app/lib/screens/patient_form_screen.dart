@@ -39,6 +39,15 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   late TextEditingController _guardian2ContactCtrl;
   late TextEditingController _allergicToCtrl;
   late TextEditingController _patientRemarksCtrl;
+  late TextEditingController _othersSpecifyCtrl;
+
+  bool _suddenIllness = false;
+  bool _initialMedication = false;
+  bool _emergencyHospital = false;
+  bool _procedure = false;
+  bool _marikinaValley = false;
+  bool _marikinaStVincent = false;
+  bool _othersPermission = false;
 
   bool get isEditing => widget.patient != null;
 
@@ -155,6 +164,16 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
             .map((m) => Map<String, dynamic>.from(m))
             .toList() ??
         [];
+
+    final p = widget.patient?.permissions ?? {};
+    _suddenIllness = p['suddenIllness'] == true;
+    _initialMedication = p['initialMedication'] == true;
+    _emergencyHospital = p['emergencyHospital'] == true;
+    _procedure = p['procedure'] == true;
+    _marikinaValley = p['marikinaValley'] == true;
+    _marikinaStVincent = p['marikinaStVincent'] == true;
+    _othersPermission = p['others'] == true;
+    _othersSpecifyCtrl = TextEditingController(text: p['othersSpecify']?.toString() ?? '');
   }
 
   @override
@@ -173,6 +192,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _guardian2ContactCtrl.dispose();
     _allergicToCtrl.dispose();
     _patientRemarksCtrl.dispose();
+    _othersSpecifyCtrl.dispose();
     super.dispose();
   }
 
@@ -209,6 +229,17 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
       finalSex = _selectedSex;
     }
 
+    final permissionsMap = {
+      'suddenIllness': _suddenIllness,
+      'initialMedication': _initialMedication,
+      'emergencyHospital': _emergencyHospital,
+      'procedure': _procedure,
+      'marikinaValley': _marikinaValley,
+      'marikinaStVincent': _marikinaStVincent,
+      'others': _othersPermission,
+      'othersSpecify': _othersSpecifyCtrl.text.trim(),
+    };
+
     if (isEditing) {
       final updated = widget.patient!.copyWith(
         firstName: firstName,
@@ -233,6 +264,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
             .toList(),
         allergicTo: _allergicToCtrl.text.trim(),
         patientRemarks: _patientRemarksCtrl.text.trim(),
+        permissions: permissionsMap,
       );
       await provider.updatePatient(updated);
       if (mounted) Navigator.pop(context);
@@ -261,6 +293,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
             .toList(),
         allergicTo: _allergicToCtrl.text.trim(),
         patientRemarks: _patientRemarksCtrl.text.trim(),
+        permissions: permissionsMap,
       );
       await provider.addPatient(patient);
       if (mounted) Navigator.pop(context, patient);
@@ -271,7 +304,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   Widget build(BuildContext context) {
     return Dialog(
       child: DefaultTabController(
-        length: 2,
+        length: 3,
         initialIndex: widget.initialTabIndex,
         child: Container(
           width: 760,
@@ -316,6 +349,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   tabs: [
                     Tab(text: 'Personal Information'),
                     Tab(text: 'Medical Information'),
+                    Tab(text: 'Permissions'),
                   ],
                   labelColor: Colors.white,
                   labelStyle: TextStyle(
@@ -342,7 +376,11 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                 // Tabbed Fields
                 Flexible(
                   child: TabBarView(
-                    children: [_buildPersonalTab(), _buildMedicalTab()],
+                    children: [
+                      _buildPersonalTab(),
+                      _buildMedicalTab(),
+                      _buildPermissionsTab(),
+                    ],
                   ),
                 ),
 
@@ -1032,6 +1070,102 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
             );
           }),
       ],
+    );
+  }
+
+  Widget _buildPermissionsTab() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.only(right: 8.0, top: 8.0, bottom: 24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Permission granted for:', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('Treatment of sudden illness or injuries'),
+              value: _suddenIllness,
+              activeColor: AppTheme.accent,
+              onChanged: (val) => setState(() => _suddenIllness = val == true),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            CheckboxListTile(
+              title: const Text("Giving of initial medication for child's illness while in school"),
+              value: _initialMedication,
+              activeColor: AppTheme.accent,
+              onChanged: (val) => setState(() => _initialMedication = val == true),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            CheckboxListTile(
+              title: const Text('School authorities to take the child to the nearest hospital if emergency'),
+              value: _emergencyHospital,
+              activeColor: AppTheme.accent,
+              onChanged: (val) => setState(() {
+                _emergencyHospital = val == true;
+                if (!_emergencyHospital) {
+                  _marikinaValley = false;
+                  _marikinaStVincent = false;
+                  _othersPermission = false;
+                  _othersSpecifyCtrl.clear();
+                }
+              }),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 32.0),
+              child: Column(
+                children: [
+                  CheckboxListTile(
+                    title: const Text('Marikina Valley Medical Center'),
+                    value: _marikinaValley,
+                    activeColor: AppTheme.accent,
+                    onChanged: _emergencyHospital ? (val) => setState(() => _marikinaValley = val == true) : null,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Marikina St. Vincent Hospital'),
+                    value: _marikinaStVincent,
+                    activeColor: AppTheme.accent,
+                    onChanged: _emergencyHospital ? (val) => setState(() => _marikinaStVincent = val == true) : null,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Others (specify)'),
+                    value: _othersPermission,
+                    activeColor: AppTheme.accent,
+                    onChanged: _emergencyHospital ? (val) => setState(() {
+                      _othersPermission = val == true;
+                      if (!_othersPermission) {
+                         _othersSpecifyCtrl.clear();
+                      }
+                    }) : null,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  if (_othersPermission)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32.0, right: 16.0, top: 4.0, bottom: 8.0),
+                      child: TextFormField(
+                        controller: _othersSpecifyCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter hospital name',
+                          isDense: true,
+                        ),
+                        inputFormatters: [UpperCaseTextFormatter()],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            CheckboxListTile(
+              title: const Text('Treatment/Procedure is deemed necessary'),
+              value: _procedure,
+              activeColor: AppTheme.accent,
+              onChanged: (val) => setState(() => _procedure = val == true),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

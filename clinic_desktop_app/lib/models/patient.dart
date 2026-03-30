@@ -22,6 +22,7 @@ class Patient {
   final List<Map<String, dynamic>> vaccinationHistory;
   final String allergicTo;
   final String patientRemarks;
+  final Map<String, dynamic> permissions;
 
   // CRDT fields
   final String hlc;
@@ -53,6 +54,7 @@ class Patient {
     this.vaccinationHistory = const [],
     this.allergicTo = '',
     this.patientRemarks = '',
+    this.permissions = const {},
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -82,6 +84,7 @@ class Patient {
       'vaccinationHistory': jsonEncode(vaccinationHistory),
       'allergicTo': allergicTo,
       'patientRemarks': patientRemarks,
+      'permissions': jsonEncode(permissions),
     };
   }
 
@@ -115,6 +118,9 @@ class Patient {
           : [],
       allergicTo: (map['allergicTo'] ?? map['allergic to']) as String? ?? '',
       patientRemarks: (map['patientRemarks'] ?? map['patient remarks']) as String? ?? '',
+      permissions: map['permissions'] != null
+          ? Map<String, dynamic>.from(jsonDecode(map['permissions'] as String))
+          : const {},
     );
   }
 
@@ -140,6 +146,7 @@ class Patient {
     List<Map<String, dynamic>>? vaccinationHistory,
     String? allergicTo,
     String? patientRemarks,
+    Map<String, dynamic>? permissions,
   }) {
     return Patient(
       id: id,
@@ -166,6 +173,7 @@ class Patient {
       vaccinationHistory: vaccinationHistory ?? this.vaccinationHistory,
       allergicTo: allergicTo ?? this.allergicTo,
       patientRemarks: patientRemarks ?? this.patientRemarks,
+      permissions: permissions ?? this.permissions,
     );
   }
 

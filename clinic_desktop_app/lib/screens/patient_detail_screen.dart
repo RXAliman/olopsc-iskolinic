@@ -5,6 +5,7 @@ import '../providers/patient_provider.dart';
 import '../theme/app_theme.dart';
 import 'visitation_form_screen.dart';
 import 'patient_form_screen.dart';
+import '../models/patient.dart';
 
 class PatientDetailScreen extends StatefulWidget {
   const PatientDetailScreen({super.key});
@@ -126,6 +127,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                               icon: Icons.medical_information_rounded,
                               isSelected: _selectedIndex == 2,
                               onTap: () => setState(() => _selectedIndex = 2),
+                            ),
+                            const SizedBox(height: 8),
+                            _SidebarItem(
+                              title: 'Permissions',
+                              icon: Icons.verified_user_outlined,
+                              isSelected: _selectedIndex == 3,
+                              onTap: () => setState(() => _selectedIndex = 3),
                             ),
                           ],
                         ),
@@ -970,6 +978,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                             ],
                           ),
                         ),
+                      if (_selectedIndex == 3)
+                        Expanded(child: _buildPermissionsTab(context, patient)),
                     ],
                   ),
                 ),
@@ -978,6 +988,123 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPermissionsTab(BuildContext context, Patient patient) {
+    final p = patient.permissions;
+    final suddenIllness = p['suddenIllness'] == true;
+    final initialMedication = p['initialMedication'] == true;
+    final emergencyHospital = p['emergencyHospital'] == true;
+    final procedure = p['procedure'] == true;
+    final marikinaValley = p['marikinaValley'] == true;
+    final marikinaStVincent = p['marikinaStVincent'] == true;
+    final othersPermission = p['others'] == true;
+    final othersSpecify = p['othersSpecify']?.toString() ?? '';
+
+    Widget buildCheck(String text, bool checked) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Row(
+          children: [
+            Icon(
+              checked
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              color: checked ? AppTheme.textMuted : AppTheme.dividerColor,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              style: TextStyle(
+                color: checked ? AppTheme.textPrimary : AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) =>
+                      PatientFormScreen(patient: patient, initialTabIndex: 2),
+                );
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: AppTheme.accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppTheme.accent),
+                ),
+              ),
+              icon: const Icon(Icons.edit_note_rounded, size: 20),
+              label: const Text('Edit Permissions'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Permission granted for:',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                buildCheck(
+                  'Treatment of sudden illness or injuries',
+                  suddenIllness,
+                ),
+                buildCheck(
+                  "Giving of initial medication for child's illness while in school",
+                  initialMedication,
+                ),
+                buildCheck(
+                  'School authorities to take the child to the nearest hospital if emergency',
+                  emergencyHospital,
+                ),
+                if (emergencyHospital)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 32.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildCheck(
+                          'Marikina Valley Medical Center',
+                          marikinaValley,
+                        ),
+                        buildCheck(
+                          'Marikina St. Vincent Hospital',
+                          marikinaStVincent,
+                        ),
+                        buildCheck(
+                          'Others: ${othersPermission ? othersSpecify : ""}'
+                              .trim(),
+                          othersPermission,
+                        ),
+                      ],
+                    ),
+                  ),
+                buildCheck(
+                  'Treatment/Procedure is deemed necessary',
+                  procedure,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

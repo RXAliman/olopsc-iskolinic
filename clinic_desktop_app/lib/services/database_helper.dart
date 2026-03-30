@@ -27,7 +27,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 9,
+        version: 10,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -60,7 +60,8 @@ class DatabaseHelper {
         medicalHistory TEXT NOT NULL DEFAULT '[]',
         vaccinationHistory TEXT NOT NULL DEFAULT '[]',
         allergicTo TEXT NOT NULL DEFAULT '',
-        patientRemarks TEXT NOT NULL DEFAULT ''
+        patientRemarks TEXT NOT NULL DEFAULT '',
+        permissions TEXT NOT NULL DEFAULT '{}'
       )
     ''');
     await db.execute('''
@@ -196,6 +197,9 @@ class DatabaseHelper {
     if (oldVersion < 9) {
       await db.execute('ALTER TABLE patients ADD COLUMN allergicTo TEXT NOT NULL DEFAULT ""');
       await db.execute('ALTER TABLE patients ADD COLUMN patientRemarks TEXT NOT NULL DEFAULT ""');
+    }
+    if (oldVersion < 10) {
+      await db.execute("ALTER TABLE patients ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'");
     }
   }
 
