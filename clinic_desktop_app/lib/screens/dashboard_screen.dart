@@ -25,6 +25,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  bool _focusSearchOnNextTab = false;
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
 
@@ -66,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0:
         return _buildDashboardHome();
       case 1:
-        return const PatientListScreen();
+        return PatientListScreen(autoFocusSearch: _focusSearchOnNextTab);
       case 2:
         return const InventoryScreen();
       case 3:
@@ -157,6 +158,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     icon: const Icon(Icons.medical_services_rounded, size: 18),
                     label: const Text('Add Visitation'),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _focusSearchOnNextTab = true;
+                        _selectedIndex = 1;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(16),
+                    ),
+                    icon: const Icon(Icons.search_rounded, size: 18),
+                    label: const Text('Search Patients'),
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton.icon(
@@ -725,7 +742,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             color: Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             child: InkWell(
-                              onTap: () => setState(() => _selectedIndex = i),
+                              onTap: () => setState(() {
+                                _focusSearchOnNextTab = false;
+                                _selectedIndex = i;
+                              }),
                               borderRadius: BorderRadius.circular(12),
                               hoverColor: Colors.white.withValues(alpha: 0.05),
                               child: AnimatedContainer(

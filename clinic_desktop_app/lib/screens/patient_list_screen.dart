@@ -8,7 +8,9 @@ import 'patient_detail_screen.dart';
 import 'patient_form_screen.dart';
 
 class PatientListScreen extends StatefulWidget {
-  const PatientListScreen({super.key});
+  final bool autoFocusSearch;
+
+  const PatientListScreen({super.key, this.autoFocusSearch = false});
 
   @override
   State<PatientListScreen> createState() => _PatientListScreenState();
@@ -16,17 +18,30 @@ class PatientListScreen extends StatefulWidget {
 
 class _PatientListScreenState extends State<PatientListScreen> {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     final query = context.read<PatientProvider>().searchQuery;
     _searchController.text = query;
+    if (widget.autoFocusSearch) {
+      _searchFocusNode.requestFocus();
+    }
+  }
+
+  @override
+  void didUpdateWidget(PatientListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.autoFocusSearch && !oldWidget.autoFocusSearch) {
+      _searchFocusNode.requestFocus();
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -72,17 +87,24 @@ class _PatientListScreenState extends State<PatientListScreen> {
                     width: 400,
                     child: TextField(
                       controller: _searchController,
+                      focusNode: _searchFocusNode,
                       onChanged: (query) => provider.setSearchQuery(query),
                       decoration: InputDecoration(
                         hintText: 'Search by name or ID number...',
                         prefixIcon: const Icon(Icons.search_rounded, size: 20),
                         suffixIcon: provider.searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 18),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  provider.setSearchQuery('');
-                                },
+                            ? Tooltip(
+                                message: 'Clear search',
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 18,
+                                  ),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    provider.setSearchQuery('');
+                                  },
+                                ),
                               )
                             : null,
                       ),
