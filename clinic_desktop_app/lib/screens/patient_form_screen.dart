@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -311,12 +312,20 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                const TabBar(
+                TabBar(
                   tabs: [
                     Tab(text: 'Personal Information'),
                     Tab(text: 'Medical Information'),
                   ],
                   labelColor: Colors.white,
+                  labelStyle: TextStyle(
+                    fontFamily: GoogleFonts.inter().fontFamily,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  unselectedLabelStyle: TextStyle(
+                    fontFamily: GoogleFonts.inter().fontFamily,
+                    fontWeight: FontWeight.normal,
+                  ),
                   indicator: BoxDecoration(
                     color: AppTheme.accent,
                     borderRadius: BorderRadius.only(
@@ -325,7 +334,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                     ),
                   ),
                   dividerColor: AppTheme.accent,
-                  dividerHeight: 0,
+                  dividerHeight: 2,
                   indicatorSize: TabBarIndicatorSize.tab,
                 ),
                 const SizedBox(height: 16),

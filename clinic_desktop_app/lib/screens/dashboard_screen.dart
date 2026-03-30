@@ -157,7 +157,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.all(16),
                     ),
                     icon: const Icon(Icons.medical_services_rounded, size: 18),
-                    label: const Text('Add Visitation'),
+                    label: const Text('Add Patient / Visitation'),
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton.icon(

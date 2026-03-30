@@ -611,11 +611,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                               s,
                                                               style: const TextStyle(
                                                                 color: AppTheme
-                                                                    .accentLight,
+                                                                    .accent,
                                                                 fontSize: 12,
                                                                 fontWeight:
                                                                     FontWeight
-                                                                        .w500,
+                                                                        .bold,
                                                               ),
                                                             ),
                                                           ),
