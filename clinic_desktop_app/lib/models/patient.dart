@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Patient {
   final String id;
   final String firstName;
@@ -16,6 +18,10 @@ class Patient {
   final String guardian2Contact;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<Map<String, dynamic>> pastMedicalHistory;
+  final List<Map<String, dynamic>> vaccinationHistory;
+  final String allergicTo;
+  final String patientRemarks;
 
   // CRDT fields
   final String hlc;
@@ -43,6 +49,10 @@ class Patient {
     this.hlc = '',
     this.nodeId = '',
     this.isDeleted = false,
+    this.pastMedicalHistory = const [],
+    this.vaccinationHistory = const [],
+    this.allergicTo = '',
+    this.patientRemarks = '',
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -68,6 +78,10 @@ class Patient {
       'hlc': hlc,
       'nodeId': nodeId,
       'isDeleted': isDeleted ? 1 : 0,
+      'medicalHistory': jsonEncode(pastMedicalHistory),
+      'vaccinationHistory': jsonEncode(vaccinationHistory),
+      'allergicTo': allergicTo,
+      'patientRemarks': patientRemarks,
     };
   }
 
@@ -93,6 +107,14 @@ class Patient {
       hlc: map['hlc'] as String? ?? '',
       nodeId: map['nodeId'] as String? ?? '',
       isDeleted: (map['isDeleted'] as int? ?? 0) == 1,
+      pastMedicalHistory: map['medicalHistory'] != null 
+          ? List<Map<String, dynamic>>.from(jsonDecode(map['medicalHistory'] as String))
+          : [],
+      vaccinationHistory: map['vaccinationHistory'] != null 
+          ? List<Map<String, dynamic>>.from(jsonDecode(map['vaccinationHistory'] as String))
+          : [],
+      allergicTo: (map['allergicTo'] ?? map['allergic to']) as String? ?? '',
+      patientRemarks: (map['patientRemarks'] ?? map['patient remarks']) as String? ?? '',
     );
   }
 
@@ -114,6 +136,10 @@ class Patient {
     String? hlc,
     String? nodeId,
     bool? isDeleted,
+    List<Map<String, dynamic>>? pastMedicalHistory,
+    List<Map<String, dynamic>>? vaccinationHistory,
+    String? allergicTo,
+    String? patientRemarks,
   }) {
     return Patient(
       id: id,
@@ -136,12 +162,27 @@ class Patient {
       hlc: hlc ?? this.hlc,
       nodeId: nodeId ?? this.nodeId,
       isDeleted: isDeleted ?? this.isDeleted,
+      pastMedicalHistory: pastMedicalHistory ?? this.pastMedicalHistory,
+      vaccinationHistory: vaccinationHistory ?? this.vaccinationHistory,
+      allergicTo: allergicTo ?? this.allergicTo,
+      patientRemarks: patientRemarks ?? this.patientRemarks,
     );
   }
 
   /// Converts this patient to a JSON-compatible map for WebSocket sync.
-  Map<String, dynamic> toSyncMap() => toMap();
+  Map<String, dynamic> toSyncMap() {
+    final map = toMap();
+    map['allergic to'] = map.remove('allergicTo');
+    map['patient remarks'] = map.remove('patientRemarks');
+    return map;
+  }
 
   /// Creates a Patient from a sync payload received over WebSocket.
-  factory Patient.fromSyncMap(Map<String, dynamic> map) => Patient.fromMap(map);
+  factory Patient.fromSyncMap(Map<String, dynamic> map) {
+    return Patient.fromMap({
+      ...map,
+      'allergicTo': map['allergic to'],
+      'patientRemarks': map['patient remarks'],
+    });
+  }
 }

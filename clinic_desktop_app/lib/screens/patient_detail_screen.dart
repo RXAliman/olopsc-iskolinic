@@ -42,7 +42,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
         return Dialog(
           child: Container(
-            width: 950,
+            width: 840,
             height: 640,
             padding: const EdgeInsets.all(32),
             child: Column(
@@ -119,6 +119,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                               icon: Icons.history_rounded,
                               isSelected: _selectedIndex == 1,
                               onTap: () => setState(() => _selectedIndex = 1),
+                            ),
+                            const SizedBox(height: 8),
+                            _SidebarItem(
+                              title: 'Medical Information',
+                              icon: Icons.medical_information_rounded,
+                              isSelected: _selectedIndex == 2,
+                              onTap: () => setState(() => _selectedIndex = 2),
                             ),
                           ],
                         ),
@@ -363,7 +370,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ElevatedButton.icon(
+                              TextButton.icon(
                                 onPressed: () {
                                   showDialog(
                                     context: context,
@@ -372,13 +379,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                     ),
                                   );
                                 },
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 12,
-                                  ),
+                                style: TextButton.styleFrom(
+                                  backgroundColor: AppTheme.accent,
+                                  foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
+                                    side: const BorderSide(
+                                      color: AppTheme.accent,
+                                    ),
                                   ),
                                 ),
                                 icon: const Icon(Icons.add_rounded, size: 18),
@@ -703,6 +711,262 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                           provider.visitPageSize) +
                                       provider.visitations.length,
                                 ),
+                            ],
+                          ),
+                        ),
+                      if (_selectedIndex == 2)
+                        // --- Medical History Content ---
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => PatientFormScreen(
+                                          patient: patient,
+                                          initialTabIndex: 1,
+                                        ),
+                                      );
+                                    },
+                                    style: TextButton.styleFrom(
+                                      backgroundColor: AppTheme.accent,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        side: const BorderSide(
+                                          color: AppTheme.accent,
+                                        ),
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.edit_note_rounded,
+                                      size: 20,
+                                    ),
+                                    label: const Text('Edit Medical Info'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Allergies',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleLarge,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        patient.allergicTo.isNotEmpty
+                                            ? patient.allergicTo
+                                            : 'No known allergies.',
+                                        style: TextStyle(
+                                          color: patient.allergicTo.isNotEmpty
+                                              ? AppTheme.textPrimary
+                                              : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      const Divider(),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        'Past Medical History',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleLarge,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      if (patient.pastMedicalHistory.isEmpty)
+                                        const Text(
+                                          'No history recorded.',
+                                          style: TextStyle(
+                                            color: AppTheme.textMuted,
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).cardColor,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: AppTheme.dividerColor,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              const Row(
+                                                children: [
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Text(
+                                                      'Disease',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    flex: 1,
+                                                    child: Center(
+                                                      child: Text(
+                                                        'Past',
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    flex: 1,
+                                                    child: Center(
+                                                      child: Text(
+                                                        'Present',
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const Divider(),
+                                              ...patient.pastMedicalHistory.map((
+                                                m,
+                                              ) {
+                                                return Row(
+                                                  children: [
+                                                    Expanded(
+                                                      flex: 2,
+                                                      child: Text(
+                                                        m['disease'].toString(),
+                                                      ),
+                                                    ),
+                                                    Expanded(
+                                                      flex: 1,
+                                                      child: Center(
+                                                        child: Checkbox(
+                                                          value:
+                                                              m['past'] == true,
+                                                          onChanged:
+                                                              null, // Read-only
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Expanded(
+                                                      flex: 1,
+                                                      child: Center(
+                                                        child: Checkbox(
+                                                          value:
+                                                              m['present'] ==
+                                                              true,
+                                                          onChanged:
+                                                              null, // Read-only
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              }), // map
+                                            ],
+                                          ),
+                                        ),
+                                      const SizedBox(height: 14),
+                                      const Divider(),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        'Vaccination History',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleLarge,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      if (patient.vaccinationHistory.isEmpty)
+                                        const Text(
+                                          'No vaccines recorded.',
+                                          style: TextStyle(
+                                            color: AppTheme.textMuted,
+                                          ),
+                                        )
+                                      else
+                                        ...patient.vaccinationHistory.map((m) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 8.0,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.vaccines_outlined,
+                                                  color: AppTheme.accent,
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    m['name'].toString(),
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Text(
+                                                  m['dateGiven'] != null
+                                                      ? DateFormat(
+                                                          'MMM dd, yyyy',
+                                                        ).format(
+                                                          DateTime.parse(
+                                                            m['dateGiven'],
+                                                          ),
+                                                        )
+                                                      : 'Unknown Date',
+                                                  style: const TextStyle(
+                                                    color: AppTheme.textMuted,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                      const SizedBox(height: 14),
+                                      const Divider(),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        'Other Patient Remarks',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleLarge,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        patient.patientRemarks.isNotEmpty
+                                            ? patient.patientRemarks
+                                            : 'No remarks.',
+                                        style: TextStyle(
+                                          color:
+                                              patient.patientRemarks.isNotEmpty
+                                              ? AppTheme.textPrimary
+                                              : AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),

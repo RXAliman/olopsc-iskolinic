@@ -27,7 +27,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 6,
+        version: 9,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -56,7 +56,11 @@ class DatabaseHelper {
         updatedAt TEXT NOT NULL,
         hlc TEXT NOT NULL DEFAULT '',
         nodeId TEXT NOT NULL DEFAULT '',
-        isDeleted INTEGER NOT NULL DEFAULT 0
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        medicalHistory TEXT NOT NULL DEFAULT '[]',
+        vaccinationHistory TEXT NOT NULL DEFAULT '[]',
+        allergicTo TEXT NOT NULL DEFAULT '',
+        patientRemarks TEXT NOT NULL DEFAULT ''
       )
     ''');
     await db.execute('''
@@ -177,6 +181,21 @@ class DatabaseHelper {
       await db.execute("ALTER TABLE patients ADD COLUMN contactNumber TEXT NOT NULL DEFAULT ''");
       await db.execute("ALTER TABLE patients ADD COLUMN guardian2Name TEXT NOT NULL DEFAULT ''");
       await db.execute("ALTER TABLE patients ADD COLUMN guardian2Contact TEXT NOT NULL DEFAULT ''");
+    }
+    if (oldVersion < 7) {
+      // Add the 2 new JSON fields to patients
+      await db.execute("ALTER TABLE patients ADD COLUMN medicalHistory TEXT NOT NULL DEFAULT '[]'");
+      await db.execute("ALTER TABLE patients ADD COLUMN vaccinationHistory TEXT NOT NULL DEFAULT '[]'");
+    }
+    if (oldVersion < 8) {
+      try {
+        await db.execute('ALTER TABLE patients ADD COLUMN "allergic to" TEXT NOT NULL DEFAULT ""');
+        await db.execute('ALTER TABLE patients ADD COLUMN "patient remarks" TEXT NOT NULL DEFAULT ""');
+      } catch (_) {}
+    }
+    if (oldVersion < 9) {
+      await db.execute('ALTER TABLE patients ADD COLUMN allergicTo TEXT NOT NULL DEFAULT ""');
+      await db.execute('ALTER TABLE patients ADD COLUMN patientRemarks TEXT NOT NULL DEFAULT ""');
     }
   }
 

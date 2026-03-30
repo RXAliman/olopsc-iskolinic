@@ -48,30 +48,19 @@ class _PatientListScreenState extends State<PatientListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Patient Records',
-                          style: Theme.of(context).textTheme.headlineLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          provider.searchQuery.isNotEmpty
-                              ? '$totalPatients search results'
-                              : '$totalPatients total records',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
+                  Text(
+                    'Patient Records',
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _showPatientForm(context),
-                    icon: const Icon(Icons.person_add_rounded, size: 18),
-                    label: const Text('Add Patient'),
+                  const SizedBox(height: 4),
+                  Text(
+                    provider.searchQuery.isNotEmpty
+                        ? '$totalPatients search results'
+                        : '$totalPatients total records',
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
               ),
@@ -98,6 +87,18 @@ class _PatientListScreenState extends State<PatientListScreen> {
                             : null,
                       ),
                     ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _showPatientForm(context),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                    icon: const Icon(Icons.person_add_rounded, size: 18),
+                    label: const Text('Add Patient'),
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton.icon(
