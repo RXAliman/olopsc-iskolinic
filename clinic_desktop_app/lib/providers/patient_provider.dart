@@ -191,6 +191,7 @@ class PatientProvider extends ChangeNotifier {
       _currentPage = newTotalPages - 1;
     }
     await loadPatients();
+    await loadTodayVisits();
     _autoPush();
   }
 

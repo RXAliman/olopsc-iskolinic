@@ -23,6 +23,7 @@ class ClinicInputApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       home: const QrScanScreen(),
       routes: {
+        '/scan': (_) => const QrScanScreen(),
         '/welcome': (_) => const WelcomeScreen(),
         '/form': (_) => const InputFormScreen(),
         '/confirmation': (_) => const ConfirmationScreen(),

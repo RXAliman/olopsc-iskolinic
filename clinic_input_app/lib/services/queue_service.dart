@@ -1,5 +1,11 @@
+import 'desktop_connection_service.dart';
+
 class QueueService {
-  /// Add a patient to the clinic queue.
+  final _connection = DesktopConnectionService.instance;
+
+  /// Submit a patient record to the desktop app via its local HTTP server.
+  ///
+  /// Throws an exception if not connected or if the request fails.
   Future<void> addToQueue({
     required String studentName,
     required String studentNumber,
@@ -18,6 +24,44 @@ class QueueService {
     required String allergicTo,
     required List<String> symptoms,
   }) async {
-    // TODO: implement submission mechanism
+    if (!_connection.isConnected) {
+      throw Exception(
+        'Not connected to the desktop app. Please scan the QR code first.',
+      );
+    }
+
+    // Re-verify connection before submitting
+    final reachable = await _connection.checkConnection();
+    if (!reachable) {
+      throw Exception(
+        'Lost connection to the desktop app. Please reconnect.',
+      );
+    }
+
+    final data = {
+      'patientName': studentName,
+      'idNumber': studentNumber,
+      'firstName': firstName,
+      'lastName': lastName,
+      'middleName': middleName,
+      'extension': extension,
+      'birthdate': birthdate?.toIso8601String(),
+      'sex': sex,
+      'contactNumber': contactNumber,
+      'address': address,
+      'guardianName': guardianName,
+      'guardianContact': guardianContact,
+      'guardian2Name': guardian2Name,
+      'guardian2Contact': guardian2Contact,
+      'allergicTo': allergicTo,
+      'symptoms': symptoms,
+    };
+
+    final success = await _connection.submitPatient(data);
+    if (!success) {
+      throw Exception(
+        'Failed to submit the form. Please try again.',
+      );
+    }
   }
 }

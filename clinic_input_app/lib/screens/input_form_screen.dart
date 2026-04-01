@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../constants/symptoms.dart';
 import '../formatters/uppercase_text.dart';
+import '../services/desktop_connection_service.dart';
 import '../services/queue_service.dart';
 import '../theme/app_theme.dart';
 
@@ -171,6 +172,14 @@ class _InputFormScreenState extends State<InputFormScreen> {
 
     setState(() => _isSubmitting = true);
 
+    // Initial connection check
+    final isConnected = await DesktopConnectionService.instance.checkConnection();
+    if (!isConnected) {
+      if (mounted) setState(() => _isSubmitting = false);
+      _showConnectionLostDialog();
+      return;
+    }
+
     try {
       await _queueService.addToQueue(
         studentName: studentName,
@@ -196,19 +205,76 @@ class _InputFormScreenState extends State<InputFormScreen> {
       Navigator.pushReplacementNamed(context, '/confirmation');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to submit: $e'),
-          backgroundColor: AppTheme.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+      setState(() => _isSubmitting = false);
+      
+      // If the error message indicates a connection issue, show the special dialog
+      final errorMsg = e.toString().toLowerCase();
+      if (errorMsg.contains('connection') || errorMsg.contains('reachable')) {
+        _showConnectionLostDialog();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit: $e'),
+            backgroundColor: AppTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
-        ),
-      );
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  /// Displays a dialog when the connection to the desktop app is lost.
+  void _showConnectionLostDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.danger.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                color: AppTheme.danger,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('Connection Lost'),
+          ],
+        ),
+        content: const Text(
+          'The connection to the clinic desktop app has been lost. Please ensure the tablet is still on the correct Wi-Fi network.',
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(ctx); // Close dialog
+              Navigator.pushReplacementNamed(context, '/scan');
+            },
+            child: const Text('Reset Connection'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx); // Close dialog
+              _submit(); // Retry submission
+            },
+            child: const Text('Retry Connection'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

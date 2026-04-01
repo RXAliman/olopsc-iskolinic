@@ -18,13 +18,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void initState() {
     super.initState();
-    _videoController = VideoPlayerController.asset('assets/olopsc-hs-clinic-avp.mp4')
-      ..initialize().then((_) {
-        _videoController.setVolume(0.0);
-        _videoController.setLooping(true);
-        _videoController.play();
-        setState(() {}); // Update to show video when initialized
-      });
+    _videoController =
+        VideoPlayerController.asset('assets/olopsc-hs-clinic-avp.mp4')
+          ..initialize().then((_) {
+            _videoController.setVolume(0.0);
+            _videoController.setLooping(true);
+            _videoController.play();
+            setState(() {}); // Update to show video when initialized
+          });
   }
 
   @override
@@ -38,7 +39,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     return GestureDetector(
       onTap: () => Navigator.pushReplacementNamed(context, '/form'),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        extendBody: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -63,7 +64,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     // Upper left: OLOPCS Marikina City Logo
                     Image.asset(
                       'assets/olopsc-marikina-city.png',
-                      height: 80, // Adjust size as needed
+                      height: 80,
                       fit: BoxFit.contain,
                     ),
                     // Upper right: Date and Time
@@ -124,7 +125,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
               // Video player area
               SizedBox(
-                width: 640, // Base width, scales aspect ratio
+                width: 640,
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Container(
@@ -184,7 +185,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   child: AnimatedTextKit(
                     animatedTexts: [
                       TyperAnimatedText(
-                        'PRESS ANYWHERE TO CONTINUE',
+                        'TAP ANYWHERE TO CONTINUE',
                         textStyle: GoogleFonts.inter(
                           fontSize: 30,
                           fontWeight: FontWeight.w500,

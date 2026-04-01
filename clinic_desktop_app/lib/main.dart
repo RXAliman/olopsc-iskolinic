@@ -5,6 +5,7 @@ import 'providers/patient_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/inventory_provider.dart';
+import 'providers/local_server_provider.dart';
 import 'screens/dashboard_screen.dart';
 // import 'services/mock_data_generator.dart';
 // import 'services/database_helper.dart';
@@ -46,11 +47,21 @@ void main() async {
   // Wire auto-deduct: visitation supplies auto-deduct from inventory
   patientProvider.setInventoryProvider(inventoryProvider);
 
+  // Initialize local HTTP server for tablet connection
+  final localServerProvider = LocalServerProvider();
+  await localServerProvider.startServer();
+
+  // When tablet submits a patient, refresh the desktop UI
+  localServerProvider.setOnDataChanged(() {
+    patientProvider.refreshAll();
+  });
+
   runApp(
     ClinicApp(
       patientProvider: patientProvider,
       syncProvider: syncProvider,
       inventoryProvider: inventoryProvider,
+      localServerProvider: localServerProvider,
     ),
   );
 }
@@ -59,12 +70,14 @@ class ClinicApp extends StatelessWidget {
   final PatientProvider patientProvider;
   final SyncProvider syncProvider;
   final InventoryProvider inventoryProvider;
+  final LocalServerProvider localServerProvider;
 
   const ClinicApp({
     super.key,
     required this.patientProvider,
     required this.syncProvider,
     required this.inventoryProvider,
+    required this.localServerProvider,
   });
 
   @override
@@ -75,6 +88,7 @@ class ClinicApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider.value(value: syncProvider),
         ChangeNotifierProvider.value(value: inventoryProvider),
+        ChangeNotifierProvider.value(value: localServerProvider),
       ],
       child: MaterialApp(
         title: 'IskoLinic App',

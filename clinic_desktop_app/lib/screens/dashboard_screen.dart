@@ -15,6 +15,7 @@ import 'patient_detail_screen.dart';
 import 'visitation_form_screen.dart';
 import 'analytics_screen.dart';
 import 'inventory_screen.dart';
+import 'connection_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -34,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.people_rounded, 'Patients'),
     _NavItem(Icons.inventory_2_rounded, 'Inventory'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
+    _NavItem(Icons.devices_rounded, 'Connection'),
   ];
 
   @override
@@ -72,6 +74,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const InventoryScreen();
       case 3:
         return const AnalyticsScreen();
+      case 4:
+        return const ConnectionScreen();
       default:
         return _buildDashboardHome();
     }
