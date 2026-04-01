@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'screens/qr_scan_screen.dart';
 import 'screens/input_form_screen.dart';
+import 'screens/welcome_screen.dart';
 import 'screens/confirmation_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const ClinicInputApp());
 }
 
@@ -20,6 +23,7 @@ class ClinicInputApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       home: const QrScanScreen(),
       routes: {
+        '/welcome': (_) => const WelcomeScreen(),
         '/form': (_) => const InputFormScreen(),
         '/confirmation': (_) => const ConfirmationScreen(),
       },

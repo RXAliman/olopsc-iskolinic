@@ -51,7 +51,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
 
   void _navigateBack() {
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/form');
+      Navigator.pushReplacementNamed(context, '/welcome');
     }
   }
 

@@ -42,7 +42,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
     if (code.trim().toLowerCase() == 'clinicinput') {
       setState(() => _isProcessing = true);
       _cameraController?.stop();
-      Navigator.pushReplacementNamed(context, '/form');
+      Navigator.pushReplacementNamed(context, '/welcome');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
