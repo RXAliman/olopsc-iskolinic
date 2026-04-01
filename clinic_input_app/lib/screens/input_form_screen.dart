@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/symptoms.dart';
 import '../formatters/uppercase_text.dart';
-import '../services/queue_service.dart';
 import '../theme/app_theme.dart';
 
 class InputFormScreen extends StatefulWidget {
@@ -13,7 +12,6 @@ class InputFormScreen extends StatefulWidget {
 
 class _InputFormScreenState extends State<InputFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _queueService = QueueService();
   bool _isSubmitting = false;
 
   // Patient fields
@@ -114,17 +112,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      await _queueService.addToQueue(
-        studentName: _nameCtrl.text.trim(),
-        studentNumber: _numberCtrl.text.trim(),
-        address: _addressCtrl.text.trim(),
-        guardianName: _guardianNameCtrl.text.trim(),
-        guardianContact: _guardianContactCtrl.text.trim(),
-        symptoms: _selectedSymptoms.toList(),
-        treatment: _treatmentCtrl.text.trim(),
-        remarks: _remarksCtrl.text.trim(),
-      );
-
       if (!mounted) return;
       _resetForm();
       Navigator.pushReplacementNamed(context, '/confirmation');
