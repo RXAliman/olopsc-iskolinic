@@ -5,6 +5,7 @@ import '../constants/symptoms.dart';
 import '../formatters/uppercase_text.dart';
 import '../services/desktop_connection_service.dart';
 import '../services/queue_service.dart';
+import '../services/persistent_form_service.dart';
 import '../theme/app_theme.dart';
 
 class InputFormScreen extends StatefulWidget {
@@ -44,6 +45,47 @@ class _InputFormScreenState extends State<InputFormScreen> {
   bool _showAllBehavioral = true;
 
   @override
+  void initState() {
+    super.initState();
+    final p = PersistentFormService.instance;
+
+    // Initialize state from persistence
+    _firstNameCtrl.text = p.firstName;
+    _lastNameCtrl.text = p.lastName;
+    _middleNameCtrl.text = p.middleName;
+    _numberCtrl.text = p.studentNumber;
+    _contactCtrl.text = p.contactNumber;
+    _addressCtrl.text = p.address;
+    _guardianNameCtrl.text = p.guardianName;
+    _guardianContactCtrl.text = p.guardianContact;
+    _guardian2NameCtrl.text = p.guardian2Name;
+    _guardian2ContactCtrl.text = p.guardian2Contact;
+    _customExtensionCtrl.text = p.customExtension;
+    _customSexCtrl.text = p.customSex;
+    _allergicToCtrl.text = p.allergicTo;
+
+    _selectedExtension = p.extension;
+    _selectedBirthdate = p.birthdate;
+    _selectedSex = p.sex;
+    _selectedSymptoms.addAll(p.selectedSymptoms);
+
+    // Add listeners to sync UI -> Persistent Service
+    _firstNameCtrl.addListener(() => p.firstName = _firstNameCtrl.text);
+    _lastNameCtrl.addListener(() => p.lastName = _lastNameCtrl.text);
+    _middleNameCtrl.addListener(() => p.middleName = _middleNameCtrl.text);
+    _customExtensionCtrl.addListener(() => p.customExtension = _customExtensionCtrl.text);
+    _numberCtrl.addListener(() => p.studentNumber = _numberCtrl.text);
+    _customSexCtrl.addListener(() => p.customSex = _customSexCtrl.text);
+    _contactCtrl.addListener(() => p.contactNumber = _contactCtrl.text);
+    _addressCtrl.addListener(() => p.address = _addressCtrl.text);
+    _guardianNameCtrl.addListener(() => p.guardianName = _guardianNameCtrl.text);
+    _guardianContactCtrl.addListener(() => p.guardianContact = _guardianContactCtrl.text);
+    _guardian2NameCtrl.addListener(() => p.guardian2Name = _guardian2NameCtrl.text);
+    _guardian2ContactCtrl.addListener(() => p.guardian2Contact = _guardian2ContactCtrl.text);
+    _allergicToCtrl.addListener(() => p.allergicTo = _allergicToCtrl.text);
+  }
+
+  @override
   void dispose() {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
@@ -76,6 +118,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _guardian2NameCtrl.clear();
     _guardian2ContactCtrl.clear();
     _allergicToCtrl.clear();
+    PersistentFormService.instance.clear();
     setState(() {
       _selectedExtension = 'None';
       _selectedBirthdate = null;
@@ -412,6 +455,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       onChanged: (val) {
                         if (val != null) {
                           setState(() => _selectedExtension = val);
+                          PersistentFormService.instance.extension = val;
                         }
                       },
                     ),
@@ -474,6 +518,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                         );
                         if (picked != null) {
                           setState(() => _selectedBirthdate = picked);
+                          PersistentFormService.instance.birthdate = picked;
                         }
                       },
                       child: InputDecorator(
@@ -510,6 +555,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       onChanged: (val) {
                         if (val != null) {
                           setState(() => _selectedSex = val);
+                          PersistentFormService.instance.sex = val;
                         }
                       },
                     ),
@@ -861,8 +907,10 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   setState(() {
                     if (selected) {
                       _selectedSymptoms.add(symptom);
+                      PersistentFormService.instance.addSymptom(symptom);
                     } else {
                       _selectedSymptoms.remove(symptom);
+                      PersistentFormService.instance.removeSymptom(symptom);
                     }
                   });
                 },
