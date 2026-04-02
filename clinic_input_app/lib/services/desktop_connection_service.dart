@@ -97,6 +97,28 @@ class DesktopConnectionService {
     }
   }
 
+  /// Fetch a single patient by their ID number.
+  ///
+  /// Returns a map of patient details or null if not found.
+  Future<Map<String, dynamic>?> fetchPatientByIdNumber(String idNumber) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/api/patients/search?idNumber=$idNumber'),
+            headers: _authHeaders,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
+      _connected = false;
+      return null;
+    }
+  }
+
   /// Submit a new patient (and optional visitation) to the desktop database.
   ///
   /// Returns `true` on success.

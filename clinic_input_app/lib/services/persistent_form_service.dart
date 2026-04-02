@@ -7,6 +7,49 @@ class PersistentFormService {
   factory PersistentFormService() => instance;
   PersistentFormService._internal();
 
+  bool get isEmpty => firstName.trim().isEmpty && lastName.trim().isEmpty;
+
+  /// Update core patient fields from a data map (e.g. from desktop API).
+  void updateFromMap(Map<String, dynamic> data) {
+    firstName = data['firstName'] as String? ?? '';
+    lastName = data['lastName'] as String? ?? '';
+    middleName = data['middleName'] as String? ?? '';
+
+    // Extension validation
+    final incomingExt = data['extension'] as String? ?? 'None';
+    const allowedExtensions = ['None', 'JR.', 'SR.', 'I', 'II', 'III'];
+    if (allowedExtensions.contains(incomingExt)) {
+      extension = incomingExt;
+      customExtension = '';
+    } else {
+      extension = 'Others';
+      customExtension = incomingExt;
+    }
+
+    if (data['birthdate'] != null) {
+      birthdate = DateTime.tryParse(data['birthdate'] as String);
+    }
+
+    // Sex validation
+    final incomingSex = data['sex'] as String? ?? 'Female';
+    const allowedSex = ['Male', 'Female'];
+    if (allowedSex.contains(incomingSex)) {
+      sex = incomingSex;
+      customSex = '';
+    } else {
+      sex = 'Others';
+      customSex = incomingSex;
+    }
+
+    contactNumber = data['contactNumber'] as String? ?? '';
+    address = data['address'] as String? ?? '';
+    guardianName = data['guardianName'] as String? ?? '';
+    guardianContact = data['guardianContact'] as String? ?? '';
+    guardian2Name = data['guardian2Name'] as String? ?? '';
+    guardian2Contact = data['guardian2Contact'] as String? ?? '';
+    allergicTo = data['allergicTo'] as String? ?? '';
+  }
+
   // ── Patient Info ─────────────────────────────────────────────────
   String studentNumber = '';
   String firstName = '';

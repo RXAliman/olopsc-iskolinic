@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/qr_scan_screen.dart';
 import 'screens/input_form_screen.dart';
+import 'screens/barcode_scanner_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/confirmation_screen.dart';
 import 'theme/app_theme.dart';
@@ -25,6 +26,7 @@ class ClinicInputApp extends StatelessWidget {
       routes: {
         '/scan': (_) => const QrScanScreen(),
         '/welcome': (_) => const WelcomeScreen(),
+        '/barcode': (_) => const BarcodeScannerScreen(),
         '/form': (_) => const InputFormScreen(),
         '/confirmation': (_) => const ConfirmationScreen(),
       },

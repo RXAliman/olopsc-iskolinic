@@ -337,6 +337,18 @@ class DatabaseHelper {
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
 
+  Future<Patient?> getPatientByIdNumber(String idNumber) async {
+    final db = await database;
+    final maps = await db.query(
+      'patients',
+      where: 'isDeleted = 0 AND idNumber = ?',
+      whereArgs: [idNumber],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return Patient.fromMap(maps.first);
+  }
+
   // ── Visitation CRUD (with soft-delete) ──────────────────────────
 
   Future<void> insertVisitation(Visitation visit) async {

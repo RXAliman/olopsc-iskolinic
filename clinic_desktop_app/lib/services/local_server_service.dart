@@ -90,6 +90,40 @@ class LocalServerService {
       }
     });
 
+    // Search patient by ID number (exact match)
+    router.get('/api/patients/search', (shelf.Request request) async {
+      try {
+        final idNumber = request.url.queryParameters['idNumber'];
+        if (idNumber == null || idNumber.isEmpty) {
+          return shelf.Response.badRequest(
+            body: jsonEncode({'error': 'idNumber query parameter is required'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+
+        final patient = await DatabaseHelper.instance.getPatientByIdNumber(idNumber);
+        if (patient == null) {
+          return shelf.Response.notFound(
+            jsonEncode({'error': 'Patient not found'}),
+            headers: {'Content-Type': 'application/json'},
+          );
+        }
+
+        final map = patient.toMap();
+        map['isDeleted'] = (map['isDeleted'] as int?) == 1;
+        
+        return shelf.Response.ok(
+          jsonEncode(map),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } catch (e) {
+        return shelf.Response.internalServerError(
+          body: jsonEncode({'error': e.toString()}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    });
+
     // Add a new patient + visitation from the tablet form
     router.post('/api/patients', (shelf.Request request) async {
       try {

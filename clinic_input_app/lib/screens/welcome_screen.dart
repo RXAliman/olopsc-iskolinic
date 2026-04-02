@@ -4,6 +4,7 @@ import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
+import '../services/persistent_form_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -13,31 +14,54 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  late VideoPlayerController _videoController;
+  VideoPlayerController? _videoController;
+  bool _videoInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    _initVideo();
+  }
+
+  void _initVideo() {
     _videoController =
         VideoPlayerController.asset('assets/olopsc-hs-clinic-avp.mp4')
           ..initialize().then((_) {
-            _videoController.setVolume(0.0);
-            _videoController.setLooping(true);
-            _videoController.play();
-            setState(() {}); // Update to show video when initialized
+            if (!mounted) return;
+            _videoController!.setVolume(0.0);
+            _videoController!.setLooping(true);
+            _videoController!.play();
+            setState(() => _videoInitialized = true);
           });
   }
 
   @override
   void dispose() {
-    _videoController.dispose();
+    _videoController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.pushReplacementNamed(context, '/form'),
+      onTap: () async {
+        // Fully dispose video to release hardware codec buffers for the camera
+        await _videoController?.dispose();
+        _videoController = null;
+        _videoInitialized = false;
+
+        if (!context.mounted) return;
+
+        final route = PersistentFormService.instance.isEmpty
+            ? '/barcode'
+            : '/form';
+        await Navigator.pushNamed(context, route);
+
+        // Re-initialize video when coming back
+        if (mounted) {
+          _initVideo();
+        }
+      },
       child: Scaffold(
         extendBody: false,
         body: Container(
@@ -139,8 +163,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: _videoController.value.isInitialized
-                          ? VideoPlayer(_videoController)
+                      child: _videoInitialized && _videoController != null
+                          ? VideoPlayer(_videoController!)
                           : const Center(
                               child: CircularProgressIndicator(
                                 color: Colors.white,

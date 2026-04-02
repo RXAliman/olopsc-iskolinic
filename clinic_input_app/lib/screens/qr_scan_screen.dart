@@ -27,6 +27,10 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   Future<void> _initCamera() async {
     try {
+      if (_cameraController != null) {
+        await _cameraController!.stop();
+        await _cameraController!.dispose();
+      }
       _cameraController = MobileScannerController();
     } catch (_) {
       setState(() => _cameraAvailable = false);
@@ -38,6 +42,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
     _manualHostCtrl.dispose();
     _manualPortCtrl.dispose();
     _manualTokenCtrl.dispose();
+    _cameraController?.stop();
     _cameraController?.dispose();
     super.dispose();
   }

@@ -19,6 +19,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _queueService = QueueService();
   bool _isSubmitting = false;
+  bool _isAutofilling = false;
 
   // ── Patient fields ───────────────────────────────────────────────
   final _firstNameCtrl = TextEditingController();
@@ -73,16 +74,73 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _firstNameCtrl.addListener(() => p.firstName = _firstNameCtrl.text);
     _lastNameCtrl.addListener(() => p.lastName = _lastNameCtrl.text);
     _middleNameCtrl.addListener(() => p.middleName = _middleNameCtrl.text);
-    _customExtensionCtrl.addListener(() => p.customExtension = _customExtensionCtrl.text);
+    _customExtensionCtrl.addListener(
+      () => p.customExtension = _customExtensionCtrl.text,
+    );
     _numberCtrl.addListener(() => p.studentNumber = _numberCtrl.text);
     _customSexCtrl.addListener(() => p.customSex = _customSexCtrl.text);
     _contactCtrl.addListener(() => p.contactNumber = _contactCtrl.text);
     _addressCtrl.addListener(() => p.address = _addressCtrl.text);
-    _guardianNameCtrl.addListener(() => p.guardianName = _guardianNameCtrl.text);
-    _guardianContactCtrl.addListener(() => p.guardianContact = _guardianContactCtrl.text);
-    _guardian2NameCtrl.addListener(() => p.guardian2Name = _guardian2NameCtrl.text);
-    _guardian2ContactCtrl.addListener(() => p.guardian2Contact = _guardian2ContactCtrl.text);
+    _guardianNameCtrl.addListener(
+      () => p.guardianName = _guardianNameCtrl.text,
+    );
+    _guardianContactCtrl.addListener(
+      () => p.guardianContact = _guardianContactCtrl.text,
+    );
+    _guardian2NameCtrl.addListener(
+      () => p.guardian2Name = _guardian2NameCtrl.text,
+    );
+    _guardian2ContactCtrl.addListener(
+      () => p.guardian2Contact = _guardian2ContactCtrl.text,
+    );
     _allergicToCtrl.addListener(() => p.allergicTo = _allergicToCtrl.text);
+  }
+
+  Future<void> _searchPatient(String id) async {
+    if (id.isEmpty || _isAutofilling) return;
+
+    setState(() => _isAutofilling = true);
+
+    try {
+      final data = await DesktopConnectionService.instance
+          .fetchPatientByIdNumber(id);
+      if (data != null && mounted) {
+        // Only autofill if the form is nearly empty to avoid overwriting current work unexpectedly
+        // or just apply it immediately if coming from scanner (which sets studentNumber before navigation)
+        PersistentFormService.instance.updateFromMap(data);
+
+        // Refresh UI from persistence
+        final p = PersistentFormService.instance;
+        _firstNameCtrl.text = p.firstName;
+        _lastNameCtrl.text = p.lastName;
+        _middleNameCtrl.text = p.middleName;
+        _contactCtrl.text = p.contactNumber;
+        _addressCtrl.text = p.address;
+        _guardianNameCtrl.text = p.guardianName;
+        _guardianContactCtrl.text = p.guardianContact;
+        _guardian2NameCtrl.text = p.guardian2Name;
+        _guardian2ContactCtrl.text = p.guardian2Contact;
+        _customExtensionCtrl.text = p.customExtension;
+        _customSexCtrl.text = p.customSex;
+        _allergicToCtrl.text = p.allergicTo;
+
+        setState(() {
+          _selectedExtension = p.extension;
+          _selectedBirthdate = p.birthdate;
+          _selectedSex = p.sex;
+          _selectedSymptoms.clear();
+          _selectedSymptoms.addAll(p.selectedSymptoms);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Patient details autofilled!')),
+        );
+      }
+    } catch (_) {
+      // Ignore errors
+    } finally {
+      if (mounted) setState(() => _isAutofilling = false);
+    }
   }
 
   @override
@@ -216,7 +274,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
     setState(() => _isSubmitting = true);
 
     // Initial connection check
-    final isConnected = await DesktopConnectionService.instance.checkConnection();
+    final isConnected = await DesktopConnectionService.instance
+        .checkConnection();
     if (!isConnected) {
       if (mounted) setState(() => _isSubmitting = false);
       _showConnectionLostDialog();
@@ -249,7 +308,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      
+
       // If the error message indicates a connection issue, show the special dialog
       final errorMsg = e.toString().toLowerCase();
       if (errorMsg.contains('connection') || errorMsg.contains('reachable')) {
@@ -372,6 +431,36 @@ class _InputFormScreenState extends State<InputFormScreen> {
               ),
               const SizedBox(height: 16),
 
+              // ID Number (At the top now)
+              TextFormField(
+                controller: _numberCtrl,
+                maxLength: 16,
+                decoration: InputDecoration(
+                  labelText: 'ID Number *',
+                  prefixIcon: const Icon(Icons.badge_outlined),
+                  counterText: '',
+                  suffixIcon: _isAutofilling
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                ),
+                onFieldSubmitted: (v) => _searchPatient(v),
+                inputFormatters: [
+                  UpperCaseTextFormatter(),
+                  LengthLimitingTextInputFormatter(16),
+                ],
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? 'ID number is required'
+                    : null,
+              ),
+              const SizedBox(height: 14),
+
               // First Name & Last Name
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,25 +570,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
                     ),
                   ],
                 ],
-              ),
-              const SizedBox(height: 14),
-
-              // ID Number
-              TextFormField(
-                controller: _numberCtrl,
-                maxLength: 16,
-                decoration: const InputDecoration(
-                  labelText: 'ID Number *',
-                  prefixIcon: Icon(Icons.badge_outlined),
-                  counterText: '',
-                ),
-                inputFormatters: [
-                  UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(16),
-                ],
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'ID number is required'
-                    : null,
               ),
               const SizedBox(height: 14),
 
