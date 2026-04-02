@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:clinic_input_app/main.dart';
+import 'package:olopsc_iskolinic_form_app/main.dart';
 
 void main() {
   testWidgets('App launches with QR scan screen', (WidgetTester tester) async {

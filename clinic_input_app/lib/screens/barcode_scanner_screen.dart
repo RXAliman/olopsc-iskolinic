@@ -42,6 +42,9 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     if (!context.mounted) return;
     setState(() => _isProcessing = true);
 
+    // Capture navigator before async gap
+    final navigator = Navigator.of(context);
+
     // 1. Save ID to persistence
     PersistentFormService.instance.studentNumber = code;
 
@@ -57,8 +60,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     }
 
     // 3. Navigate to form
-    if (!context.mounted) return;
-    Navigator.pushReplacementNamed(context, '/form');
+    navigator.pushReplacementNamed('/form');
   }
 
   @override

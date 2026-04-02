@@ -19,7 +19,7 @@ class ClinicInputApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Clinic Form',
+      title: 'OLOPSC IskoLinic Form App',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const QrScanScreen(),
