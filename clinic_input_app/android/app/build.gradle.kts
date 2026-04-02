@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.olopsc.iskolinic_form_app"
+    namespace = "com.example.clinic_input_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
