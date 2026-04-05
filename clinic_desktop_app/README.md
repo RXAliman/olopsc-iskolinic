@@ -5,7 +5,7 @@ A **Flutter Windows desktop application** for managing a school clinic's patient
 **Package name:** `olopsc_iskolinic`
 **Target platform:** Windows (uses `sqflite_common_ffi`)
 **Database:** Local SQLite via `sqflite_common_ffi`, stored at `%APPDATA%/com.olopsc/OLOPSC Iskolinic/clinic.db`
-**Database version:** 5
+**Database version:** 10
 
 ---
 
@@ -31,30 +31,22 @@ A **Flutter Windows desktop application** for managing a school clinic's patient
 ## Architecture Overview
 
 ```
+                         (Desktop)
 ┌──────────────────────────────────────────────────────────┐
 │                    Flutter UI (Screens)                  │
-│ Dashboard │ PatientList │ PatientDetail │ Analytics │ ...│
-└────────────────────┬─────────────────────────────────────┘
-                     │ reads/writes via
-┌────────────────────▼─────────────────────────────────────┐
+└──────────▲─────────────────────────────▲─────────────────┘
+           │ reads/writes via            │ notifies via
+┌──────────▼─────────────────────────────┴─────────────────┐
 │               Providers (ChangeNotifier)                 │
-│  PatientProvider │ InventoryProvider │ AnalyticsProvider │
-│                  │ SyncProvider      │                   │
-└────────┬─────────┴───────────────────┬───────────────────┘
-         │                             │
-┌────────▼──────────┐        ┌─────────▼───────────┐
-│  DatabaseHelper   │        │  CRDT Sync Layer    │
-│  (SQLite FFI)     │        │  SyncClient (WS)    │
-│                   │◄──────►│  SyncIsolate        │
-│  clinic.db        │        │  HLC, NodeId        │
-└───────────────────┘        │  DataCompactor      │
-                             └─────────────────────┘
-                                       │
-                              ┌────────▼────────┐
-                              │  Relay Server   │
-                              │  (WebSocket)    │
-                              │  Render.com     │
-                              └─────────────────┘
+└──────────▲─────────────────────────────▲─────────────────┘
+           │                             │
+           │ (Tablet)                    │ (Sync)
+           ▼                             ▼
+┌──────────────────────────┐    ┌──────────────────────────┐
+│  Local Server (HTTP)     │    │      Relay Server        │
+│  (Shelf)                 │    │      (WebSocket)         │
+│  Port 8080               │    │      Render.com          │
+└──────────────────────────┘    └──────────────────────────┘
 ```
 
 The app follows a **Provider + Repository** pattern:
@@ -89,17 +81,20 @@ lib/
 │   ├── patient_provider.dart     # Core provider: patients, visitations, pagination, CRDT writes
 │   ├── inventory_provider.dart   # Inventory CRUD, FEFO deduction
 │   ├── analytics_provider.dart   # Monthly symptom/supply analytics
-│   └── sync_provider.dart        # Sync lifecycle management, connection state
+│   ├── sync_provider.dart        # Sync lifecycle management, connection state
+│   └── local_server_provider.dart# Tablet server state & connection monitoring
 ├── screens/
 │   ├── dashboard_screen.dart     # Main dashboard with summary cards, quick actions, today's visits
 │   ├── patient_list_screen.dart  # Paginated patient table with search
-│   ├── patient_detail_screen.dart# Full patient detail dialog with visitation history
-│   ├── patient_form_screen.dart  # Add/edit patient dialog
+│   ├── patient_detail_screen.dart# Full patient detail dialog with medical history & permissions tabs
+│   ├── patient_form_screen.dart  # Tabbed add/edit patient dialog (Personal, Medical, Permissions)
 │   ├── visitation_form_screen.dart # Add/edit visitation dialog
 │   ├── inventory_screen.dart     # Stock management UI
-│   └── analytics_screen.dart     # Monthly charts (symptoms, supplies, visits)
+│   ├── analytics_screen.dart     # Monthly charts (symptoms, supplies, visits)
+│   └── connection_screen.dart    # Tablet pairing UI (QR code, Auth Token, IP)
 ├── services/
 │   ├── database_helper.dart      # SQLite singleton with all queries
+│   ├── local_server_service.dart # Embedded Shelf HTTP server for tablet integration
 │   └── mock_data_generator.dart  # Test data seeder (disabled in prod)
 └── theme/
     └── app_theme.dart            # App-wide theme, colors, gradients, glass card style
@@ -114,10 +109,12 @@ The app initializes in this order:
 1. `sqfliteFfiInit()` — Initialize FFI for Windows SQLite
 2. `PatientProvider.initCrdt()` — Load/generate the node ID and HLC clock
 3. `PatientProvider.loadPatients()` — Load the first page of patients
-4. `SyncProvider.init(patientProvider, wsUrl: '...')` — Connect to relay server
+4. `SyncProvider.init(...)` — **(Non-blocking)** Start background WebSocket connection to relay server
 5. `patientProvider.setOnLocalWrite(() => syncProvider.pushChanges())` — Wire auto-push
 6. `InventoryProvider.loadInventory()` — Load stock batches
 7. `patientProvider.setInventoryProvider(inventoryProvider)` — Wire auto-deduct
+8. `LocalServerProvider.startServer()` — Start embedded HTTP server for tablet pairing
+9. `localServerProvider.setOnDataChanged(() => patientProvider.refreshAll())` — Wire UI refresh for tablet submissions
 
 All providers are registered via `MultiProvider`:
 - `PatientProvider` — `.value()` (pre-initialized)
@@ -148,6 +145,11 @@ All providers are registered via `MultiProvider`:
 | `hlc`            | `String`   | Packed HLC for CRDT ordering               |
 | `nodeId`         | `String`   | Origin node ID                             |
 | `isDeleted`      | `bool`     | Soft-delete flag (stored as `INTEGER 0/1`) |
+| `pastMedicalHistory` | `List<Map>`| JSON List of `{"disease": String, "past": bool, "present": bool}` |
+| `vaccinationHistory` | `List<Map>`| JSON List of `{"name": String, "dateGiven": ISO8601String}` |
+| `allergicTo`     | `String`   | Free-text allergies list                   |
+| `patientRemarks` | `String`   | General medical notes                      |
+| `permissions`    | `Map`      | JSON Map of granted school health permissions|
 
 Methods: `toMap()`, `fromMap()`, `copyWith()`, `toSyncMap()`, `fromSyncMap()`
 
@@ -186,7 +188,7 @@ Methods: `toMap()`, `fromMap()`, `copyWith()`
 ## Database Schema & Migrations
 
 **File:** `services/database_helper.dart`
-**Current version:** 5
+**Current version:** 10
 
 ### Tables
 
@@ -207,7 +209,12 @@ CREATE TABLE patients (
   updatedAt TEXT NOT NULL,
   hlc TEXT NOT NULL DEFAULT '',
   nodeId TEXT NOT NULL DEFAULT '',
-  isDeleted INTEGER NOT NULL DEFAULT 0
+  isDeleted INTEGER NOT NULL DEFAULT 0,
+  medicalHistory TEXT NOT NULL DEFAULT '[]',
+  vaccinationHistory TEXT NOT NULL DEFAULT '[]',
+  allergicTo TEXT NOT NULL DEFAULT '',
+  patientRemarks TEXT NOT NULL DEFAULT '',
+  permissions TEXT NOT NULL DEFAULT '{}'
 )
 -- Index: idx_patients_hlc ON patients (hlc)
 ```
@@ -259,7 +266,12 @@ Used for: `nodeId` (persistent node identity), `lastSyncHlc` (sync watermark).
 | 2 | Added `suppliesUsed` column to visitations; dropped `emergency_alerts` |
 | 3 | Added CRDT columns (`hlc`, `nodeId`, `isDeleted`) to patients & visitations; created `meta` table and HLC indexes |
 | 4 | Created `stock_batches` table for inventory |
-| 5 | Added `firstName`, `lastName`, `middleName`, `extension` columns to patients (with try-catch for idempotency); migrated existing `patientName` to `firstName` |
+| 5 | Added `firstName`, `lastName`, `middleName`, `extension` columns to patients; migrated existing `patientName` to `firstName` |
+| 6 | Added `birthdate` (TEXT), `sex`, `contactNumber`, `guardian2Name`, `guardian2Contact` to patients |
+| 7 | Added `medicalHistory` (JSON) and `vaccinationHistory` (JSON) to patients |
+| 8 | (Legacy) Added `"allergic to"` and `"patient remarks"` columns (spaced names) |
+| 9 | (Corrected) Added `allergicTo` and `patientRemarks` columns (camelCase) |
+| 10 | Added `permissions` (JSON Map) column to patients |
 
 ### Key DB Methods
 
@@ -323,7 +335,7 @@ Manages the WebSocket sync lifecycle.
 **State:** `_connectionState` (`SyncConnectionState`: disconnected/connecting/connected)
 
 **Key Methods:**
-- `init(patientProvider, {wsUrl})` — Create SyncClient, wire callbacks, run DataCompactor, auto-connect
+- `init(patientProvider, {wsUrl})` — Create SyncClient, wire callbacks, run DataCompactor, auto-connect **(fire-and-forget: does not block app launch)**
 - `connect()` / `disconnect()` — Manual connection control
 - `forceSync()` — Disconnect + reconnect (manual refresh trigger)
 - `pushChanges()` — Delegate to SyncClient
@@ -352,7 +364,40 @@ Monthly analytics for symptoms and supplies used.
 - `loadAnalytics()` — Count symptom/supply occurrences for selected month
 - `setMonth(year, month)` / `previousMonth()` / `nextMonth()` — Navigation
 
+### LocalServerProvider (`providers/local_server_provider.dart`)
+
+Manages the embedded HTTP server used for connecting tablets (Clinic Input App).
+
+**State:** `isRunning`, `localIp`, `port`, `authToken`, `connectedDevices` (Set of IPs)
+
+**Key Methods:**
+- `startServer()` — Spin up the Shelf server on port 8080 (or 8081 fallback)
+- `stopServer()` — Shutdown
+- `regenerateToken()` — Invalidate existing tablet sessions
+- `setOnDataChanged(callback)` — Callback for desktop UI refresh when tablet submits data
+
 ---
+
+## Local Tablet Server
+
+**File:** `services/local_server_service.dart`
+
+To allow students/employees to fill out forms on a tablet, the desktop app hosts a private REST API.
+
+### Authentication & Security
+- **Bearer Token**: A UUID v4 token is required in the `Authorization: Bearer <token>` header.
+- **Private LAN**: The server binds to `0.0.0.0` but expects connections from the local network.
+- **Auto-Discovery**: Encodes Host IP, Port, and Token into a JSON QR Code for tablet pairing.
+
+### Endpoints
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/health` | Server status and heartbeat |
+| GET | `/api/patients` | Fetch all non-deleted patient records |
+| GET | `/api/patients/search?idNumber=...` | Search for a specific patient by ID |
+| POST | `/api/patients` | Submit a new patient entry + optional visitation record (symptoms) |
+
+**Note:** Post data from the tablet is automatically stamped with the Desktop's current CRDT NodeId and wrapped in a new HLC to ensure correct multi-device sync later.
 
 ## CRDT Sync System
 
@@ -415,29 +460,34 @@ Runs on startup. Permanently removes tombstoned records (`isDeleted = 1`) older 
 
 ### DashboardScreen (`screens/dashboard_screen.dart`)
 - **Main app screen** with sidebar navigation to all other screens
-- **Summary cards:** Total patients, today's visits, sync status
-- **Quick Actions:** Record Visitation, Add Patient, Analytics, Refresh (calls `refreshAll()` + `forceSync()`)
+- **Quick Actions:** Record Visitation, Add Patient, Search Patients, **Connect Tablet**, Analytics, Refresh (calls `refreshAll()` + `forceSync()`)
+  - **Search Patients:** Switches to Patients tab and immediately focuses the search bar.
+  - **Connect Tablet:** Opens `ConnectionScreen` for pairing.
 - **Today's Visits list:** Paginated (3 per page), shows patient name, time, symptoms, treatment
   - Clicking a visit opens `PatientDetailScreen`
   - Shows **"Add Missing Treatment Details"** `TextButton.icon` if both `treatment` and `suppliesUsed` are empty, which opens `VisitationFormScreen` in edit mode
 - **Sidebar navigation:** Dashboard, Patients, Analytics, Inventory
+- **Header:** Live digital clock synced to OS time.
 
 ### PatientListScreen (`screens/patient_list_screen.dart`)
 - **Paginated table** of all patients (10 per page)
-- **Search bar** filters by name or ID number
+- **Search bar** filters by name or ID number; supports **auto-focus** when navigating via Quick Actions
 - **Refresh button** (IconButton) beside "Add Patient" — calls `refreshAll()` + `forceSync()`
 - Clicking a patient opens `PatientDetailScreen`
 
 ### PatientDetailScreen (`screens/patient_detail_screen.dart`)
-- **Fullscreen dialog** showing patient info + paginated visitation history
-- **Actions:** Edit patient, delete patient, add visit
-- **Visitation tiles:** Show date, symptoms, treatment (with supplies inline), remarks
-  - Each visitation can be **edited** (opens `VisitationFormScreen` with existing data) or **deleted**
+- **Fullscreen dialog** with sidebar-based navigation
+  - **Basic Info**: Personal demographics and age
+  - **Visitation History**: All past visits, paginated, editable/deletable
+  - **Medical Information**: Displays Allergies, Remarks, and the **Past Medical History Table** (listing diseases with Past/Present status) and Vaccination list
+  - **Permissions**: Visual checklist of granted health permissions (Emergency transport, medications, etc.)
 - Treatment display format: `"Treatment: Supply1, Supply2, Treatment Text"`
 
 ### PatientFormScreen (`screens/patient_form_screen.dart`)
-- **Dialog** for creating/editing patients
-- Fields: First Name, Last Name, Middle Name, Extension (dropdown + custom), ID Number, Address, Guardian Name, Guardian Contact
+- **Dialog** with Tabbed Layout:
+  - **Personal Information**: Names, ID, demographics (original fields)
+  - **Medical Information**: Allergies field, Past Medical History checklist (Chicken Pox, Measles, etc.), Vaccination list, and Patient Remarks
+  - **Permissions**: Structured checklist for legal/school healthcare permissions with hospital selection logic
 - All text fields use `UpperCaseTextFormatter`
 - Extension dropdown options: None, JR., SR., I, II, III, Others (shows custom text field)
 
@@ -454,6 +504,12 @@ Runs on startup. Permanently removes tombstoned records (`isDeleted = 1`) older 
 ### AnalyticsScreen (`screens/analytics_screen.dart`)
 - Monthly symptom frequency chart and supply usage chart
 - Month navigation (prev/next)
+
+### ConnectionScreen (`screens/connection_screen.dart`)
+- **QR Code Pairing**: Encodes pairing JSON for the Clinic Input App
+- **Pairing Details**: Displays Local IP, Port, and active Auth Token
+- **Real-time Monitoring**: Lists IPs of currently active/recently seen tablet devices
+- **Regenerate Token**: Button to reset security credentials instantly
 
 ### InventoryScreen (`screens/inventory_screen.dart`)
 - Stock batch management with add/deduct functionality
@@ -520,6 +576,9 @@ A `TextInputFormatter` that converts all input to uppercase. Applied to all pati
 | `audioplayers` | ^6.1.0 | Sound effects (if any) |
 | `qr_flutter` | ^4.1.0 | QR code generation |
 | `web_socket_channel` | ^3.0.2 | WebSocket for CRDT sync |
+| `shelf` | ^1.4.1 | Embedded HTTP server engine |
+| `shelf_router` | ^1.1.4 | REST routing for tablet API |
+| `shelf_io` | ^1.0.4 | IO adapter for shelf |
 
 ---
 
@@ -567,3 +626,5 @@ All enforced via both `maxLength` property and `LengthLimitingTextInputFormatter
 11. **Database Path:** `%APPDATA%/com.olopsc/OLOPSC Iskolinic/clinic.db` (via `getApplicationSupportDirectory()`)
 
 12. **Assets:** `assets/app-icon-white.png`, `assets/app-icon-colored.png`
+13. **Tablet Integration:** The desktop app acts as a **Local Server**. The `clinic_input_app` (Tablet app) connects via QR pairing to the desktop's IP:8080. It uses an `Authorization: Bearer` token generated by the desktop.
+14. **CORS Support:** The local server identifies with `Access-Control-Allow-Origin: *` to simplify tablet web/mobile client development.

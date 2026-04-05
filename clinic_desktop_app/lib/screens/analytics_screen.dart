@@ -79,17 +79,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           splashRadius: 18,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          DateFormat('MMMM yyyy').format(
-                            DateTime(
-                              provider.selectedYear,
-                              provider.selectedMonth,
+                        SizedBox(
+                          width: 150,
+                          child: Text(
+                            DateFormat('MMMM yyyy').format(
+                              DateTime(
+                                provider.selectedYear,
+                                provider.selectedMonth,
+                              ),
                             ),
-                          ),
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -225,8 +229,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   enabled: true,
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipColor: (_) => AppTheme.cardLight,
-                    tooltipBorder: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
-                    tooltipPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    tooltipBorder: const BorderSide(
+                      color: AppTheme.dividerColor,
+                      width: 1.5,
+                    ),
+                    tooltipPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     tooltipRoundedRadius: 10,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(

@@ -31,8 +31,9 @@ void main() async {
   await patientProvider.loadPatients();
 
   // Initialize sync (no wsUrl = offline mode)
+  // Fire-and-forget: don't block app launch while connecting to relay server
   final syncProvider = SyncProvider();
-  await syncProvider.init(
+  syncProvider.init(
     patientProvider,
     wsUrl: 'wss://olopsc-iskolinic.onrender.com/ws',
   );
