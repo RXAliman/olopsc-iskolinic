@@ -370,6 +370,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           builder: (_) => VisitationFormScreen(
                                             patientId: visit.patientId,
                                             visitation: visit,
+                                            hideChiefComplaintOptions: true,
                                           ),
                                         );
                                       },
@@ -394,6 +395,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         textStyle: const TextStyle(
                                           fontSize: 12,
                                         ),
+                                        foregroundColor: AppTheme.danger,
                                       ),
                                     ),
                                   ],

@@ -14,8 +14,14 @@ import '../services/database_helper.dart';
 class VisitationFormScreen extends StatefulWidget {
   final String? patientId;
   final Visitation? visitation;
+  final bool hideChiefComplaintOptions;
 
-  const VisitationFormScreen({super.key, this.patientId, this.visitation});
+  const VisitationFormScreen({
+    super.key,
+    this.patientId,
+    this.visitation,
+    this.hideChiefComplaintOptions = false,
+  });
 
   @override
   State<VisitationFormScreen> createState() => _VisitationFormScreenState();
@@ -39,6 +45,12 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.hideChiefComplaintOptions) {
+      _showAllTraumatic = false;
+      _showAllMedical = false;
+      _showAllBehavioral = false;
+    }
+
     if (widget.visitation != null) {
       _treatmentCtrl.text = widget.visitation!.treatment;
       _remarksCtrl.text = widget.visitation!.remarks;
