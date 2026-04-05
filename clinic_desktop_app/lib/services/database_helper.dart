@@ -666,4 +666,12 @@ class DatabaseHelper {
       await txn.delete('meta');
     });
   }
+
+  /// Close the database connection gracefully.
+  Future<void> close() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+  }
 }

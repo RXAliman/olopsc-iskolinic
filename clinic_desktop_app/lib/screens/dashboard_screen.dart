@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,7 @@ import '../models/visitation.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/sync_provider.dart';
+import '../providers/local_server_provider.dart';
 import '../theme/app_theme.dart';
 import '../services/database_helper.dart';
 import 'patient_list_screen.dart';
@@ -29,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _focusSearchOnNextTab = false;
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
+  late final AppLifecycleListener _lifecycleListener;
 
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
@@ -41,6 +44,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _lifecycleListener = AppLifecycleListener(
+      onExitRequested: _handleExitRequest,
+    );
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() => _now = DateTime.now());
     });
@@ -51,8 +57,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     _clockTimer.cancel();
     super.dispose();
+  }
+
+  Future<AppExitResponse> _handleExitRequest() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Exit ISKOLINIC?'),
+        content: const Text('Are you sure you want to close the application?'),
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 24,
+          vertical: 16,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            ),
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Exit App'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true) {
+      if (mounted) {
+        // Disconnect from CRDT relay
+        context.read<SyncProvider>().disconnect();
+
+        // Stop local HTTP server
+        await context.read<LocalServerProvider>().stopServer();
+      }
+
+      // Close database connection
+      await DatabaseHelper.instance.close();
+
+      return AppExitResponse.exit;
+    }
+    return AppExitResponse.cancel;
   }
 
   Future<void> _loadDashboardData() async {
