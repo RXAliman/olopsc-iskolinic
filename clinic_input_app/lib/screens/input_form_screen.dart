@@ -195,14 +195,36 @@ class _InputFormScreenState extends State<InputFormScreen> {
     if (!isValid) return;
 
     if (_selectedSymptoms.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select at least one symptom'),
-          backgroundColor: AppTheme.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.danger.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppTheme.danger,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('Warning'),
+            ],
           ),
+          content: const Text('Please select at least one symptom.'),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
         ),
       );
       return;
@@ -229,7 +251,17 @@ class _InputFormScreenState extends State<InputFormScreen> {
       finalSex = _selectedSex;
     }
 
-    // Show confirmation dialog
+    // Check connection FIRST
+    setState(() => _isSubmitting = true);
+    final isConnected = await DesktopConnectionService.instance.checkConnection();
+    setState(() => _isSubmitting = false);
+    
+    if (!isConnected) {
+      _showConnectionLostDialog();
+      return;
+    }
+
+    // Show confirmation dialog AFTER connection check
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -273,15 +305,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // Initial connection check
-    final isConnected = await DesktopConnectionService.instance
-        .checkConnection();
-    if (!isConnected) {
-      if (mounted) setState(() => _isSubmitting = false);
-      _showConnectionLostDialog();
-      return;
-    }
-
     try {
       await _queueService.addToQueue(
         studentName: studentName,
@@ -300,6 +323,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
         guardian2Contact: _guardian2ContactCtrl.text.trim(),
         allergicTo: _allergicToCtrl.text.trim(),
         symptoms: _selectedSymptoms.toList(),
+        existingPatientId: PersistentFormService.instance.existingPatientId,
       );
 
       if (!mounted) return;

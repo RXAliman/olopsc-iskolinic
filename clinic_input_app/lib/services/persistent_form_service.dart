@@ -11,6 +11,7 @@ class PersistentFormService {
 
   /// Update core patient fields from a data map (e.g. from desktop API).
   void updateFromMap(Map<String, dynamic> data) {
+    existingPatientId = data['id'] as String?;
     firstName = data['firstName'] as String? ?? '';
     lastName = data['lastName'] as String? ?? '';
     middleName = data['middleName'] as String? ?? '';
@@ -18,7 +19,10 @@ class PersistentFormService {
     // Extension validation
     final incomingExt = data['extension'] as String? ?? 'None';
     const allowedExtensions = ['None', 'JR.', 'SR.', 'I', 'II', 'III'];
-    if (allowedExtensions.contains(incomingExt)) {
+    if (incomingExt.trim().isEmpty) {
+      extension = 'None';
+      customExtension = '';
+    } else if (allowedExtensions.contains(incomingExt)) {
       extension = incomingExt;
       customExtension = '';
     } else {
@@ -51,6 +55,7 @@ class PersistentFormService {
   }
 
   // ── Patient Info ─────────────────────────────────────────────────
+  String? existingPatientId;
   String studentNumber = '';
   String firstName = '';
   String lastName = '';
@@ -80,6 +85,7 @@ class PersistentFormService {
   /// Resets all data in the persistence service. 
   /// Usually called after successful submission or manual form clear.
   void clear() {
+    existingPatientId = null;
     studentNumber = '';
     firstName = '';
     lastName = '';

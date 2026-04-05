@@ -24,7 +24,17 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
 
   Future<void> _initCamera() async {
     try {
-      _cameraController = MobileScannerController();
+      _cameraController = MobileScannerController(
+        formats: const [
+          BarcodeFormat.code128,
+          BarcodeFormat.code39,
+          BarcodeFormat.code93,
+          BarcodeFormat.ean13,
+          BarcodeFormat.ean8,
+          BarcodeFormat.upcA,
+          BarcodeFormat.upcE,
+        ],
+      );
       if (mounted) setState(() {});
     } catch (_) {
       if (mounted) setState(() => _cameraAvailable = false);
@@ -48,15 +58,62 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     // 1. Save ID to persistence
     PersistentFormService.instance.studentNumber = code;
 
-    // 2. Attempt to fetch details from desktop
+    bool isPatientFound = false;
     try {
       final patientData = await DesktopConnectionService.instance
           .fetchPatientByIdNumber(code);
       if (patientData != null) {
         PersistentFormService.instance.updateFromMap(patientData);
+        isPatientFound = true;
       }
     } catch (_) {
       // Ignore fetch errors, user can fill manually
+    }
+
+    if (!isPatientFound) {
+      if (!mounted) return;
+      
+      final isCorrect = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Unregistered ID Scanned'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                code,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('This ID number was scanned but no existing record was found. Is this ID number correct?'),
+            ],
+          ),
+          actions: [
+            OutlinedButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Rescan'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Correct'),
+            ),
+          ],
+        ),
+      );
+
+      if (isCorrect != true) {
+        // User wants to rescan
+        setState(() => _isProcessing = false);
+        _cameraController?.start();
+        return;
+      }
     }
 
     // 3. Navigate to form

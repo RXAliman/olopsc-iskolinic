@@ -12,9 +12,6 @@ class QrScanScreen extends StatefulWidget {
 }
 
 class _QrScanScreenState extends State<QrScanScreen> {
-  final _manualHostCtrl = TextEditingController();
-  final _manualPortCtrl = TextEditingController(text: '8080');
-  final _manualTokenCtrl = TextEditingController();
   MobileScannerController? _cameraController;
   bool _isProcessing = false;
   bool _cameraAvailable = true;
@@ -31,7 +28,9 @@ class _QrScanScreenState extends State<QrScanScreen> {
         await _cameraController!.stop();
         await _cameraController!.dispose();
       }
-      _cameraController = MobileScannerController();
+      _cameraController = MobileScannerController(
+        formats: const [BarcodeFormat.qrCode],
+      );
     } catch (_) {
       setState(() => _cameraAvailable = false);
     }
@@ -39,9 +38,6 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   @override
   void dispose() {
-    _manualHostCtrl.dispose();
-    _manualPortCtrl.dispose();
-    _manualTokenCtrl.dispose();
     _cameraController?.stop();
     _cameraController?.dispose();
     super.dispose();
@@ -87,43 +83,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
     }
   }
 
-  Future<void> _handleManualConnect() async {
-    final host = _manualHostCtrl.text.trim();
-    final portStr = _manualPortCtrl.text.trim();
-    final token = _manualTokenCtrl.text.trim();
 
-    if (host.isEmpty || portStr.isEmpty || token.isEmpty) {
-      _showError('Please fill in all fields.');
-      return;
-    }
-
-    final port = int.tryParse(portStr);
-    if (port == null) {
-      _showError('Invalid port number.');
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    final connected = await DesktopConnectionService.instance.connectManual(
-      host: host,
-      port: port,
-      token: token,
-    );
-
-    if (!mounted) return;
-
-    if (connected) {
-      _showSuccess();
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/welcome');
-      }
-    } else {
-      _showError('Connection failed. Check the IP, port, and token.');
-      setState(() => _isProcessing = false);
-    }
-  }
 
   void _resumeScanning() {
     setState(() => _isProcessing = false);
@@ -263,93 +223,11 @@ class _QrScanScreenState extends State<QrScanScreen> {
                                   'Camera not available',
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Use the manual input below',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
                               ],
                             ),
                           ),
                         ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Manual input fallback ───────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'OR CONNECT MANUALLY',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 1.2,
-                              ),
-                        ),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: _manualHostCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'IP Address (e.g. 192.168.1.100)',
-                            prefixIcon: Icon(Icons.language_rounded),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 1,
-                        child: TextField(
-                          controller: _manualPortCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'Port',
-                            prefixIcon: Icon(Icons.numbers_rounded),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _manualTokenCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'Auth token...',
-                            prefixIcon: Icon(Icons.vpn_key_rounded),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isProcessing ? null : _handleManualConnect,
-                          child: const Text('Connect'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: 32),

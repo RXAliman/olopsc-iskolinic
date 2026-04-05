@@ -137,7 +137,14 @@ class LocalServerService {
         final clock = HLC.now(nodeId).send();
         final hlcStr = clock.pack();
         final now = DateTime.now();
-        final patientId = const Uuid().v4();
+        
+        final existingId = data['existingPatientId'] as String?;
+        Patient? existingRecord;
+        if (existingId != null && existingId.isNotEmpty) {
+          existingRecord = await DatabaseHelper.instance.getPatient(existingId);
+        }
+        
+        final patientId = existingRecord?.id ?? const Uuid().v4();
 
         // Build patientName from parts: "LAST, FIRST MIDDLE EXT"
         final firstName = data['firstName'] as String? ?? '';
@@ -159,7 +166,7 @@ class LocalServerService {
           idNumber: data['idNumber'] as String? ?? '',
           birthdate: data['birthdate'] != null
               ? DateTime.tryParse(data['birthdate'] as String)
-              : null,
+              : existingRecord?.birthdate,
           sex: data['sex'] as String? ?? '',
           contactNumber: data['contactNumber'] as String? ?? '',
           address: data['address'] as String? ?? '',
@@ -168,13 +175,17 @@ class LocalServerService {
           guardian2Name: data['guardian2Name'] as String? ?? '',
           guardian2Contact: data['guardian2Contact'] as String? ?? '',
           allergicTo: data['allergicTo'] as String? ?? '',
-          createdAt: now,
+          createdAt: existingRecord?.createdAt ?? now,
           updatedAt: now,
           hlc: hlcStr,
           nodeId: nodeId,
         );
 
-        await DatabaseHelper.instance.insertPatient(patient);
+        if (existingRecord != null) {
+          await DatabaseHelper.instance.updatePatient(patient);
+        } else {
+          await DatabaseHelper.instance.insertPatient(patient);
+        }
 
         // If symptoms are included, create a visitation record too
         final symptoms = data['symptoms'] as List<dynamic>?;

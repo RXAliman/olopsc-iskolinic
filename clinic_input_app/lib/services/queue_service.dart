@@ -23,6 +23,7 @@ class QueueService {
     required String guardian2Contact,
     required String allergicTo,
     required List<String> symptoms,
+    String? existingPatientId,
   }) async {
     if (!_connection.isConnected) {
       throw Exception(
@@ -55,6 +56,7 @@ class QueueService {
       'guardian2Contact': guardian2Contact,
       'allergicTo': allergicTo,
       'symptoms': symptoms,
+      if (existingPatientId != null) 'existingPatientId': existingPatientId,
     };
 
     final success = await _connection.submitPatient(data);
