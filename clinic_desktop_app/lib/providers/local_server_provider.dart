@@ -5,6 +5,10 @@ import '../services/local_server_service.dart';
 class LocalServerProvider extends ChangeNotifier {
   final LocalServerService _service = LocalServerService.instance;
 
+  LocalServerProvider() {
+    _service.onDevicesChanged = () => notifyListeners();
+  }
+
   bool get isRunning => _service.isRunning;
   String get localIp => _service.localIp;
   int get port => _service.port;

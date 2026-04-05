@@ -51,6 +51,9 @@ class LocalServerService {
   /// The desktop's PatientProvider should listen to this to refresh its UI.
   void Function()? onDataChanged;
 
+  /// Callback invoked when the list of connected devices changes.
+  void Function()? onDevicesChanged;
+
   /// Start the HTTP server on all network interfaces.
   Future<void> start({int port = 8080}) async {
     if (_server != null) return; // Already running
@@ -212,7 +215,11 @@ class LocalServerService {
               ?.remoteAddress
               .address;
           if (remoteIp != null) {
+            final isNew = !_connectedDevices.containsKey(remoteIp);
             _connectedDevices[remoteIp] = DateTime.now();
+            if (isNew) {
+              onDevicesChanged?.call();
+            }
           }
 
           final authHeader = request.headers['authorization'];
@@ -277,6 +284,7 @@ class LocalServerService {
   void regenerateToken() {
     _authToken = const Uuid().v4();
     _connectedDevices.clear();
+    onDevicesChanged?.call();
   }
 
   /// Detect the local IP address on the LAN (not loopback).

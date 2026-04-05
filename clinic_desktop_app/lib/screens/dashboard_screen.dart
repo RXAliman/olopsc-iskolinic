@@ -35,7 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.people_rounded, 'Patients'),
     _NavItem(Icons.inventory_2_rounded, 'Inventory'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
-    _NavItem(Icons.devices_rounded, 'Connection'),
+    _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
   ];
 
   @override
@@ -769,7 +769,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             alpha: 0.3,
                                           ),
                                         )
-                                      : null,
+                                      : Border.all(color: Colors.transparent),
                                 ),
                                 child: Row(
                                   children: [
