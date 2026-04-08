@@ -73,7 +73,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Exit ISKOLINIC?'),
+        title: const Text(
+          'CLOSE ISKOLINIC?',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        ),
         content: const Text('Are you sure you want to close the application?'),
         actionsPadding: const EdgeInsets.symmetric(
           horizontal: 24,
@@ -95,7 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: AppTheme.danger,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Exit App'),
+            child: const Text('Close App'),
           ),
         ],
       ),
