@@ -29,6 +29,12 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   bool _focusSearchOnNextTab = false;
+  bool _isSidebarCollapsed = false;
+
+  static const double _expandedWidth = 250;
+  static const double _collapsedWidth = 72;
+  static const Duration _animDuration = Duration(milliseconds: 0);
+  static const Curve _animCurve = Curves.easeInOutCubic;
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
   late final AppLifecycleListener _lifecycleListener;
@@ -583,8 +589,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Row(
               children: [
                 // Left: App Logo + Name (same width as sidebar)
-                Container(
-                  width: 250,
+                AnimatedContainer(
+                  duration: _animDuration,
+                  curve: _animCurve,
+                  width: _isSidebarCollapsed ? _collapsedWidth : _expandedWidth,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 0,
                     vertical: 18,
@@ -607,17 +615,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           height: 44,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'ISKOLINIC',
-                        style: GoogleFonts.audiowide(
-                          textStyle: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF1B4697),
-                              ),
+                      if (!_isSidebarCollapsed) ...[
+                        const SizedBox(width: 12),
+                        Text(
+                          'ISKOLINIC',
+                          style: GoogleFonts.audiowide(
+                            textStyle: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF1B4697),
+                                ),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -777,8 +787,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Sidebar (nav only) ──
-                Container(
-                  width: 250,
+                AnimatedContainer(
+                  duration: _animDuration,
+                  curve: _animCurve,
+                  width: _isSidebarCollapsed ? _collapsedWidth : _expandedWidth,
                   decoration: const BoxDecoration(
                     color: AppTheme.sidebarBg,
                     border: Border(
@@ -797,8 +809,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         final isSelected = _selectedIndex == i;
 
                         return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: _isSidebarCollapsed ? 8 : 12,
                             vertical: 2,
                           ),
                           child: Material(
@@ -821,9 +833,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 alpha: 0.05,
                               ),
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
+                                duration: _animDuration,
+                                curve: _animCurve,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: _isSidebarCollapsed ? 0 : 16,
                                   vertical: 12,
                                 ),
                                 decoration: BoxDecoration(
@@ -839,35 +852,117 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         )
                                       : Border.all(color: Colors.transparent),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      item.icon,
-                                      size: 20,
-                                      color: isSelected
-                                          ? AppTheme.accent
-                                          : AppTheme.textMuted,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      item.label,
-                                      style: TextStyle(
-                                        color: isSelected
-                                            ? AppTheme.accent
-                                            : AppTheme.textSecondary,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                        fontSize: 14,
+                                child: _isSidebarCollapsed
+                                    ? Center(
+                                        child: Tooltip(
+                                          message: item.label,
+                                          preferBelow: false,
+                                          child: Icon(
+                                            item.icon,
+                                            size: 20,
+                                            color: isSelected
+                                                ? AppTheme.accent
+                                                : AppTheme.textMuted,
+                                          ),
+                                        ),
+                                      )
+                                    : Row(
+                                        children: [
+                                          Icon(
+                                            item.icon,
+                                            size: 20,
+                                            color: isSelected
+                                                ? AppTheme.accent
+                                                : AppTheme.textMuted,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Flexible(
+                                            child: Text(
+                                              item.label,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: isSelected
+                                                    ? AppTheme.accent
+                                                    : AppTheme.textSecondary,
+                                                fontWeight: isSelected
+                                                    ? FontWeight.w600
+                                                    : FontWeight.w400,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
-                                ),
                               ),
                             ),
                           ),
                         );
                       }),
+
+                      const Spacer(),
+
+                      // ── Collapse / Expand Toggle ──
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () => setState(
+                              () => _isSidebarCollapsed = !_isSidebarCollapsed,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            hoverColor: AppTheme.textPrimary.withValues(
+                              alpha: 0.08,
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: _isSidebarCollapsed ? 0 : 16,
+                                vertical: 10,
+                              ),
+                              child: _isSidebarCollapsed
+                                  ? Center(
+                                      child: Tooltip(
+                                        message: 'Expand Sidebar',
+                                        preferBelow: false,
+                                        child: AnimatedRotation(
+                                          turns: 0,
+                                          duration: _animDuration,
+                                          child: const Icon(
+                                            Icons.chevron_right_rounded,
+                                            size: 22,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : Row(
+                                      children: [
+                                        AnimatedRotation(
+                                          turns: 0,
+                                          duration: _animDuration,
+                                          child: const Icon(
+                                            Icons.chevron_left_rounded,
+                                            size: 22,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Collapse',
+                                          style: TextStyle(
+                                            color: AppTheme.textMuted,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
