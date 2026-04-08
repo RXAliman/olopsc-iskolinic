@@ -3,7 +3,8 @@
 /// This ensures that if the tablet loses connection and the user needs to
 /// re-scan or go back to the welcome screen, their progress is not lost.
 class PersistentFormService {
-  static final PersistentFormService instance = PersistentFormService._internal();
+  static final PersistentFormService instance =
+      PersistentFormService._internal();
   factory PersistentFormService() => instance;
   PersistentFormService._internal();
 
@@ -35,14 +36,14 @@ class PersistentFormService {
     }
 
     // Sex validation
-    final incomingSex = data['sex'] as String? ?? 'Female';
-    const allowedSex = ['Male', 'Female'];
-    if (allowedSex.contains(incomingSex)) {
+    final incomingSex = data['sex'] as String?;
+    const allowedSex = ['Male', 'Female', 'Intersex'];
+    if (incomingSex == null || incomingSex.isEmpty) {
+      sex = null;
+    } else if (allowedSex.contains(incomingSex)) {
       sex = incomingSex;
-      customSex = '';
     } else {
-      sex = 'Others';
-      customSex = incomingSex;
+      sex = 'Intersex';
     }
 
     contactNumber = data['contactNumber'] as String? ?? '';
@@ -63,8 +64,7 @@ class PersistentFormService {
   String extension = 'None';
   String customExtension = '';
   DateTime? birthdate;
-  String sex = 'Female';
-  String customSex = '';
+  String? sex;
   String contactNumber = '';
   String address = '';
   String guardianName = '';
@@ -82,7 +82,7 @@ class PersistentFormService {
   void removeSymptom(String symptom) => _selectedSymptoms.remove(symptom);
   void clearSymptoms() => _selectedSymptoms.clear();
 
-  /// Resets all data in the persistence service. 
+  /// Resets all data in the persistence service.
   /// Usually called after successful submission or manual form clear.
   void clear() {
     existingPatientId = null;
@@ -93,8 +93,7 @@ class PersistentFormService {
     extension = 'None';
     customExtension = '';
     birthdate = null;
-    sex = 'Female';
-    customSex = '';
+    sex = null;
     contactNumber = '';
     address = '';
     guardianName = '';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../constants/symptoms.dart';
 import '../formatters/uppercase_text.dart';
@@ -20,6 +21,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
   final _queueService = QueueService();
   bool _isSubmitting = false;
   bool _isAutofilling = false;
+  bool _hasAttemptedSubmit = false;
 
   // ── Patient fields ───────────────────────────────────────────────
   final _firstNameCtrl = TextEditingController();
@@ -29,8 +31,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
   String _selectedExtension = 'None';
   final _numberCtrl = TextEditingController();
   DateTime? _selectedBirthdate;
-  String _selectedSex = 'Female';
-  final _customSexCtrl = TextEditingController();
+  String? _selectedSex;
   final _contactCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _guardianNameCtrl = TextEditingController();
@@ -62,7 +63,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _guardian2NameCtrl.text = p.guardian2Name;
     _guardian2ContactCtrl.text = p.guardian2Contact;
     _customExtensionCtrl.text = p.customExtension;
-    _customSexCtrl.text = p.customSex;
     _allergicToCtrl.text = p.allergicTo;
 
     _selectedExtension = p.extension;
@@ -78,7 +78,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
       () => p.customExtension = _customExtensionCtrl.text,
     );
     _numberCtrl.addListener(() => p.studentNumber = _numberCtrl.text);
-    _customSexCtrl.addListener(() => p.customSex = _customSexCtrl.text);
     _contactCtrl.addListener(() => p.contactNumber = _contactCtrl.text);
     _addressCtrl.addListener(() => p.address = _addressCtrl.text);
     _guardianNameCtrl.addListener(
@@ -121,7 +120,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
         _guardian2NameCtrl.text = p.guardian2Name;
         _guardian2ContactCtrl.text = p.guardian2Contact;
         _customExtensionCtrl.text = p.customExtension;
-        _customSexCtrl.text = p.customSex;
         _allergicToCtrl.text = p.allergicTo;
 
         setState(() {
@@ -150,7 +148,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _middleNameCtrl.dispose();
     _customExtensionCtrl.dispose();
     _numberCtrl.dispose();
-    _customSexCtrl.dispose();
     _contactCtrl.dispose();
     _addressCtrl.dispose();
     _guardianNameCtrl.dispose();
@@ -168,7 +165,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _middleNameCtrl.clear();
     _customExtensionCtrl.clear();
     _numberCtrl.clear();
-    _customSexCtrl.clear();
     _contactCtrl.clear();
     _addressCtrl.clear();
     _guardianNameCtrl.clear();
@@ -180,12 +176,14 @@ class _InputFormScreenState extends State<InputFormScreen> {
     setState(() {
       _selectedExtension = 'None';
       _selectedBirthdate = null;
-      _selectedSex = 'Female';
+      _selectedSex = null;
       _selectedSymptoms.clear();
+      _hasAttemptedSubmit = false;
     });
   }
 
   Future<void> _submit() async {
+    setState(() => _hasAttemptedSubmit = true);
     bool isValid = _formKey.currentState!.validate();
     if (_selectedBirthdate == null) {
       setState(() {}); // trigger rebuild to show error text
@@ -198,7 +196,9 @@ class _InputFormScreenState extends State<InputFormScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Row(
             children: [
               Container(
@@ -244,18 +244,14 @@ class _InputFormScreenState extends State<InputFormScreen> {
         .trim()
         .replaceAll(RegExp(r'\s+'), ' ');
 
-    String finalSex = '';
-    if (_selectedSex == 'Others') {
-      finalSex = _customSexCtrl.text.trim();
-    } else {
-      finalSex = _selectedSex;
-    }
+    String finalSex = _selectedSex ?? '';
 
     // Check connection FIRST
     setState(() => _isSubmitting = true);
-    final isConnected = await DesktopConnectionService.instance.checkConnection();
+    final isConnected = await DesktopConnectionService.instance
+        .checkConnection();
     setState(() => _isSubmitting = false);
-    
+
     if (!isConnected) {
       _showConnectionLostDialog();
       return;
@@ -416,8 +412,10 @@ class _InputFormScreenState extends State<InputFormScreen> {
               Row(
                 children: [
                   IconButton(
-                    onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/welcome'),
+                    onPressed: () => Navigator.popUntil(
+                      context,
+                      ModalRoute.withName('/welcome'),
+                    ),
                     icon: const Icon(Icons.chevron_left_rounded),
                     iconSize: 28,
                     padding: EdgeInsets.zero,
@@ -454,13 +452,37 @@ class _InputFormScreenState extends State<InputFormScreen> {
                 title: 'Personal Information',
               ),
               const SizedBox(height: 16),
+              const Text(
+                "Fields with asterisks (*) are required to be filled up.",
+                style: TextStyle(
+                  color: AppTheme.danger,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // ID Number (At the top now)
               TextFormField(
                 controller: _numberCtrl,
                 maxLength: 16,
                 decoration: InputDecoration(
-                  labelText: 'ID Number *',
+                  label: RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                      children: [
+                        TextSpan(
+                          text: 'ID Number ',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                        TextSpan(
+                          text: '*',
+                          style: TextStyle(color: AppTheme.danger),
+                        ),
+                      ],
+                    ),
+                  ),
                   prefixIcon: const Icon(Icons.badge_outlined),
                   counterText: '',
                   suffixIcon: _isAutofilling
@@ -479,9 +501,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   UpperCaseTextFormatter(),
                   LengthLimitingTextInputFormatter(16),
                 ],
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'ID number is required'
-                    : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 14),
 
@@ -493,9 +514,25 @@ class _InputFormScreenState extends State<InputFormScreen> {
                     child: TextFormField(
                       controller: _firstNameCtrl,
                       maxLength: 30,
-                      decoration: const InputDecoration(
-                        labelText: 'First Name *',
-                        prefixIcon: Icon(Icons.person_outline),
+                      decoration: InputDecoration(
+                        label: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'First Name ',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
+                          ),
+                        ),
+                        prefixIcon: const Icon(Icons.person_outline),
                         counterText: '',
                       ),
                       inputFormatters: [
@@ -512,9 +549,25 @@ class _InputFormScreenState extends State<InputFormScreen> {
                     child: TextFormField(
                       controller: _lastNameCtrl,
                       maxLength: 30,
-                      decoration: const InputDecoration(
-                        labelText: 'Last Name *',
-                        prefixIcon: Icon(Icons.person_outline),
+                      decoration: InputDecoration(
+                        label: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'Last Name ',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
+                          ),
+                        ),
+                        prefixIcon: const Icon(Icons.person_outline),
                         counterText: '',
                       ),
                       inputFormatters: [
@@ -562,7 +615,15 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       ),
                       items: ['None', 'JR.', 'SR.', 'I', 'II', 'III', 'Others']
                           .map((e) {
-                            return DropdownMenuItem(value: e, child: Text(e));
+                            return DropdownMenuItem(
+                              value: e,
+                              child: Text(
+                                e,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            );
                           })
                           .toList(),
                       onChanged: (val) {
@@ -616,9 +677,32 @@ class _InputFormScreenState extends State<InputFormScreen> {
                         }
                       },
                       child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Birthdate *',
-                          prefixIcon: Icon(Icons.cake_outlined),
+                        decoration: InputDecoration(
+                          label: RichText(
+                            text: TextSpan(
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w400,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Birthdate ',
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: '*',
+                                  style: TextStyle(color: AppTheme.danger),
+                                ),
+                              ],
+                            ),
+                          ),
+                          prefixIcon: const Icon(Icons.cake_outlined),
+                          errorText:
+                              (_hasAttemptedSubmit &&
+                                  _selectedBirthdate == null)
+                              ? 'Required'
+                              : null,
                         ),
                         child: Text(
                           _selectedBirthdate != null
@@ -639,13 +723,49 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: _selectedSex,
-                      decoration: const InputDecoration(
-                        labelText: 'Sex *',
-                        prefixIcon: Icon(Icons.wc_outlined),
+                      hint: Text(
+                        'Select Biological Sex',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                      items: ['Male', 'Female', 'Others'].map((s) {
-                        return DropdownMenuItem(value: s, child: Text(s));
+                      decoration: InputDecoration(
+                        label: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'Sex ',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
+                          ),
+                        ),
+                        prefixIcon: const Icon(Icons.wc_outlined),
+                        errorText: (_hasAttemptedSubmit && _selectedSex == null)
+                            ? 'Required'
+                            : null,
+                      ),
+                      items: ['Male', 'Female', 'Intersex'].map((s) {
+                        return DropdownMenuItem(
+                          value: s,
+                          child: Text(
+                            s,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        );
                       }).toList(),
+                      validator: (v) => v == null ? 'Required' : null,
                       onChanged: (val) {
                         if (val != null) {
                           setState(() => _selectedSex = val);
@@ -654,37 +774,9 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       },
                     ),
                   ),
-                  if (_selectedSex == 'Others') ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _customSexCtrl,
-                        maxLength: 20,
-                        decoration: const InputDecoration(
-                          labelText: 'Specify',
-                          counterText: '',
-                        ),
-                        inputFormatters: [LengthLimitingTextInputFormatter(20)],
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Required' : null,
-                      ),
-                    ),
-                  ],
                 ],
               ),
-              if (_selectedBirthdate == null) ...[
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: 14),
-                  child: Text(
-                    'Birthdate is required',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
+
               const SizedBox(height: 14),
 
               // Contact Number

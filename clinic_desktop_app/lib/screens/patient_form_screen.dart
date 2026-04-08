@@ -118,12 +118,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     if (sex.isEmpty) {
       _selectedSex = null;
       _customSexCtrl = TextEditingController();
-    } else if (['Male', 'Female'].contains(sex)) {
+    } else if (['Male', 'Female', 'Intersex'].contains(sex)) {
       _selectedSex = sex;
-      _customSexCtrl = TextEditingController();
     } else {
-      _selectedSex = 'Others';
-      _customSexCtrl = TextEditingController(text: sex);
+      _selectedSex = 'Intersex'; // fallback for backward compatibility
     }
     _contactCtrl = TextEditingController(
       text: widget.patient?.contactNumber ?? '',
@@ -232,12 +230,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         .trim()
         .replaceAll(RegExp(r'\s+'), ' ');
 
-    String finalSex = '';
-    if (_selectedSex == 'Others') {
-      finalSex = _customSexCtrl.text.trim();
-    } else {
-      finalSex = _selectedSex ?? '';
-    }
+    String finalSex = _selectedSex ?? '';
 
     final permissionsMap = {
       'suddenIllness': _suddenIllness,
@@ -694,8 +687,14 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                       ),
                       prefixIcon: const Icon(Icons.wc_outlined),
                     ),
-                    items: ['Male', 'Female', 'Others'].map((s) {
-                      return DropdownMenuItem(value: s, child: Text(s));
+                    items: ['Male', 'Female', 'Intersex'].map((s) {
+                      return DropdownMenuItem(
+                        value: s,
+                        child: Text(
+                          s,
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        ),
+                      );
                     }).toList(),
                     validator: (v) => v == null ? 'Required' : null,
                     onChanged: (val) {
@@ -705,22 +704,6 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                     },
                   ),
                 ),
-                if (_selectedSex == 'Others') ...[
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _customSexCtrl,
-                      maxLength: 20,
-                      decoration: const InputDecoration(
-                        labelText: 'Specify',
-                        counterText: '',
-                      ),
-                      inputFormatters: [LengthLimitingTextInputFormatter(20)],
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                ],
               ],
             ),
             const SizedBox(height: 16),
