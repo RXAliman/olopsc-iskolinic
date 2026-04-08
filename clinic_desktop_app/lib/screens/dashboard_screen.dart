@@ -804,13 +804,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Material(
                             color: Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
+                            clipBehavior: Clip.antiAlias,
                             child: InkWell(
                               onTap: () => setState(() {
                                 _focusSearchOnNextTab = false;
                                 _selectedIndex = i;
                               }),
                               borderRadius: BorderRadius.circular(12),
-                              hoverColor: Colors.white.withValues(alpha: 0.05),
+                              hoverColor: AppTheme.textPrimary.withValues(
+                                alpha: 0.08,
+                              ),
+                              splashColor: AppTheme.textPrimary.withValues(
+                                alpha: 0.12,
+                              ),
+                              highlightColor: AppTheme.textPrimary.withValues(
+                                alpha: 0.05,
+                              ),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(

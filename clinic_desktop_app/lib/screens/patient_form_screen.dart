@@ -32,7 +32,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   late TextEditingController _guardianContactCtrl;
 
   DateTime? _selectedBirthdate;
-  String _selectedSex = 'Female';
+  late TextEditingController _birthdateCtrl;
+  String? _selectedSex;
   late TextEditingController _customSexCtrl;
   late TextEditingController _contactCtrl;
   late TextEditingController _guardian2NameCtrl;
@@ -48,6 +49,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   bool _marikinaValley = false;
   bool _marikinaStVincent = false;
   bool _othersPermission = false;
+  bool _hasAttemptedSave = false;
 
   bool get isEditing => widget.patient != null;
 
@@ -107,9 +109,14 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
       text: widget.patient?.guardianContact ?? '',
     );
     _selectedBirthdate = widget.patient?.birthdate;
+    _birthdateCtrl = TextEditingController(
+      text: _selectedBirthdate != null
+          ? DateFormat('MMM dd, yyyy').format(_selectedBirthdate!)
+          : '',
+    );
     final sex = widget.patient?.sex ?? '';
     if (sex.isEmpty) {
-      _selectedSex = 'Female';
+      _selectedSex = null;
       _customSexCtrl = TextEditingController();
     } else if (['Male', 'Female'].contains(sex)) {
       _selectedSex = sex;
@@ -173,7 +180,9 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _marikinaValley = p['marikinaValley'] == true;
     _marikinaStVincent = p['marikinaStVincent'] == true;
     _othersPermission = p['others'] == true;
-    _othersSpecifyCtrl = TextEditingController(text: p['othersSpecify']?.toString() ?? '');
+    _othersSpecifyCtrl = TextEditingController(
+      text: p['othersSpecify']?.toString() ?? '',
+    );
   }
 
   @override
@@ -182,6 +191,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _lastNameCtrl.dispose();
     _middleNameCtrl.dispose();
     _customExtensionCtrl.dispose();
+    _birthdateCtrl.dispose();
     _numberCtrl.dispose();
     _addressCtrl.dispose();
     _guardianNameCtrl.dispose();
@@ -197,10 +207,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   }
 
   Future<void> _save() async {
+    setState(() => _hasAttemptedSave = true);
     // Check custom required validation for Birthdate
     bool isValid = _formKey.currentState!.validate();
     if (_selectedBirthdate == null) {
-      setState(() {}); // trigger rebuild to show error text
       isValid = false;
     }
     if (!isValid) return;
@@ -226,7 +236,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     if (_selectedSex == 'Others') {
       finalSex = _customSexCtrl.text.trim();
     } else {
-      finalSex = _selectedSex;
+      finalSex = _selectedSex ?? '';
     }
 
     final permissionsMap = {
@@ -417,7 +427,16 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
+            Text(
+              "Fields with asterisks (*) are required to be filled up.",
+              style: TextStyle(
+                color: AppTheme.danger,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
             // Name Row 1: First Name & Last Name
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -426,8 +445,22 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   child: TextFormField(
                     controller: _firstNameCtrl,
                     maxLength: 30,
-                    decoration: const InputDecoration(
-                      labelText: 'First Name *',
+                    decoration: InputDecoration(
+                      label: RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                          children: [
+                            TextSpan(
+                              text: 'First Name ',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                            TextSpan(
+                              text: '*',
+                              style: TextStyle(color: AppTheme.danger),
+                            ),
+                          ],
+                        ),
+                      ),
                       prefixIcon: Icon(Icons.person_outline),
                       counterText: '',
                     ),
@@ -444,8 +477,22 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   child: TextFormField(
                     controller: _lastNameCtrl,
                     maxLength: 30,
-                    decoration: const InputDecoration(
-                      labelText: 'Last Name *',
+                    decoration: InputDecoration(
+                      label: RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                          children: [
+                            TextSpan(
+                              text: 'Last Name ',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                            TextSpan(
+                              text: '*',
+                              style: TextStyle(color: AppTheme.danger),
+                            ),
+                          ],
+                        ),
+                      ),
                       prefixIcon: Icon(Icons.person_outline),
                       counterText: '',
                     ),
@@ -492,7 +539,17 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                     ),
                     items: ['None', 'JR.', 'SR.', 'I', 'II', 'III', 'Others']
                         .map((e) {
-                          return DropdownMenuItem(value: e, child: Text(e));
+                          return DropdownMenuItem(
+                            value: e,
+                            child: Text(
+                              e,
+                              style: GoogleFonts.inter(
+                                color: Colors.black,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          );
                         })
                         .toList(),
                     onChanged: (val) {
@@ -530,8 +587,22 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
             TextFormField(
               controller: _numberCtrl,
               maxLength: 16,
-              decoration: const InputDecoration(
-                labelText: 'ID Number *',
+              decoration: InputDecoration(
+                label: RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                    children: [
+                      TextSpan(
+                        text: 'ID Number ',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
+                      TextSpan(
+                        text: '*',
+                        style: TextStyle(color: AppTheme.danger),
+                      ),
+                    ],
+                  ),
+                ),
                 prefixIcon: Icon(Icons.badge_outlined),
                 counterText: '',
               ),
@@ -539,9 +610,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                 UpperCaseTextFormatter(),
                 LengthLimitingTextInputFormatter(16),
               ],
-              validator: (v) => v == null || v.trim().isEmpty
-                  ? 'ID number is required'
-                  : null,
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 16),
 
@@ -550,7 +620,9 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: InkWell(
+                  child: TextFormField(
+                    controller: _birthdateCtrl,
+                    readOnly: true,
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
@@ -559,26 +631,35 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         lastDate: DateTime.now(),
                       );
                       if (picked != null) {
-                        setState(() => _selectedBirthdate = picked);
+                        setState(() {
+                          _selectedBirthdate = picked;
+                          _birthdateCtrl.text = DateFormat(
+                            'MMM dd, yyyy',
+                          ).format(picked);
+                        });
                       }
                     },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Birthdate *',
-                        prefixIcon: Icon(Icons.cake_outlined),
-                      ),
-                      child: Text(
-                        _selectedBirthdate != null
-                            ? DateFormat(
-                                'MMM dd, yyyy',
-                              ).format(_selectedBirthdate!)
-                            : 'Select Date',
-                        style: TextStyle(
-                          color: _selectedBirthdate != null
-                              ? AppTheme.textPrimary
-                              : AppTheme.textMuted,
+                    decoration: InputDecoration(
+                      label: RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                          children: [
+                            TextSpan(
+                              text: 'Birthdate ',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                            TextSpan(
+                              text: '*',
+                              style: TextStyle(color: AppTheme.danger),
+                            ),
+                          ],
                         ),
                       ),
+                      prefixIcon: const Icon(Icons.cake_outlined),
+                      errorText:
+                          (_hasAttemptedSave && _selectedBirthdate == null)
+                          ? 'Required'
+                          : null,
                     ),
                   ),
                 ),
@@ -587,13 +668,36 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                   flex: _selectedSex == 'Others' ? 1 : 1,
                   child: DropdownButtonFormField<String>(
                     initialValue: _selectedSex,
-                    decoration: const InputDecoration(
-                      labelText: 'Sex *',
-                      prefixIcon: Icon(Icons.wc_outlined),
+                    hint: Text(
+                      'Select Biological Sex',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textMuted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    decoration: InputDecoration(
+                      label: RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                          children: [
+                            TextSpan(
+                              text: 'Sex ',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                            TextSpan(
+                              text: '*',
+                              style: TextStyle(color: AppTheme.danger),
+                            ),
+                          ],
+                        ),
+                      ),
+                      prefixIcon: const Icon(Icons.wc_outlined),
                     ),
                     items: ['Male', 'Female', 'Others'].map((s) {
                       return DropdownMenuItem(value: s, child: Text(s));
                     }).toList(),
+                    validator: (v) => v == null ? 'Required' : null,
                     onChanged: (val) {
                       if (val != null) {
                         setState(() => _selectedSex = val);
@@ -619,19 +723,6 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                 ],
               ],
             ),
-            if (_selectedBirthdate == null) ...[
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(left: 14),
-                child: Text(
-                  'Birthdate is required',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
             const SizedBox(height: 16),
 
             // Contact Number
@@ -1080,24 +1171,46 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Permission granted for:', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Permission granted for:',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             CheckboxListTile(
-              title: const Text('Treatment of sudden illness or injuries'),
+              title: Text(
+                'Treatment of sudden illness or injuries',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                ),
+              ),
               value: _suddenIllness,
               activeColor: AppTheme.accent,
               onChanged: (val) => setState(() => _suddenIllness = val == true),
               controlAffinity: ListTileControlAffinity.leading,
             ),
             CheckboxListTile(
-              title: const Text("Giving of initial medication for child's illness while in school"),
+              title: Text(
+                "Giving of initial medication for child's illness while in school",
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                ),
+              ),
               value: _initialMedication,
               activeColor: AppTheme.accent,
-              onChanged: (val) => setState(() => _initialMedication = val == true),
+              onChanged: (val) =>
+                  setState(() => _initialMedication = val == true),
               controlAffinity: ListTileControlAffinity.leading,
             ),
             CheckboxListTile(
-              title: const Text('School authorities to take the child to the nearest hospital if emergency'),
+              title: Text(
+                'School authorities to take the child to the nearest hospital if emergency',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                ),
+              ),
               value: _emergencyHospital,
               activeColor: AppTheme.accent,
               onChanged: (val) => setState(() {
@@ -1116,34 +1229,64 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               child: Column(
                 children: [
                   CheckboxListTile(
-                    title: const Text('Marikina Valley Medical Center'),
+                    title: Text(
+                      'Marikina Valley Medical Center',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
                     value: _marikinaValley,
                     activeColor: AppTheme.accent,
-                    onChanged: _emergencyHospital ? (val) => setState(() => _marikinaValley = val == true) : null,
+                    onChanged: _emergencyHospital
+                        ? (val) => setState(() => _marikinaValley = val == true)
+                        : null,
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                   CheckboxListTile(
-                    title: const Text('Marikina St. Vincent Hospital'),
+                    title: Text(
+                      'Marikina St. Vincent Hospital',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
                     value: _marikinaStVincent,
                     activeColor: AppTheme.accent,
-                    onChanged: _emergencyHospital ? (val) => setState(() => _marikinaStVincent = val == true) : null,
+                    onChanged: _emergencyHospital
+                        ? (val) =>
+                              setState(() => _marikinaStVincent = val == true)
+                        : null,
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                   CheckboxListTile(
-                    title: const Text('Others (specify)'),
+                    title: Text(
+                      'Others (specify)',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
                     value: _othersPermission,
                     activeColor: AppTheme.accent,
-                    onChanged: _emergencyHospital ? (val) => setState(() {
-                      _othersPermission = val == true;
-                      if (!_othersPermission) {
-                         _othersSpecifyCtrl.clear();
-                      }
-                    }) : null,
+                    onChanged: _emergencyHospital
+                        ? (val) => setState(() {
+                            _othersPermission = val == true;
+                            if (!_othersPermission) {
+                              _othersSpecifyCtrl.clear();
+                            }
+                          })
+                        : null,
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                   if (_othersPermission)
                     Padding(
-                      padding: const EdgeInsets.only(left: 32.0, right: 16.0, top: 4.0, bottom: 8.0),
+                      padding: const EdgeInsets.only(
+                        left: 32.0,
+                        right: 16.0,
+                        top: 4.0,
+                        bottom: 8.0,
+                      ),
                       child: TextFormField(
                         controller: _othersSpecifyCtrl,
                         decoration: const InputDecoration(
@@ -1157,7 +1300,13 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
               ),
             ),
             CheckboxListTile(
-              title: const Text('Treatment/Procedure is deemed necessary'),
+              title: Text(
+                'Treatment/Procedure is deemed necessary',
+                style: GoogleFonts.inter(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                ),
+              ),
               value: _procedure,
               activeColor: AppTheme.accent,
               onChanged: (val) => setState(() => _procedure = val == true),
