@@ -41,11 +41,8 @@ class LocalServerService {
   }
 
   /// JSON payload to encode in the QR code.
-  String get qrPayload => jsonEncode({
-        'host': _localIp,
-        'port': _port,
-        'token': _authToken,
-      });
+  String get qrPayload =>
+      jsonEncode({'host': _localIp, 'port': _port, 'token': _authToken});
 
   /// Callback invoked when patient data changes (new patient/visitation).
   /// The desktop's PatientProvider should listen to this to refresh its UI.
@@ -67,7 +64,10 @@ class LocalServerService {
     // Health check endpoint
     router.get('/api/health', (shelf.Request request) {
       return shelf.Response.ok(
-        jsonEncode({'status': 'ok', 'timestamp': DateTime.now().toIso8601String()}),
+        jsonEncode({
+          'status': 'ok',
+          'timestamp': DateTime.now().toIso8601String(),
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     });
@@ -104,7 +104,9 @@ class LocalServerService {
           );
         }
 
-        final patient = await DatabaseHelper.instance.getPatientByIdNumber(idNumber);
+        final patient = await DatabaseHelper.instance.getPatientByIdNumber(
+          idNumber,
+        );
         if (patient == null) {
           return shelf.Response.notFound(
             jsonEncode({'error': 'Patient not found'}),
@@ -114,7 +116,7 @@ class LocalServerService {
 
         final map = patient.toMap();
         map['isDeleted'] = (map['isDeleted'] as int?) == 1;
-        
+
         return shelf.Response.ok(
           jsonEncode(map),
           headers: {'Content-Type': 'application/json'},
@@ -137,13 +139,13 @@ class LocalServerService {
         final clock = HLC.now(nodeId).send();
         final hlcStr = clock.pack();
         final now = DateTime.now();
-        
+
         final existingId = data['existingPatientId'] as String?;
         Patient? existingRecord;
         if (existingId != null && existingId.isNotEmpty) {
           existingRecord = await DatabaseHelper.instance.getPatient(existingId);
         }
-        
+
         final patientId = existingRecord?.id ?? const Uuid().v4();
 
         // Build patientName from parts: "LAST, FIRST MIDDLE EXT"
@@ -151,10 +153,12 @@ class LocalServerService {
         final lastName = data['lastName'] as String? ?? '';
         final middleName = data['middleName'] as String? ?? '';
         final ext = data['extension'] as String? ?? '';
-        final patientName = data['patientName'] as String? ??
-            '$lastName, $firstName $middleName $ext'
-                .trim()
-                .replaceAll(RegExp(r'\s+'), ' ');
+        final patientName =
+            data['patientName'] as String? ??
+            '$lastName, $firstName $middleName $ext'.trim().replaceAll(
+              RegExp(r'\s+'),
+              ' ',
+            );
 
         final patient = Patient(
           id: patientId,
@@ -221,10 +225,11 @@ class LocalServerService {
       return (shelf.Handler innerHandler) {
         return (shelf.Request request) {
           // Track connected devices
-          final remoteIp = (request.context['shelf.io.connection_info']
-                  as HttpConnectionInfo?)
-              ?.remoteAddress
-              .address;
+          final remoteIp =
+              (request.context['shelf.io.connection_info']
+                      as HttpConnectionInfo?)
+                  ?.remoteAddress
+                  .address;
           if (remoteIp != null) {
             final isNew = !_connectedDevices.containsKey(remoteIp);
             _connectedDevices[remoteIp] = DateTime.now();
@@ -251,11 +256,13 @@ class LocalServerService {
       return (shelf.Handler innerHandler) {
         return (shelf.Request request) async {
           final response = await innerHandler(request);
-          return response.change(headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-          });
+          return response.change(
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+            },
+          );
         };
       };
     }
@@ -277,7 +284,9 @@ class LocalServerService {
         _server = await shelf_io.serve(pipeline, '0.0.0.0', _port);
         _server!.autoCompress = true;
         // ignore: avoid_print
-        print('[LocalServer] Running on http://$_localIp:$_port (fallback port)');
+        print(
+          '[LocalServer] Running on http://$_localIp:$_port (fallback port)',
+        );
       } catch (e2) {
         // ignore: avoid_print
         print('[LocalServer] Failed to start: $e2');
@@ -299,26 +308,41 @@ class LocalServerService {
   }
 
   /// Detect the local IP address on the LAN (not loopback).
+  ///
+  /// Prioritises 192.168.x.x (typical home/office router range) over other
+  /// private ranges so that VPN or virtual adapters on 10.x.x.x don't win.
   Future<String> _detectLocalIp() async {
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
         includeLoopback: false,
       );
+
+      // Collect all non-loopback IPv4 addresses
+      final allAddresses = <String>[];
       for (final iface in interfaces) {
         for (final addr in iface.addresses) {
-          // Prefer private network ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-          if (addr.address.startsWith('192.168.') ||
-              addr.address.startsWith('10.') ||
-              addr.address.startsWith('172.')) {
-            return addr.address;
-          }
+          allAddresses.add(addr.address);
         }
       }
-      // Fallback: return the first non-loopback address
-      if (interfaces.isNotEmpty && interfaces.first.addresses.isNotEmpty) {
-        return interfaces.first.addresses.first.address;
+
+      // ignore: avoid_print
+      print('[LocalServer] Detected IPs: $allAddresses');
+
+      // Priority 1: 192.168.x.x — typical local router
+      for (final ip in allAddresses) {
+        if (ip.startsWith('192.168.')) return ip;
       }
+      // Priority 2: 172.16-31.x.x — private range
+      for (final ip in allAddresses) {
+        if (ip.startsWith('172.')) return ip;
+      }
+      // Priority 3: 10.x.x.x — can be VPN or corporate, lowest priority
+      for (final ip in allAddresses) {
+        if (ip.startsWith('10.')) return ip;
+      }
+      // Fallback: first available address
+      if (allAddresses.isNotEmpty) return allAddresses.first;
     } catch (_) {}
     return '127.0.0.1';
   }

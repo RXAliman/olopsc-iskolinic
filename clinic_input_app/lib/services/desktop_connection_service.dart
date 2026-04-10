@@ -26,15 +26,27 @@ class DesktopConnectionService {
   /// Returns `true` if the health check succeeds.
   Future<bool> connect(String qrPayload) async {
     try {
+      // ignore: avoid_print
+      print('[DesktopConnection] Parsing QR payload: $qrPayload');
       final data = jsonDecode(qrPayload) as Map<String, dynamic>;
       _host = data['host'] as String;
-      _port = data['port'] as int;
+      // JSON numbers can decode as int or double depending on platform
+      _port = (data['port'] is int)
+          ? data['port'] as int
+          : (data['port'] as num).toInt();
       _token = data['token'] as String;
+
+      // ignore: avoid_print
+      print('[DesktopConnection] Connecting to http://$_host:$_port');
 
       // Verify connection with health check
       _connected = await _healthCheck();
+      // ignore: avoid_print
+      print('[DesktopConnection] Health check result: $_connected');
       return _connected;
     } catch (e) {
+      // ignore: avoid_print
+      print('[DesktopConnection] Connect error: $e');
       _connected = false;
       return false;
     }
@@ -56,14 +68,21 @@ class DesktopConnectionService {
   /// Verify the server is reachable and the token is valid.
   Future<bool> _healthCheck() async {
     try {
+      final url = '$baseUrl/api/health';
+      // ignore: avoid_print
+      print('[DesktopConnection] Health check: GET $url');
       final response = await http
           .get(
-            Uri.parse('$baseUrl/api/health'),
+            Uri.parse(url),
             headers: _authHeaders,
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 10));
+      // ignore: avoid_print
+      print('[DesktopConnection] Response: ${response.statusCode} ${response.body}');
       return response.statusCode == 200;
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[DesktopConnection] Health check failed: $e');
       return false;
     }
   }

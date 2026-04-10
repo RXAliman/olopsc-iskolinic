@@ -55,6 +55,9 @@ class _QrScanScreenState extends State<QrScanScreen> {
           data.containsKey('host') &&
           data.containsKey('port') &&
           data.containsKey('token')) {
+        final host = data['host'];
+        final port = data['port'];
+
         final connected =
             await DesktopConnectionService.instance.connect(code);
         if (!mounted) return;
@@ -66,8 +69,8 @@ class _QrScanScreenState extends State<QrScanScreen> {
           }
         } else {
           _showError(
-            'Could not connect to the desktop app. '
-            'Make sure you are on the same Wi-Fi network.',
+            'Could not connect to $host:$port. '
+            'Ensure the tablet and desktop are on the same network.',
           );
           _resumeScanning();
         }
@@ -75,10 +78,10 @@ class _QrScanScreenState extends State<QrScanScreen> {
         _showError('Invalid QR code. Please scan the code from the desktop app.');
         _resumeScanning();
       }
-    } catch (_) {
+    } catch (e) {
       // Not valid JSON
       if (!mounted) return;
-      _showError('Invalid QR code format. Please scan the code from the desktop app.');
+      _showError('QR code error: $e');
       _resumeScanning();
     }
   }
