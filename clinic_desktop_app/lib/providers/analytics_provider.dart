@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/database_helper.dart';
 import '../constants/symptoms.dart';
-import '../constants/supplies.dart';
 
 class AnalyticsProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -46,14 +45,17 @@ class AnalyticsProvider extends ChangeNotifier {
 
     // Count each supply used
     final supplyMap = <String, int>{};
-    for (final supply in kSuppliesList) {
-      supplyMap[supply] = 0;
+    
+    // Initialize with all current inventory items (to show 0 counts)
+    final inventory = await _db.getAllInventory();
+    for (final item in inventory) {
+      supplyMap[item.itemName] = 0;
     }
+
     for (final visit in visitations) {
       for (final supply in visit.suppliesUsed) {
-        if (supplyMap.containsKey(supply)) {
-          supplyMap[supply] = supplyMap[supply]! + 1;
-        }
+        // If it's a legacy item not in current inventory or new item, still count it
+        supplyMap[supply] = (supplyMap[supply] ?? 0) + 1;
       }
     }
     _supplyCounts = supplyMap;

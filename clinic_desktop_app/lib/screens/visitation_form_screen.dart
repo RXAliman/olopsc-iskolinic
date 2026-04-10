@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants/symptoms.dart';
-import '../constants/supplies.dart';
 import '../providers/patient_provider.dart';
+import '../providers/inventory_provider.dart';
+import '../models/inventory_item.dart';
 import '../theme/app_theme.dart';
 
 import '../models/patient.dart';
@@ -110,6 +111,10 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     }
 
     if (widget.visitation != null) {
+      // Track which supplies are newly added (not in original visitation)
+      final originalSupplies = widget.visitation!.suppliesUsed.toSet();
+      final newlyAddedSupplies = _selectedSupplies.difference(originalSupplies);
+
       final updated = widget.visitation!.copyWith(
         symptoms: _selectedSymptoms.toList(),
         suppliesUsed: _selectedSupplies.toList(),
@@ -117,6 +122,14 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         remarks: _remarksCtrl.text.trim(),
       );
       await context.read<PatientProvider>().updateVisitation(updated);
+
+      // Deduct stock only for newly added supplies
+      if (newlyAddedSupplies.isNotEmpty) {
+        final inventoryProvider = context.read<InventoryProvider>();
+        for (final supply in newlyAddedSupplies) {
+          await inventoryProvider.deductStock(supply, 1);
+        }
+      }
     } else {
       await context.read<PatientProvider>().addVisitation(
         patientId: _selectedPatient!.id,
@@ -389,13 +402,42 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        _buildSection(
-                          title: 'Clinic Supplies Used',
-                          allItems: kSuppliesList,
-                          selectedItems: _selectedSupplies,
-                          showAll: _showAllSupplies,
-                          onToggle: () => setState(
-                            () => _showAllSupplies = !_showAllSupplies,
+                        Consumer<InventoryProvider>(
+                          builder: (context, inventory, _) {
+                            final allItems = inventory.items;
+                            return _buildSection(
+                              title: 'Clinic Supplies Used',
+                              overrideItems: allItems,
+                              selectedItems: _selectedSupplies,
+                              showAll: _showAllSupplies,
+                              onToggle: () => setState(
+                                () => _showAllSupplies = !_showAllSupplies,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline_rounded,
+                                size: 14,
+                                color: AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Note: Please manually verify the supply\'s physical expiration date before use.',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: AppTheme.textMuted,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -463,15 +505,25 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
 
   Widget _buildSection({
     required String title,
-    required List<String> allItems,
+    List<String> allItems = const [],
+    List<InventoryItem>? overrideItems,
     required Set<String> selectedItems,
     required bool showAll,
     required VoidCallback onToggle,
     Color accentColor = AppTheme.accent,
   }) {
+    // If overrideItems is provided, we're dealing with InventoryItems (supplies)
+    final bool isSupplies = overrideItems != null;
+
     final displayItems = showAll
-        ? allItems
-        : allItems.where((item) => selectedItems.contains(item)).toList();
+        ? (isSupplies ? overrideItems : allItems)
+        : (isSupplies
+              ? overrideItems
+                    .where((item) => selectedItems.contains(item.itemName))
+                    .toList()
+              : allItems
+                    .where((item) => selectedItems.contains(item))
+                    .toList());
 
     return Container(
       width: double.infinity,
@@ -516,36 +568,94 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
             spacing: 8,
             runSpacing: 8,
             children: displayItems.map((item) {
-              final isSelected = selectedItems.contains(item);
-              return FilterChip(
-                showCheckmark: false,
-                label: Text(
-                  item,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppTheme.textSecondary,
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
+              final String name = isSupplies
+                  ? (item as InventoryItem).itemName
+                  : item as String;
+              final isSelected = selectedItems.contains(name);
+              final bool isOutOfStock =
+                  isSupplies && (item as InventoryItem).quantity == 0;
+              final bool isDisabled = isOutOfStock && !isSelected;
+
+              Widget chipLabel = Text(
+                isSupplies
+                    ? '$name (${(item as InventoryItem).quantity})'
+                    : name,
+                style: TextStyle(
+                  color: isDisabled
+                      ? AppTheme.textMuted
+                      : isSelected
+                      ? Colors.white
+                      : AppTheme.textSecondary,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
+              );
+
+              Widget chip = FilterChip(
+                showCheckmark: false,
+                label: chipLabel,
                 selected: isSelected,
-                onSelected: (sel) {
-                  setState(() {
-                    if (sel) {
-                      selectedItems.add(item);
-                    } else {
-                      selectedItems.remove(item);
-                    }
-                  });
-                },
+                onSelected: isDisabled
+                    ? null
+                    : (sel) {
+                        setState(() {
+                          if (sel) {
+                            selectedItems.add(name);
+                          } else {
+                            selectedItems.remove(name);
+                          }
+                        });
+                      },
                 selectedColor: accentColor,
-                backgroundColor: AppTheme.cardLight,
+                backgroundColor: isDisabled
+                    ? AppTheme.cardLight.withValues(alpha: 0.5)
+                    : AppTheme.cardLight,
+                disabledColor: AppTheme.cardLight.withValues(alpha: 0.5),
                 side: BorderSide(
-                  color: isSelected ? accentColor : AppTheme.dividerColor,
+                  color: isDisabled
+                      ? AppTheme.dividerColor.withValues(alpha: 0.5)
+                      : isSelected
+                      ? accentColor
+                      : AppTheme.dividerColor,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               );
+
+              if (isSupplies && (item as InventoryItem).isLowStock) {
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    chip,
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.yellow,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.priority_high_rounded,
+                          size: 10,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return chip;
             }).toList(),
           ),
         ],

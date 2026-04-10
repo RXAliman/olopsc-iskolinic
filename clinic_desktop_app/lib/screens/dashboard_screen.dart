@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../models/visitation.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
+import '../providers/inventory_provider.dart';
 import '../providers/sync_provider.dart';
 import '../providers/local_server_provider.dart';
 import '../theme/app_theme.dart';
@@ -33,7 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const double _expandedWidth = 250;
   static const double _collapsedWidth = 72;
-  static const Duration _animDuration = Duration(milliseconds: 0);
+  static const Duration _animDuration = Duration(milliseconds: 250);
   static const Curve _animCurve = Curves.easeInOutCubic;
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
@@ -124,10 +125,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadDashboardData() async {
     final patientProvider = context.read<PatientProvider>();
     final analyticsProvider = context.read<AnalyticsProvider>();
+    final inventoryProvider = context.read<InventoryProvider>();
 
     await patientProvider.loadPatients();
     await analyticsProvider.loadAnalytics();
     await patientProvider.loadTodayVisits();
+    await inventoryProvider.loadInventory();
   }
 
   Widget _buildBody() {
@@ -485,6 +488,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
+              const SizedBox(height: 32),
+
+              // Low Stock Alerts
+              Consumer<InventoryProvider>(
+                builder: (context, inventory, _) {
+                  final lowStock = inventory.lowStockItems;
+                  if (lowStock.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            "Low Stock Alerts",
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.danger,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${lowStock.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        decoration: AppTheme.glassCard(),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: lowStock.length,
+                          separatorBuilder: (_, __) => const Divider(
+                            height: 1,
+                            color: AppTheme.dividerColor,
+                          ),
+                          itemBuilder: (context, index) {
+                            final item = lowStock[index];
+                            return ListTile(
+                              onTap: () {
+                                setState(() {
+                                  _selectedIndex = 2; // Switch to Inventory tab
+                                });
+                              },
+                              leading: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.danger.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: AppTheme.danger,
+                                  size: 18,
+                                ),
+                              ),
+                              title: Text(
+                                item.itemName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Current: ${item.quantity} units (ROP: ${item.reorderPoint})',
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppTheme.textMuted,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
         );
@@ -620,14 +715,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       if (!_isSidebarCollapsed) ...[
                         const SizedBox(width: 12),
-                        Text(
-                          'ISKOLINIC',
-                          style: GoogleFonts.audiowide(
-                            textStyle: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF1B4697),
-                                ),
+                        Flexible(
+                          child: Text(
+                            'ISKOLINIC',
+                            overflow: TextOverflow.clip,
+                            softWrap: false,
+                            style: GoogleFonts.audiowide(
+                              textStyle: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF1B4697),
+                                  ),
+                            ),
                           ),
                         ),
                       ],
@@ -952,12 +1053,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 12),
-                                        Text(
-                                          'Collapse',
-                                          style: TextStyle(
-                                            color: AppTheme.textMuted,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w400,
+                                        Flexible(
+                                          child: Text(
+                                            overflow: TextOverflow.clip,
+                                            softWrap: false,
+                                            'Collapse',
+                                            style: TextStyle(
+                                              color: AppTheme.textMuted,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w400,
+                                            ),
                                           ),
                                         ),
                                       ],

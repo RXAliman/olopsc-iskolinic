@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../constants/supplies.dart';
+import '../models/inventory_item.dart';
 import '../providers/inventory_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -15,7 +15,10 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   final _searchCtrl = TextEditingController();
+  final _horizontalScrollCtrl = ScrollController();
   String _searchQuery = '';
+  int _sortColumnIndex = 0;
+  bool _sortAscending = true;
 
   @override
   void initState() {
@@ -28,21 +31,139 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _horizontalScrollCtrl.dispose();
     super.dispose();
   }
 
-  void _showAddStockDialog() {
-    String? selectedItem;
+  void _showAddStockDialog(InventoryItem item) {
     final qtyCtrl = TextEditingController();
-    DateTime? expirationDate;
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => Dialog(
-          child: Container(
-            width: 420,
-            padding: const EdgeInsets.all(28),
+      builder: (ctx) => Dialog(
+        child: Container(
+          width: 360,
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.accentGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.add_box_rounded,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Add Stock',
+                    style: Theme.of(ctx).textTheme.headlineMedium,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Supply: ${item.itemName}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Current Stock: ${item.quantity}',
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Fields with asterisks (*) are required to be filled up.",
+                style: TextStyle(
+                  color: AppTheme.danger,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: qtyCtrl,
+                decoration: InputDecoration(
+                  label: Text.rich(
+                    TextSpan(
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                      children: [
+                        TextSpan(
+                          text: 'Quantity to Add ',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                        TextSpan(
+                          text: '*',
+                          style: TextStyle(color: AppTheme.danger),
+                        ),
+                      ],
+                    ),
+                  ),
+                  prefixIcon: const Icon(Icons.numbers_rounded),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                autofocus: true,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      final qty = int.tryParse(qtyCtrl.text) ?? 0;
+                      if (qty <= 0) return;
+                      context.read<InventoryProvider>().addStock(
+                        item.itemName,
+                        qty,
+                      );
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Add Stock'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddNewItemDialog() {
+    final nameCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController();
+    final aduCtrl = TextEditingController();
+    final ltCtrl = TextEditingController();
+    final ssCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(28),
+          child: Form(
+            key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,86 +178,155 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
-                        Icons.add_box_rounded,
+                        Icons.post_add_rounded,
                         size: 20,
                         color: Colors.white,
                       ),
                     ),
                     const SizedBox(width: 16),
                     Text(
-                      'Add Stock',
+                      'New Supply Item',
                       style: Theme.of(ctx).textTheme.headlineMedium,
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
-
-                // Item dropdown
-                DropdownButtonFormField<String>(
-                  initialValue: selectedItem,
-                  decoration: const InputDecoration(
-                    labelText: 'Supply Item *',
-                    prefixIcon: Icon(Icons.medical_services_outlined),
+                Text(
+                  "Fields with asterisks (*) are required to be filled up.",
+                  style: TextStyle(
+                    color: AppTheme.danger,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic,
                   ),
-                  items: kSuppliesList
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => selectedItem = v),
                 ),
                 const SizedBox(height: 16),
-
-                // Quantity
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Supply Name ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                    prefixIcon: const Icon(Icons.medical_services_outlined),
+                  ),
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: qtyCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Quantity *',
-                    prefixIcon: Icon(Icons.numbers_rounded),
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Initial Quantity ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                    prefixIcon: const Icon(Icons.inventory_2_outlined),
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
-
-                // Expiration date
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: ctx,
-                      initialDate: DateTime.now().add(
-                        const Duration(days: 365),
-                      ),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 3650)),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => expirationDate = picked);
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Expiration Date *',
-                      prefixIcon: Icon(Icons.calendar_month_rounded),
-                    ),
-                    child: Text(
-                      expirationDate != null
-                          ? DateFormat('MMM dd, yyyy').format(expirationDate!)
-                          : 'Select date',
-                      style: TextStyle(
-                        color: expirationDate != null
-                            ? AppTheme.textPrimary
-                            : AppTheme.textMuted,
+                TextFormField(
+                  controller: ssCtrl,
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Safety Stock ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
                       ),
                     ),
+                    prefixIcon: const Icon(Icons.shield_outlined),
+                    helperText: 'Minimum number of units to keep in reserve',
                   ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 24),
-
-                // Buttons
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: aduCtrl,
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Avg. Daily Use ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                    prefixIcon: const Icon(Icons.trending_up_outlined),
+                    helperText: 'Average number of units used per day',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: ltCtrl,
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Lead Time (Days) ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                    prefixIcon: const Icon(Icons.timer_outlined),
+                    helperText: 'Number of days it takes to receive supply',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 32),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -147,28 +337,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     const SizedBox(width: 12),
                     ElevatedButton(
                       onPressed: () {
-                        if (selectedItem == null ||
-                            qtyCtrl.text.isEmpty ||
-                            expirationDate == null) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please fill in all fields'),
-                              backgroundColor: AppTheme.danger,
-                            ),
+                        if (formKey.currentState!.validate()) {
+                          context.read<InventoryProvider>().addNewSupplyItem(
+                            itemName: nameCtrl.text.trim(),
+                            initialQuantity: int.parse(qtyCtrl.text),
+                            averageDailyUse: int.parse(aduCtrl.text),
+                            leadTime: int.parse(ltCtrl.text),
+                            safetyStock: int.parse(ssCtrl.text),
                           );
-                          return;
+                          Navigator.pop(ctx);
                         }
-                        final qty = int.tryParse(qtyCtrl.text) ?? 0;
-                        if (qty <= 0) return;
-
-                        context.read<InventoryProvider>().addStock(
-                          itemName: selectedItem!,
-                          quantity: qty,
-                          expirationDate: expirationDate!,
-                        );
-                        Navigator.pop(ctx);
                       },
-                      child: const Text('Add Stock'),
+                      child: const Text('Create Item'),
                     ),
                   ],
                 ),
@@ -180,7 +360,180 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  void _showRemoveDialog(String itemName, int currentQty) {
+  void _showEditROPDialog(InventoryItem item) {
+    final aduCtrl = TextEditingController(
+      text: item.averageDailyUse.toString(),
+    );
+    final ltCtrl = TextEditingController(text: item.leadTime.toString());
+    final ssCtrl = TextEditingController(text: item.safetyStock.toString());
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(28),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.accentGradient,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.settings_suggest_rounded,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Edit ROP Variables',
+                      style: Theme.of(ctx).textTheme.headlineMedium,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Fields with asterisks (*) are required to be filled up.",
+                  style: TextStyle(
+                    color: AppTheme.danger,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Supply: ${item.itemName}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: ssCtrl,
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Safety Stock ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                    prefixIcon: const Icon(Icons.shield_outlined),
+                    helperText: 'Minimum allowance to keep in reserve',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: aduCtrl,
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Average Daily Use ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                    prefixIcon: const Icon(Icons.trending_up_outlined),
+                    helperText: 'Estimated units used per day',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: ltCtrl,
+                  decoration: InputDecoration(
+                    label: Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                        children: [
+                          TextSpan(
+                            text: 'Lead Time (Days) ',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                          TextSpan(
+                            text: '*',
+                            style: TextStyle(color: AppTheme.danger),
+                          ),
+                        ],
+                      ),
+                    ),
+                    prefixIcon: const Icon(Icons.timer_outlined),
+                    helperText: 'Days needed to receive new stock',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (formKey.currentState!.validate()) {
+                          final updated = item.copyWith(
+                            averageDailyUse: int.parse(aduCtrl.text),
+                            leadTime: int.parse(ltCtrl.text),
+                            safetyStock: int.parse(ssCtrl.text),
+                          );
+                          context.read<InventoryProvider>().updateInventoryItem(
+                            updated,
+                          );
+                          Navigator.pop(ctx);
+                        }
+                      },
+                      child: const Text('Update ROP'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRemoveDialog(InventoryItem item) {
     final qtyCtrl = TextEditingController();
     showDialog(
       context: context,
@@ -198,19 +551,43 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'How many units of $itemName to remove?',
+                'How many units of ${item.itemName} to remove?',
                 style: Theme.of(ctx).textTheme.bodyMedium,
               ),
               Text(
-                'Current stock: $currentQty',
+                'Current stock: ${item.quantity}',
                 style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Fields with asterisks (*) are required to be filled up.",
+                style: TextStyle(
+                  color: AppTheme.danger,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: qtyCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Quantity to remove',
-                  prefixIcon: Icon(Icons.remove_circle_outline),
+                decoration: InputDecoration(
+                  label: Text.rich(
+                    TextSpan(
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                      children: [
+                        TextSpan(
+                          text: 'Quantity to remove ',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                        TextSpan(
+                          text: '*',
+                          style: TextStyle(color: AppTheme.danger),
+                        ),
+                      ],
+                    ),
+                  ),
+                  prefixIcon: const Icon(Icons.remove_circle_outline),
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -232,8 +609,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     onPressed: () {
                       final qty = int.tryParse(qtyCtrl.text) ?? 0;
                       if (qty <= 0) return;
-                      context.read<InventoryProvider>().removeStock(
-                        itemName,
+                      context.read<InventoryProvider>().deductStock(
+                        item.itemName,
                         qty,
                       );
                       Navigator.pop(ctx);
@@ -249,79 +626,363 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  void _showDeleteConfirmationDialog(InventoryItem item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Supply'),
+        content: Text(
+          'Are you sure you want to permanently delete "${item.itemName}"? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<InventoryProvider>().deleteItem(item.id);
+              Navigator.pop(ctx);
+            },
+            style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<InventoryProvider>(
       builder: (context, inventory, _) {
-        // Build the display list from kSuppliesList with quantities
-        final items = kSuppliesList.where((name) {
+        var filteredItems = inventory.items.where((item) {
           if (_searchQuery.isEmpty) return true;
-          return name.toLowerCase().contains(_searchQuery.toLowerCase());
+          return item.itemName.toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          );
         }).toList();
+
+        // Sorting
+        filteredItems.sort((a, b) {
+          int cmp;
+          switch (_sortColumnIndex) {
+            case 0:
+              cmp = a.itemName.compareTo(b.itemName);
+              break;
+            case 1:
+              cmp = a.quantity.compareTo(b.quantity);
+              break;
+            case 2:
+              cmp = a.averageDailyUse.compareTo(b.averageDailyUse);
+              break;
+            case 3:
+              cmp = a.leadTime.compareTo(b.leadTime);
+              break;
+            case 4:
+              cmp = a.safetyStock.compareTo(b.safetyStock);
+              break;
+            case 5:
+              cmp = a.reorderPoint.compareTo(b.reorderPoint);
+              break;
+            default:
+              cmp = 0;
+          }
+          return _sortAscending ? cmp : -cmp;
+        });
 
         return Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Row(
-                children: [
-                  Text(
-                    'Inventory',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: _showAddStockDialog,
-                    icon: const Icon(Icons.add_rounded, size: 20),
-                    label: const Text('Add Stock'),
-                  ),
-                ],
+              Text(
+                'Inventory',
+                style: Theme.of(context).textTheme.headlineLarge,
               ),
               const SizedBox(height: 4),
               Text(
                 'Track and manage clinic supplies',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // Search bar
-              SizedBox(
-                width: 320,
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: const InputDecoration(
-                    hintText: 'Search supplies...',
-                    prefixIcon: Icon(Icons.search_rounded),
+              // Search & Add Row
+              Row(
+                children: [
+                  SizedBox(
+                    width: 320,
+                    child: TextField(
+                      controller: _searchCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Search supplies...',
+                        prefixIcon: Icon(Icons.search_rounded, size: 20),
+                      ),
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                    ),
                   ),
-                  onChanged: (v) => setState(() => _searchQuery = v),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _showAddNewItemDialog,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add New Item'),
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: AppTheme.accent),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      backgroundColor: AppTheme.accent,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Expiration Warning Note
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.amber.shade800,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Note: Please manually verify the supply\'s physical expiration date before use.',
+                        style: TextStyle(
+                          color: Colors.amber.shade900,
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               // Inventory table
               Expanded(
                 child: Card(
-                  child: items.isEmpty
+                  clipBehavior: Clip.antiAlias,
+                  child: filteredItems.isEmpty
                       ? const Center(child: Text('No supplies found'))
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final itemName = items[index];
-                            final totalQty = inventory.summary[itemName] ?? 0;
-                            final batches = inventory.batchesForItem(itemName);
-
-                            return _InventoryRow(
-                              itemName: itemName,
-                              totalQty: totalQty,
-                              batches: batches,
-                              onRemove: () =>
-                                  _showRemoveDialog(itemName, totalQty),
-                            );
-                          },
+                      : Scrollbar(
+                          controller: _horizontalScrollCtrl,
+                          thumbVisibility: true,
+                          notificationPredicate: (notification) =>
+                              notification.depth == 1,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: SingleChildScrollView(
+                              controller: _horizontalScrollCtrl,
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                sortColumnIndex: _sortColumnIndex,
+                                sortAscending: _sortAscending,
+                                headingRowColor: WidgetStateProperty.all(
+                                  AppTheme.cardLight,
+                                ),
+                                columns: [
+                                  DataColumn(
+                                    label: const Tooltip(
+                                      message: 'Supply Item Name',
+                                      child: Text(
+                                        'Supply Item',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    onSort: (idx, asc) => _onSort(idx, asc),
+                                  ),
+                                  DataColumn(
+                                    label: const Tooltip(
+                                      message: 'Current Stock Level',
+                                      child: Text(
+                                        'In Stock',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    numeric: true,
+                                    onSort: (idx, asc) => _onSort(idx, asc),
+                                  ),
+                                  DataColumn(
+                                    label: const Tooltip(
+                                      message: 'Average Daily Use',
+                                      child: Text(
+                                        'Daily Use',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    numeric: true,
+                                    onSort: (idx, asc) => _onSort(idx, asc),
+                                  ),
+                                  DataColumn(
+                                    label: const Tooltip(
+                                      message:
+                                          'Number of days to receive new stock',
+                                      child: Text(
+                                        'Lead Time',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    numeric: true,
+                                    onSort: (idx, asc) => _onSort(idx, asc),
+                                  ),
+                                  DataColumn(
+                                    label: const Tooltip(
+                                      message: 'Safety Stock Buffer',
+                                      child: Text(
+                                        'Safety',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    numeric: true,
+                                    onSort: (idx, asc) => _onSort(idx, asc),
+                                  ),
+                                  DataColumn(
+                                    label: const Tooltip(
+                                      message: 'Inventory Status',
+                                      child: Text(
+                                        'Status',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: const Tooltip(
+                                      message: 'Available Actions',
+                                      child: Text(
+                                        'Actions',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                rows: filteredItems.map((item) {
+                                  final isLow = item.isLowStock;
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(
+                                        Text(
+                                          item.itemName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(Text(item.quantity.toString())),
+                                      DataCell(
+                                        Text(item.averageDailyUse.toString()),
+                                      ),
+                                      DataCell(Text('${item.leadTime}d')),
+                                      DataCell(
+                                        Text(item.safetyStock.toString()),
+                                      ),
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isLow
+                                                ? AppTheme.danger.withValues(
+                                                    alpha: 0.1,
+                                                  )
+                                                : Colors.green.withValues(
+                                                    alpha: 0.1,
+                                                  ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            isLow ? 'LOW STOCK' : 'HEALTHY',
+                                            style: TextStyle(
+                                              color: isLow
+                                                  ? AppTheme.danger
+                                                  : Colors.green,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons
+                                                    .add_circle_outline_rounded,
+                                                color: AppTheme.accent,
+                                                size: 20,
+                                              ),
+                                              tooltip: 'Add Stock',
+                                              onPressed: () =>
+                                                  _showAddStockDialog(item),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons
+                                                    .remove_circle_outline_rounded,
+                                                color: AppTheme.danger,
+                                                size: 20,
+                                              ),
+                                              tooltip: 'Remove Stock',
+                                              onPressed: () =>
+                                                  _showRemoveDialog(item),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.settings_outlined,
+                                                color: AppTheme.textMuted,
+                                                size: 20,
+                                              ),
+                                              tooltip: 'Edit ROP',
+                                              onPressed: () =>
+                                                  _showEditROPDialog(item),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.delete_outline_rounded,
+                                                color: AppTheme.danger,
+                                                size: 20,
+                                              ),
+                                              tooltip: 'Delete Item',
+                                              onPressed: () =>
+                                                  _showDeleteConfirmationDialog(
+                                                    item,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
                         ),
                 ),
               ),
@@ -331,158 +992,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
       },
     );
   }
-}
 
-class _InventoryRow extends StatelessWidget {
-  final String itemName;
-  final int totalQty;
-  final List batches;
-  final VoidCallback onRemove;
-
-  const _InventoryRow({
-    required this.itemName,
-    required this.totalQty,
-    required this.batches,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMM dd, yyyy');
-
-    return ExpansionTile(
-      tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      childrenPadding: const EdgeInsets.only(left: 60, right: 20, bottom: 12),
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: totalQty > 0
-              ? AppTheme.accent.withValues(alpha: 0.1)
-              : AppTheme.danger.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          Icons.medical_services_outlined,
-          size: 18,
-          color: totalQty > 0 ? AppTheme.accent : AppTheme.danger,
-        ),
-      ),
-      title: Text(itemName, style: Theme.of(context).textTheme.titleMedium),
-      subtitle: Text(
-        '$totalQty units in stock',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: totalQty > 0 ? AppTheme.textMuted : AppTheme.danger,
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: totalQty > 0
-                  ? AppTheme.accent.withValues(alpha: 0.1)
-                  : AppTheme.cardLight,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '$totalQty',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: totalQty > 0 ? AppTheme.accent : AppTheme.textMuted,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (totalQty > 0)
-            IconButton(
-              onPressed: onRemove,
-              icon: const Icon(Icons.remove_circle_outline, size: 20),
-              tooltip: 'Remove stock',
-              color: AppTheme.danger,
-            ),
-        ],
-      ),
-      children: batches.isEmpty
-          ? [
-              Text(
-                'No stock batches',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ]
-          : batches.map<Widget>((batch) {
-              final isExpired = batch.expirationDate.isBefore(DateTime.now());
-              final isExpiringSoon =
-                  !isExpired &&
-                  batch.expirationDate.isBefore(
-                    DateTime.now().add(const Duration(days: 30)),
-                  );
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      isExpired
-                          ? Icons.warning_rounded
-                          : Icons.calendar_today_rounded,
-                      size: 14,
-                      color: isExpired
-                          ? AppTheme.danger
-                          : isExpiringSoon
-                          ? AppTheme.warning
-                          : AppTheme.textMuted,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Exp: ${dateFormat.format(batch.expirationDate)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isExpired
-                            ? AppTheme.danger
-                            : isExpiringSoon
-                            ? AppTheme.warning
-                            : AppTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isExpired
-                            ? AppTheme.danger.withValues(alpha: 0.1)
-                            : AppTheme.cardLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${batch.quantity} units',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isExpired
-                              ? AppTheme.danger
-                              : AppTheme.textPrimary,
-                        ),
-                      ),
-                    ),
-                    if (isExpired) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        'EXPIRED',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.danger,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            }).toList(),
-    );
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
   }
 }
+
+// _InventoryRow class removed in favor of DataTable rows

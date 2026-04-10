@@ -5,7 +5,7 @@ A **Flutter Windows desktop application** for managing a school clinic's patient
 **Package name:** `olopsc_iskolinic`
 **Target platform:** Windows (uses `sqflite_common_ffi`)
 **Database:** Local SQLite via `sqflite_common_ffi`, stored at `%APPDATA%/com.olopsc/OLOPSC Iskolinic/clinic.db`
-**Database version:** 10
+**Database version:** 11
 
 ---
 
@@ -63,8 +63,7 @@ The app follows a **Provider + Repository** pattern:
 lib/
 ├── main.dart                     # App entry, provider wiring
 ├── constants/
-│   ├── symptoms.dart             # Predefined symptom lists (Traumatic, Medical, Behavioral)
-│   └── supplies.dart             # Predefined clinic supplies list
+│   └── symptoms.dart             # Predefined symptom lists (Traumatic, Medical, Behavioral)
 ├── crdt/
 │   ├── hlc.dart                  # Hybrid Logical Clock implementation
 │   ├── node_id.dart              # Persistent unique node identifier
@@ -76,11 +75,11 @@ lib/
 ├── models/
 │   ├── patient.dart              # Patient data model with CRDT fields
 │   ├── visitation.dart           # Visitation data model with CRDT fields
-│   └── stock_batch.dart          # Inventory stock batch model
+│   └── inventory_item.dart       # Tabular inventory item model
 ├── providers/
 │   ├── patient_provider.dart     # Core provider: patients, visitations, pagination, CRDT writes
-│   ├── inventory_provider.dart   # Inventory CRUD, FEFO deduction
-│   ├── analytics_provider.dart   # Monthly symptom/supply analytics
+│   ├── inventory_provider.dart   # Inventory CRUD, ROP calculations
+│   ├── analytics_provider.dart   # Monthly symptom/supply analytics (dynamic inventory)
 │   ├── sync_provider.dart        # Sync lifecycle management, connection state
 │   └── local_server_provider.dart# Tablet server state & connection monitoring
 ├── screens/
@@ -111,8 +110,8 @@ The app initializes in this order:
 3. `PatientProvider.loadPatients()` — Load the first page of patients
 4. `SyncProvider.init(...)` — **(Non-blocking)** Start background WebSocket connection to relay server
 5. `patientProvider.setOnLocalWrite(() => syncProvider.pushChanges())` — Wire auto-push
-6. `InventoryProvider.loadInventory()` — Load stock batches
-7. `patientProvider.setInventoryProvider(inventoryProvider)` — Wire auto-deduct
+6. `InventoryProvider.loadInventory()` — Load inventory items
+7. `patientProvider.setInventoryProvider(inventoryProvider)` — Wire auto-deduct/check stock
 8. `LocalServerProvider.startServer()` — Start embedded HTTP server for tablet pairing
 9. `localServerProvider.setOnDataChanged(() => patientProvider.refreshAll())` — Wire UI refresh for tablet submissions
 
@@ -170,25 +169,27 @@ Methods: `toMap()`, `fromMap()`, `copyWith()`, `toSyncMap()`, `fromSyncMap()`
 
 Methods: `toMap()`, `fromMap()`, `copyWith()`, `toSyncMap()`, `fromSyncMap()`
 
-### StockBatch (`models/stock_batch.dart`)
+### InventoryItem (`models/inventory_item.dart`)
 
-| Field            | Type       | Notes                    |
-|------------------|------------|--------------------------|
-| `id`             | `String`   | UUID v4, primary key     |
-| `itemName`       | `String`   | Supply name              |
-| `quantity`        | `int`      | Current batch quantity   |
-| `expirationDate` | `DateTime` | Expiry for FEFO ordering |
-| `createdAt`      | `DateTime` | When batch was added     |
+| Field            | Type       | Notes                         |
+|------------------|------------|-------------------------------|
+| `id`             | `String`   | UUID v4, primary key          |
+| `itemName`       | `String`   | Supply name                   |
+| `quantity`       | `int`      | Total units in stock          |
+| `averageDailyUse`| `int`      | Used for ROP calculation      |
+| `leadTime`       | `int`      | Procurement days              |
+| `safetyStock`    | `int`      | Minimum reserve               |
+| `createdAt`      | `DateTime` | When item was created         |
 
-Methods: `toMap()`, `fromMap()`, `copyWith()`
-**Note:** StockBatch is NOT synced via CRDT — it's local-only.
+Methods: `toMap()`, `fromMap()`, `copyWith()`, `reorderPoint` (getter)
+**Note:** Inventory is local-only (for now).
 
 ---
 
 ## Database Schema & Migrations
 
 **File:** `services/database_helper.dart`
-**Current version:** 10
+**Current version:** 11
 
 ### Tables
 
@@ -281,7 +282,7 @@ Used for: `nodeId` (persistent node identity), `lastSyncHlc` (sync watermark).
 
 **CRDT Sync:** `getPatientChangesSince(hlc)`, `getVisitationChangesSince(hlc)`, `upsertPatientFromRemote`, `upsertVisitationFromRemote`
 
-**Inventory:** `insertStockBatch`, `getStockBatchesForItem`, `getInventorySummary`, `getAllStockBatches`, `deductStock` (FEFO)
+**Inventory:** `insertInventoryItem`, `getAllInventory`, `updateInventoryItem`, `deleteInventoryItem`, `deductStock`, `addStock`
 
 **Maintenance:** `compactTombstones(daysThreshold)`, `clearAllData`
 
@@ -342,17 +343,18 @@ Manages the WebSocket sync lifecycle.
 
 ### InventoryProvider (`providers/inventory_provider.dart`)
 
-Manages clinic supply stock batches.
+Manages the clinic's inventory using the ROP model.
 
 **State:**
-- `_summary` — `Map<String, int>` aggregated item → total quantity
-- `_batches` — `List<StockBatch>` all batches with qty > 0
+- `_inventory` — `List<InventoryItem>` all supplies
+- `_searchQuery` — filter for inventory table
 
 **Key Methods:**
-- `loadInventory()` — Reload summary + batches
-- `addStock({itemName, quantity, expirationDate})` — Add new batch
-- `deductStock(itemName, qty)` — FEFO deduction
-- `batchesForItem(itemName)` — Get batches for specific item
+- `loadInventory()` — Reload from database
+- `addStock(itemName, qty)` — Deduct/Add stock manually
+- `addInventoryItem(item)` — Create a custom supply item
+- `updateInventoryItem(item)` — Update ROP variables or details
+- `deleteInventoryItem(id)` — Remove item record
 
 ### AnalyticsProvider (`providers/analytics_provider.dart`)
 
@@ -530,15 +532,9 @@ kBehavioralSymptoms = ['Panic Attacks']
 kSymptomsList = [...kTraumaticSymptoms, ...kMedicalSymptoms, ...kBehavioralSymptoms]
 ```
 
-### Supplies (`constants/supplies.dart`)
+### Supplies
 
-```dart
-kSuppliesList = ['Bandage', 'Cotton Balls', 'Alcohol', 'Betadine', 'Gauze', 'Medical Tape',
-  'Band-Aid', 'Thermometer Cover', 'Disposable Gloves', 'Face Mask', 'Ice Pack', 'Hot Compress',
-  'Tongue Depressor', 'Syringe', 'Saline Solution', 'Hydrogen Peroxide', 'Eye Drops', 'Ear Drops',
-  'Paracetamol', 'Ibuprofen', 'Mefenamic Acid', 'Antacid', 'ORS Sachet', 'Antihistamine',
-  'Ointment', 'Nasal Spray', 'Cough Syrup', 'Vitamin C']
-```
+Supply lists are now managed dynamically via the **Inventory** screen and stored in the database. There is no longer a static `kSuppliesList` constant. Usage is recorded in visitations and reflected in analytics based on the items currently in the `inventory` table.
 
 ---
 

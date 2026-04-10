@@ -3,7 +3,6 @@ import 'package:uuid/uuid.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
 import '../constants/symptoms.dart';
-import '../constants/supplies.dart';
 import '../crdt/hlc.dart';
 import 'database_helper.dart';
 
@@ -264,7 +263,7 @@ class MockDataGenerator {
     final middle = _pick(_middleNames);
     final last = _pick(_lastNames);
     final ext = _random.nextDouble() < 0.1 ? _pick(_extensions) : '';
-    
+
     final fullNameBuilder = StringBuffer('$last, $first $middle');
     if (ext.isNotEmpty) {
       fullNameBuilder.write(' $ext');
@@ -292,7 +291,8 @@ class MockDataGenerator {
 
   static String _generateAddress() {
     final houseNum = _random.nextInt(999) + 1;
-    return '$houseNum ${_pick(_streets)}, ${_pick(_barangays)}, ${_pick(_cities)}'.toUpperCase();
+    return '$houseNum ${_pick(_streets)}, ${_pick(_barangays)}, ${_pick(_cities)}'
+        .toUpperCase();
   }
 
   static String _generatePhone() {
@@ -326,7 +326,7 @@ class MockDataGenerator {
         Duration(days: _random.nextInt(365)),
       );
       final nameProvider = _generateNameComponents();
-      
+
       patients.add(
         Patient(
           id: _uuid.v4(),
@@ -365,13 +365,14 @@ class MockDataGenerator {
 
       // Generate Visitations
       for (int j = 0; j < visitationsPerPatient; j++) {
-        final visitDate = DateTime.now().subtract(Duration(days: _random.nextInt(365)));
+        final visitDate = DateTime.now().subtract(
+          Duration(days: _random.nextInt(365)),
+        );
         final visit = Visitation(
           id: _uuid.v4(),
           patientId: patient.id,
           dateTime: visitDate,
           symptoms: [_pick(kSymptomsList)],
-          suppliesUsed: [_pick(kSuppliesList)],
           treatment: _pick([
             'Rest and Hydration',
             'Pain Reliever',

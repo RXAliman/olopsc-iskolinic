@@ -1,56 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import '../models/stock_batch.dart';
+import '../models/inventory_item.dart';
 import '../services/database_helper.dart';
 
 class InventoryProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
 
-  /// Aggregated inventory: itemName → total quantity
-  Map<String, int> _summary = {};
+  List<InventoryItem> _items = [];
 
-  /// All stock batches (with qty > 0), sorted by item then expiry
-  List<StockBatch> _batches = [];
+  List<InventoryItem> get items => _items;
 
-  Map<String, int> get summary => _summary;
-  List<StockBatch> get batches => _batches;
+  List<InventoryItem> get lowStockItems =>
+      _items.where((item) => item.isLowStock).toList();
 
-  /// Get batches for a specific item, grouped by expiry
-  List<StockBatch> batchesForItem(String itemName) {
-    return _batches.where((b) => b.itemName == itemName).toList();
-  }
-
-  /// Load both summary and detailed batches
   Future<void> loadInventory() async {
-    _summary = await _db.getInventorySummary();
-    _batches = await _db.getAllStockBatches();
+    _items = await _db.getAllInventory();
     notifyListeners();
   }
 
-  /// Add a new stock batch
-  Future<void> addStock({
+  Future<void> addNewSupplyItem({
     required String itemName,
-    required int quantity,
-    required DateTime expirationDate,
+    required int initialQuantity,
+    required int averageDailyUse,
+    required int leadTime,
+    required int safetyStock,
   }) async {
-    final batch = StockBatch(
+    final item = InventoryItem(
       id: const Uuid().v4(),
       itemName: itemName,
-      quantity: quantity,
-      expirationDate: expirationDate,
+      quantity: initialQuantity,
+      averageDailyUse: averageDailyUse,
+      leadTime: leadTime,
+      safetyStock: safetyStock,
     );
-    await _db.insertStockBatch(batch);
+    await _db.insertInventoryItem(item);
     await loadInventory();
   }
 
-  /// Deduct stock using FEFO (called when visitation uses supplies)
+  Future<void> updateInventoryItem(InventoryItem item) async {
+    await _db.updateInventoryItem(item);
+    await loadInventory();
+  }
+
+  Future<void> addStock(String itemName, int qty) async {
+    await _db.addStock(itemName, qty);
+    await loadInventory();
+  }
+
   Future<void> deductStock(String itemName, int qty) async {
     await _db.deductStock(itemName, qty);
     await loadInventory();
   }
 
-  /// Manual removal (same as deduct but explicit)
-  Future<void> removeStock(String itemName, int qty) async {
-    await deductStock(itemName, qty);
+  Future<void> deleteItem(String id) async {
+    await _db.deleteInventoryItem(id);
+    await loadInventory();
   }
 }

@@ -3,8 +3,9 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
-import '../models/stock_batch.dart';
+import '../models/inventory_item.dart';
 import '../crdt/hlc.dart';
+import 'package:uuid/uuid.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -27,7 +28,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 10,
+        version: 11,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -92,18 +93,20 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_visitations_hlc ON visitations (hlc)',
     );
-    // Stock batches table for inventory
+    // Inventory table
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS stock_batches (
+      CREATE TABLE IF NOT EXISTS inventory (
         id TEXT PRIMARY KEY,
         itemName TEXT NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 0,
-        expirationDate TEXT NOT NULL,
+        averageDailyUse INTEGER NOT NULL DEFAULT 0,
+        leadTime INTEGER NOT NULL DEFAULT 0,
+        safetyStock INTEGER NOT NULL DEFAULT 0,
         createdAt TEXT NOT NULL
       )
     ''');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_batches (itemName, expirationDate)',
+      'CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory (itemName)',
     );
   }
 
@@ -200,6 +203,48 @@ class DatabaseHelper {
     }
     if (oldVersion < 10) {
       await db.execute("ALTER TABLE patients ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'");
+    }
+    if (oldVersion < 11) {
+      // Create new inventory table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS inventory (
+          id TEXT PRIMARY KEY,
+          itemName TEXT NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 0,
+          averageDailyUse INTEGER NOT NULL DEFAULT 0,
+          leadTime INTEGER NOT NULL DEFAULT 0,
+          safetyStock INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL
+        )
+      ''');
+
+      // Migrate data from stock_batches if it exists
+      try {
+        final List<Map<String, dynamic>> batchMaps = await db.query('stock_batches');
+        if (batchMaps.isNotEmpty) {
+          final summary = <String, int>{};
+          for (final row in batchMaps) {
+            final name = row['itemName'] as String;
+            final qty = row['quantity'] as int;
+            summary[name] = (summary[name] ?? 0) + qty;
+          }
+
+          for (final entry in summary.entries) {
+            await db.insert('inventory', {
+              'id': const Uuid().v4(),
+              'itemName': entry.key,
+              'quantity': entry.value,
+              'averageDailyUse': 0,
+              'leadTime': 0,
+              'safetyStock': 0,
+              'createdAt': DateTime.now().toIso8601String(),
+            });
+          }
+        }
+        await db.execute('DROP TABLE IF EXISTS stock_batches');
+      } catch (e) {
+        // Table might not exist or migration failed, continue
+      }
     }
   }
 
@@ -579,80 +624,80 @@ class DatabaseHelper {
     return removed;
   }
 
-  // ── Inventory (Stock Batches) ────────────────────────────────────
+  // ── Inventory (New Tabular Model) ─────────────────────────────
 
-  /// Insert a new stock batch.
-  Future<void> insertStockBatch(StockBatch batch) async {
+  Future<void> insertInventoryItem(InventoryItem item) async {
     final db = await database;
-    await db.insert('stock_batches', batch.toMap());
-  }
-
-  /// Get all batches for a specific item, sorted by earliest expiration first.
-  Future<List<StockBatch>> getStockBatchesForItem(String itemName) async {
-    final db = await database;
-    final maps = await db.query(
-      'stock_batches',
-      where: 'itemName = ? AND quantity > 0',
-      whereArgs: [itemName],
-      orderBy: 'expirationDate ASC',
+    await db.insert(
+      'inventory',
+      item.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    return maps.map((m) => StockBatch.fromMap(m)).toList();
   }
 
-  /// Get aggregated inventory summary: {itemName: totalQuantity}.
-  Future<Map<String, int>> getInventorySummary() async {
+  Future<List<InventoryItem>> getAllInventory() async {
     final db = await database;
-    final maps = await db.rawQuery(
-      'SELECT itemName, SUM(quantity) as total FROM stock_batches WHERE quantity > 0 GROUP BY itemName ORDER BY itemName',
-    );
-    final summary = <String, int>{};
-    for (final row in maps) {
-      summary[row['itemName'] as String] = (row['total'] as int?) ?? 0;
-    }
-    return summary;
+    final maps = await db.query('inventory', orderBy: 'itemName ASC');
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
   }
 
-  /// Get all batches with quantity > 0, sorted by item then expiry.
-  Future<List<StockBatch>> getAllStockBatches() async {
+  Future<void> deleteInventoryItem(String id) async {
     final db = await database;
-    final maps = await db.query(
-      'stock_batches',
-      where: 'quantity > 0',
-      orderBy: 'itemName ASC, expirationDate ASC',
-    );
-    return maps.map((m) => StockBatch.fromMap(m)).toList();
+    await db.delete('inventory', where: 'id = ?', whereArgs: [id]);
   }
 
-  /// Deduct [qty] units from [itemName] using FEFO (First-Expired, First-Out).
-  /// Returns the number of units actually deducted.
+  Future<void> updateInventoryItem(InventoryItem item) async {
+    final db = await database;
+    await db.update(
+      'inventory',
+      item.toMap(),
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
   Future<int> deductStock(String itemName, int qty) async {
     final db = await database;
-    final batches = await getStockBatchesForItem(itemName);
+    final List<Map<String, dynamic>> results = await db.query(
+      'inventory',
+      where: 'itemName = ?',
+      whereArgs: [itemName],
+    );
 
-    int remaining = qty;
-    for (final batch in batches) {
-      if (remaining <= 0) break;
+    if (results.isEmpty) return 0;
 
-      final deduct = remaining > batch.quantity ? batch.quantity : remaining;
-      final newQty = batch.quantity - deduct;
-      remaining -= deduct;
+    final currentQty = results.first['quantity'] as int;
+    final newQty = currentQty - qty;
 
-      if (newQty <= 0) {
-        await db.delete(
-          'stock_batches',
-          where: 'id = ?',
-          whereArgs: [batch.id],
-        );
-      } else {
-        await db.update(
-          'stock_batches',
-          {'quantity': newQty},
-          where: 'id = ?',
-          whereArgs: [batch.id],
-        );
-      }
-    }
-    return qty - remaining;
+    await db.update(
+      'inventory',
+      {'quantity': newQty},
+      where: 'itemName = ?',
+      whereArgs: [itemName],
+    );
+
+    return qty;
+  }
+
+  Future<void> addStock(String itemName, int qty) async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.query(
+      'inventory',
+      where: 'itemName = ?',
+      whereArgs: [itemName],
+    );
+
+    if (results.isEmpty) return;
+
+    final currentQty = results.first['quantity'] as int;
+    final newQty = currentQty + qty;
+
+    await db.update(
+      'inventory',
+      {'quantity': newQty},
+      where: 'itemName = ?',
+      whereArgs: [itemName],
+    );
   }
 
   // TODO: Delete this after testing
@@ -662,7 +707,7 @@ class DatabaseHelper {
     await db.transaction((txn) async {
       await txn.delete('visitations');
       await txn.delete('patients');
-      await txn.delete('stock_batches');
+      await txn.delete('inventory');
       await txn.delete('meta');
     });
   }
