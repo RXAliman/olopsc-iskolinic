@@ -62,41 +62,54 @@ Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; Launch the app after installation (unless running in silent mode)
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+; Launch the app after installation (including silent/auto-update mode)
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall
 
 [Code]
 // ═══════════════════════════════════════════════════════════════════
 //  Uninstall: prompt user to delete AppData (patient database, etc.)
 // ═══════════════════════════════════════════════════════════════════
+procedure DeleteAppDataIfExists(const DirPath: String; const ParentPath: String);
+begin
+  if DirExists(DirPath) then
+  begin
+    if MsgBox(
+      'Do you also want to remove all patient data and application settings?' + #13#10 + #13#10 +
+      'This will permanently delete the clinic database and all saved data.' + #13#10 +
+      'This action cannot be undone.',
+      mbConfirmation,
+      MB_YESNO or MB_DEFBUTTON2
+    ) = IDYES then
+    begin
+      // Delete the entire app data directory recursively
+      DelTree(DirPath, True, True, True);
+      // Try to remove the parent company directory if it's now empty
+      RemoveDir(ParentPath);
+    end;
+  end;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  AppDataDir: String;
-  ParentDir: String;
+  NewAppDataDir: String;
+  NewParentDir: String;
+  OldAppDataDir: String;
+  OldParentDir: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    // Path where Flutter's getApplicationSupportDirectory() stores data.
-    // This contains clinic.db, Google Fonts cache, and other app data.
-    AppDataDir := ExpandConstant('{userappdata}\Iskolinic Team\OLOPSC Iskolinic');
+    // Current path (CompanyName: "Iskolinic Team")
+    NewAppDataDir := ExpandConstant('{userappdata}\Iskolinic Team\OLOPSC Iskolinic');
+    NewParentDir := ExpandConstant('{userappdata}\Iskolinic Team');
 
-    if DirExists(AppDataDir) then
-    begin
-      if MsgBox(
-        'Do you also want to remove all patient data and application settings?' + #13#10 + #13#10 +
-        'This will permanently delete the clinic database and all saved data.' + #13#10 +
-        'This action cannot be undone.',
-        mbConfirmation,
-        MB_YESNO or MB_DEFBUTTON2
-      ) = IDYES then
-      begin
-        // Delete the app data directory recursively
-        DelTree(AppDataDir, True, True, True);
+    // Legacy path (CompanyName: "com.olopsc") — for upgrades from older versions
+    OldAppDataDir := ExpandConstant('{userappdata}\com.olopsc\OLOPSC Iskolinic');
+    OldParentDir := ExpandConstant('{userappdata}\com.olopsc');
 
-        // Try to remove the parent company directory if it's now empty
-        ParentDir := ExpandConstant('{userappdata}\Iskolinic Team');
-        RemoveDir(ParentDir);
-      end;
-    end;
+    // Check new path first, then old path
+    if DirExists(NewAppDataDir) then
+      DeleteAppDataIfExists(NewAppDataDir, NewParentDir)
+    else if DirExists(OldAppDataDir) then
+      DeleteAppDataIfExists(OldAppDataDir, OldParentDir);
   end;
 end;
