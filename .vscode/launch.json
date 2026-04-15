@@ -8,7 +8,10 @@
       "name": "clinic_desktop_app",
       "cwd": "clinic_desktop_app",
       "request": "launch",
-      "type": "dart"
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=ENV=dev"
+      ]
     },
     // {
     //   "name": "clinic_desktop_app (profile mode)",
