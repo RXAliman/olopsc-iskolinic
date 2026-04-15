@@ -69,23 +69,43 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 // ═══════════════════════════════════════════════════════════════════
 //  Uninstall: prompt user to delete AppData (patient database, etc.)
 // ═══════════════════════════════════════════════════════════════════
-procedure DeleteAppDataIfExists(const DirPath: String; const ParentPath: String);
+
+// Force-kill the app process to release any locked files (e.g., clinic.db)
+procedure KillAppProcess();
+var
+  ResultCode: Integer;
 begin
+  Exec('taskkill', '/F /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // Small delay to let file handles fully release
+  Sleep(1000);
+end;
+
+// Attempt to delete the app data directory. Falls back to shell command if needed.
+procedure ForceDeleteDir(const DirPath: String; const ParentPath: String);
+var
+  ResultCode: Integer;
+begin
+  // First attempt: Inno Setup's built-in DelTree
+  if DelTree(DirPath, True, True, True) then
+  begin
+    RemoveDir(ParentPath);
+    Exit;
+  end;
+
+  // Fallback: use Windows shell command for stubborn files
+  Exec('cmd.exe', '/C rmdir /S /Q "' + DirPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  RemoveDir(ParentPath);
+
+  // If the directory still exists, notify the user
   if DirExists(DirPath) then
   begin
-    if MsgBox(
-      'Do you also want to remove all patient data and application settings?' + #13#10 + #13#10 +
-      'This will permanently delete the clinic database and all saved data.' + #13#10 +
-      'This action cannot be undone.',
-      mbConfirmation,
-      MB_YESNO or MB_DEFBUTTON2
-    ) = IDYES then
-    begin
-      // Delete the entire app data directory recursively
-      DelTree(DirPath, True, True, True);
-      // Try to remove the parent company directory if it's now empty
-      RemoveDir(ParentPath);
-    end;
+    MsgBox(
+      'Some files could not be removed automatically.' + #13#10 +
+      'You can manually delete this folder:' + #13#10 + #13#10 +
+      DirPath,
+      mbInformation,
+      MB_OK
+    );
   end;
 end;
 
@@ -95,6 +115,8 @@ var
   NewParentDir: String;
   OldAppDataDir: String;
   OldParentDir: String;
+  FoundDir: String;
+  FoundParent: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
@@ -106,10 +128,34 @@ begin
     OldAppDataDir := ExpandConstant('{userappdata}\com.olopsc\OLOPSC Iskolinic');
     OldParentDir := ExpandConstant('{userappdata}\com.olopsc');
 
-    // Check new path first, then old path
+    // Determine which path exists
+    FoundDir := '';
     if DirExists(NewAppDataDir) then
-      DeleteAppDataIfExists(NewAppDataDir, NewParentDir)
+    begin
+      FoundDir := NewAppDataDir;
+      FoundParent := NewParentDir;
+    end
     else if DirExists(OldAppDataDir) then
-      DeleteAppDataIfExists(OldAppDataDir, OldParentDir);
+    begin
+      FoundDir := OldAppDataDir;
+      FoundParent := OldParentDir;
+    end;
+
+    if FoundDir <> '' then
+    begin
+      if MsgBox(
+        'Do you also want to remove all patient data and application settings?' + #13#10 + #13#10 +
+        'This will permanently delete the clinic database and all saved data.' + #13#10 +
+        'This action cannot be undone.',
+        mbConfirmation,
+        MB_YESNO or MB_DEFBUTTON2
+      ) = IDYES then
+      begin
+        // Kill any running instance to release locked files
+        KillAppProcess();
+        // Force-delete the directory
+        ForceDeleteDir(FoundDir, FoundParent);
+      end;
+    end;
   end;
 end;
