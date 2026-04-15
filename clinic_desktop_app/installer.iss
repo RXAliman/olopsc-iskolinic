@@ -28,8 +28,11 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
+#ifndef MyOutputFilename
+  #define MyOutputFilename "OLOPSC-IskoLinic-Setup"
+#endif
 OutputDir=dist
-OutputBaseFilename=OLOPSC-IskoLinic-Setup
+OutputBaseFilename={#MyOutputFilename}
 SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma2/max
 SolidCompression=yes
