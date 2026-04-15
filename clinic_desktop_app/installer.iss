@@ -28,13 +28,16 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
+#ifndef MyOutputFilename
+  #define MyOutputFilename "OLOPSC-IskoLinic-Setup"
+#endif
 OutputDir=dist
-OutputBaseFilename=OLOPSC-IskoLinic-Setup
+OutputBaseFilename={#MyOutputFilename}
 SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 ; Close the running app before installing (handles auto-updates too)
 CloseApplications=force
 CloseApplicationsFilter=olopsc-iskolinic.exe
@@ -59,13 +62,53 @@ Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; Launch the app after installation (unless running in silent mode)
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+; Launch the app after installation (including silent/auto-update mode)
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall
 
 [Code]
 // ═══════════════════════════════════════════════════════════════════
 //  Uninstall: prompt user to delete AppData (patient database, etc.)
 // ═══════════════════════════════════════════════════════════════════
+
+// Force-kill the app process to release any locked files (e.g., clinic.db)
+procedure KillAppProcess();
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill', '/F /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // Small delay to let file handles fully release
+  Sleep(1000);
+end;
+
+// Attempt to delete the app data directory. Falls back to shell command if needed.
+procedure ForceDeleteDir(const DirPath: String; const ParentPath: String);
+var
+  ResultCode: Integer;
+begin
+  // First attempt: Inno Setup's built-in DelTree
+  if DelTree(DirPath, True, True, True) then
+  begin
+    RemoveDir(ParentPath);
+    Exit;
+  end;
+
+  // Fallback: use Windows shell command for stubborn files
+  Exec('cmd.exe', '/C rmdir /S /Q "' + DirPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  RemoveDir(ParentPath);
+
+  // If the directory still exists, notify the user
+  if DirExists(DirPath) then
+  begin
+    MsgBox(
+      'Some files could not be removed automatically.' + #13#10 +
+      'You can manually delete this folder:' + #13#10 + #13#10 +
+      DirPath,
+      mbInformation,
+      MB_OK
+    );
+  end;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   AppDataDir: String;
@@ -73,9 +116,8 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    // Path where Flutter's getApplicationSupportDirectory() stores data.
-    // This contains clinic.db, Google Fonts cache, and other app data.
     AppDataDir := ExpandConstant('{userappdata}\Iskolinic Team\OLOPSC Iskolinic');
+    ParentDir := ExpandConstant('{userappdata}\Iskolinic Team');
 
     if DirExists(AppDataDir) then
     begin
@@ -87,12 +129,8 @@ begin
         MB_YESNO or MB_DEFBUTTON2
       ) = IDYES then
       begin
-        // Delete the app data directory recursively
-        DelTree(AppDataDir, True, True, True);
-
-        // Try to remove the parent company directory if it's now empty
-        ParentDir := ExpandConstant('{userappdata}\Iskolinic Team');
-        RemoveDir(ParentDir);
+        KillAppProcess();
+        ForceDeleteDir(AppDataDir, ParentDir);
       end;
     end;
   end;

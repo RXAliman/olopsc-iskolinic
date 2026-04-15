@@ -99,7 +99,11 @@ if (-not $iscc) {
 }
 
 $issPath = Join-Path $PSScriptRoot "installer.iss"
-$isccArgs = @("/DMyAppVersion=$versionName", $issPath)
+$outputFilename = "OLOPSC-IskoLinic-Setup-$versionName"
+if ($BuildEnv -ne 'prod') {
+    $outputFilename = "$outputFilename-pre"
+}
+$isccArgs = @("/DMyAppVersion=$versionName", "/DMyOutputFilename=$outputFilename", $issPath)
 Write-Host "  > $iscc $($isccArgs -join ' ')" -ForegroundColor DarkGray
 
 & $iscc @isccArgs
@@ -112,7 +116,7 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "          Build Complete!               " -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Installer:   dist\OLOPSC-IskoLinic-Setup.exe" -ForegroundColor White
+Write-Host "  Installer:   dist\$outputFilename.exe" -ForegroundColor White
 Write-Host "  Version:     $versionName" -ForegroundColor White
 Write-Host "  Environment: $BuildEnv" -ForegroundColor White
 Write-Host ""
