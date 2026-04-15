@@ -37,7 +37,7 @@ SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 ; Close the running app before installing (handles auto-updates too)
 CloseApplications=force
 CloseApplicationsFilter=olopsc-iskolinic.exe
@@ -111,48 +111,15 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  NewAppDataDir: String;
-  NewParentDir: String;
-  OldAppDataDir: String;
-  OldParentDir: String;
-  FoundDir: String;
-  FoundParent: String;
+  AppDataDir: String;
+  ParentDir: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    // Current path (CompanyName: "Iskolinic Team")
-    NewAppDataDir := ExpandConstant('{userappdata}\Iskolinic Team\OLOPSC Iskolinic');
-    NewParentDir := ExpandConstant('{userappdata}\Iskolinic Team');
+    AppDataDir := ExpandConstant('{userappdata}\Iskolinic Team\OLOPSC Iskolinic');
+    ParentDir := ExpandConstant('{userappdata}\Iskolinic Team');
 
-    // Legacy path (CompanyName: "com.olopsc") — for upgrades from older versions
-    OldAppDataDir := ExpandConstant('{userappdata}\com.olopsc\OLOPSC Iskolinic');
-    OldParentDir := ExpandConstant('{userappdata}\com.olopsc');
-
-    // DEBUG: Remove this MsgBox after confirming the correct path
-    MsgBox(
-      'DEBUG: Checking paths...' + #13#10 + #13#10 +
-      'New path: ' + NewAppDataDir + #13#10 +
-      'Exists: ' + IntToStr(Ord(DirExists(NewAppDataDir))) + #13#10 + #13#10 +
-      'Old path: ' + OldAppDataDir + #13#10 +
-      'Exists: ' + IntToStr(Ord(DirExists(OldAppDataDir))),
-      mbInformation,
-      MB_OK
-    );
-
-    // Determine which path exists
-    FoundDir := '';
-    if DirExists(NewAppDataDir) then
-    begin
-      FoundDir := NewAppDataDir;
-      FoundParent := NewParentDir;
-    end
-    else if DirExists(OldAppDataDir) then
-    begin
-      FoundDir := OldAppDataDir;
-      FoundParent := OldParentDir;
-    end;
-
-    if FoundDir <> '' then
+    if DirExists(AppDataDir) then
     begin
       if MsgBox(
         'Do you also want to remove all patient data and application settings?' + #13#10 + #13#10 +
@@ -162,10 +129,8 @@ begin
         MB_YESNO or MB_DEFBUTTON2
       ) = IDYES then
       begin
-        // Kill any running instance to release locked files
         KillAppProcess();
-        // Force-delete the directory
-        ForceDeleteDir(FoundDir, FoundParent);
+        ForceDeleteDir(AppDataDir, ParentDir);
       end;
     end;
   end;
