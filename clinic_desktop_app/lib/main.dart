@@ -7,8 +7,7 @@ import 'providers/sync_provider.dart';
 import 'providers/inventory_provider.dart';
 import 'providers/local_server_provider.dart';
 import 'screens/dashboard_screen.dart';
-// import 'services/mock_data_generator.dart';
-// import 'services/database_helper.dart';
+import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -18,53 +17,61 @@ void main() async {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
-  // TODO: Delete this after testing
-  // Clear the database
-  // await DatabaseHelper.instance.clearAllData();
+  runApp(const AppRoot());
+}
 
-  // Seed mock data (only runs if DB is empty)
-  // await MockDataGenerator.seedDatabase(count: 100, visitationsPerPatient: 20);
+/// Root widget that manages the splash → main app transition.
+///
+/// Shows the [SplashScreen] first, which handles update checks and service
+/// initialization. Once initialization completes, it rebuilds with the full
+/// [ClinicApp] including all providers.
+class AppRoot extends StatefulWidget {
+  const AppRoot({super.key});
 
-  // Initialize CRDT node identity
-  final patientProvider = PatientProvider();
-  await patientProvider.initCrdt();
-  await patientProvider.loadPatients();
+  @override
+  State<AppRoot> createState() => _AppRootState();
+}
 
-  // Initialize sync (no wsUrl = offline mode)
-  // Fire-and-forget: don't block app launch while connecting to relay server
-  final syncProvider = SyncProvider();
-  syncProvider.init(
-    patientProvider,
-    wsUrl: 'wss://olopsc-iskolinic.onrender.com/ws',
-  );
+class _AppRootState extends State<AppRoot> {
+  PatientProvider? _patientProvider;
+  SyncProvider? _syncProvider;
+  InventoryProvider? _inventoryProvider;
+  LocalServerProvider? _localServerProvider;
 
-  // Wire auto-push: every local write triggers an immediate sync push
-  patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());
+  void _onInitComplete({
+    required PatientProvider patientProvider,
+    required SyncProvider syncProvider,
+    required InventoryProvider inventoryProvider,
+    required LocalServerProvider localServerProvider,
+  }) {
+    setState(() {
+      _patientProvider = patientProvider;
+      _syncProvider = syncProvider;
+      _inventoryProvider = inventoryProvider;
+      _localServerProvider = localServerProvider;
+    });
+  }
 
-  // Initialize inventory
-  final inventoryProvider = InventoryProvider();
-  await inventoryProvider.loadInventory();
+  @override
+  Widget build(BuildContext context) {
+    // While services are initializing, show the splash screen
+    if (_patientProvider == null) {
+      return MaterialApp(
+        title: 'IskoLinic App',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: SplashScreen(onInitComplete: _onInitComplete),
+      );
+    }
 
-  // Wire auto-deduct: visitation supplies auto-deduct from inventory
-  patientProvider.setInventoryProvider(inventoryProvider);
-
-  // Initialize local HTTP server for tablet connection
-  final localServerProvider = LocalServerProvider();
-  await localServerProvider.startServer();
-
-  // When tablet submits a patient, refresh the desktop UI
-  localServerProvider.setOnDataChanged(() {
-    patientProvider.refreshAll();
-  });
-
-  runApp(
-    ClinicApp(
-      patientProvider: patientProvider,
-      syncProvider: syncProvider,
-      inventoryProvider: inventoryProvider,
-      localServerProvider: localServerProvider,
-    ),
-  );
+    // Once initialized, show the full app with providers
+    return ClinicApp(
+      patientProvider: _patientProvider!,
+      syncProvider: _syncProvider!,
+      inventoryProvider: _inventoryProvider!,
+      localServerProvider: _localServerProvider!,
+    );
+  }
 }
 
 class ClinicApp extends StatelessWidget {

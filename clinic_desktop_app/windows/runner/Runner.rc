@@ -89,7 +89,7 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.olopsc" "\0"
+            VALUE "CompanyName", "Iskolinic Team" "\0"
             VALUE "FileDescription", "OLOPSC Iskolinic" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "olopsc-iskolinic" "\0"
