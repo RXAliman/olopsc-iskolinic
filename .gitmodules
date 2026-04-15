@@ -1,0 +1,3 @@
+[submodule "olopsc_iskolinic_relay_server"]
+	path = olopsc_iskolinic_relay_server
+	url = https://github.com/RXAliman/olopsc_iskolinic_relay_server.git

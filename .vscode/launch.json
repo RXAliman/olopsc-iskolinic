@@ -1,0 +1,68 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "clinic_desktop_app",
+      "cwd": "clinic_desktop_app",
+      "request": "launch",
+      "type": "dart"
+    },
+    // {
+    //   "name": "clinic_desktop_app (profile mode)",
+    //   "cwd": "clinic_desktop_app",
+    //   "request": "launch",
+    //   "type": "dart",
+    //   "flutterMode": "profile"
+    // },
+    // {
+    //   "name": "clinic_desktop_app (release mode)",
+    //   "cwd": "clinic_desktop_app",
+    //   "request": "launch",
+    //   "type": "dart",
+    //   "flutterMode": "release"
+    // },
+    {
+      "name": "student_mobile_app",
+      "cwd": "student_mobile_app",
+      "request": "launch",
+      "type": "dart"
+    },
+    // {
+    //   "name": "student_mobile_app (profile mode)",
+    //   "cwd": "student_mobile_app",
+    //   "request": "launch",
+    //   "type": "dart",
+    //   "flutterMode": "profile"
+    // },
+    // {
+    //   "name": "student_mobile_app (release mode)",
+    //   "cwd": "student_mobile_app",
+    //   "request": "launch",
+    //   "type": "dart",
+    //   "flutterMode": "release"
+    // },
+    {
+      "name": "clinic_input_app",
+      "cwd": "clinic_input_app",
+      "request": "launch",
+      "type": "dart"
+    },
+    // {
+    //   "name": "clinic_input_app (profile mode)",
+    //   "cwd": "clinic_input_app",
+    //   "request": "launch",
+    //   "type": "dart",
+    //   "flutterMode": "profile"
+    // },
+    // {
+    //   "name": "clinic_input_app (release mode)",
+    //   "cwd": "clinic_input_app",
+    //   "request": "launch",
+    //   "type": "dart",
+    //   "flutterMode": "release"
+    // }
+  ]
+}
