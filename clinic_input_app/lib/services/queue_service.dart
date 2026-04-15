@@ -23,6 +23,8 @@ class QueueService {
     required String guardian2Contact,
     required String allergicTo,
     required List<String> symptoms,
+    required String role,
+    required String department,
     String? existingPatientId,
   }) async {
     if (!_connection.isConnected) {
@@ -56,6 +58,8 @@ class QueueService {
       'guardian2Contact': guardian2Contact,
       'allergicTo': allergicTo,
       'symptoms': symptoms,
+      'role': role,
+      'department': department,
       if (existingPatientId != null) 'existingPatientId': existingPatientId,
     };
 

@@ -28,7 +28,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 11,
+        version: 12,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -62,7 +62,9 @@ class DatabaseHelper {
         vaccinationHistory TEXT NOT NULL DEFAULT '[]',
         allergicTo TEXT NOT NULL DEFAULT '',
         patientRemarks TEXT NOT NULL DEFAULT '',
-        permissions TEXT NOT NULL DEFAULT '{}'
+        permissions TEXT NOT NULL DEFAULT '{}',
+        role TEXT NOT NULL DEFAULT '',
+        department TEXT NOT NULL DEFAULT ''
       )
     ''');
     await db.execute('''
@@ -245,6 +247,10 @@ class DatabaseHelper {
       } catch (e) {
         // Table might not exist or migration failed, continue
       }
+    }
+    if (oldVersion < 12) {
+      await db.execute("ALTER TABLE patients ADD COLUMN role TEXT NOT NULL DEFAULT ''");
+      await db.execute("ALTER TABLE patients ADD COLUMN department TEXT NOT NULL DEFAULT ''");
     }
   }
 

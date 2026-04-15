@@ -179,6 +179,9 @@ class LocalServerService {
           guardian2Name: data['guardian2Name'] as String? ?? '',
           guardian2Contact: data['guardian2Contact'] as String? ?? '',
           allergicTo: data['allergicTo'] as String? ?? '',
+          role: data['role'] as String? ?? existingRecord?.role ?? '',
+          department:
+              data['department'] as String? ?? existingRecord?.department ?? '',
           createdAt: existingRecord?.createdAt ?? now,
           updatedAt: now,
           hlc: hlcStr,

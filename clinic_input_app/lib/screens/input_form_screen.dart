@@ -32,6 +32,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
   final _numberCtrl = TextEditingController();
   DateTime? _selectedBirthdate;
   String? _selectedSex;
+  String? _selectedRole;
+  String? _selectedDepartment;
   final _contactCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _guardianNameCtrl = TextEditingController();
@@ -68,6 +70,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _selectedExtension = p.extension;
     _selectedBirthdate = p.birthdate;
     _selectedSex = p.sex;
+    _selectedRole = p.role;
+    _selectedDepartment = p.department;
     _selectedSymptoms.addAll(p.selectedSymptoms);
 
     // Add listeners to sync UI -> Persistent Service
@@ -126,6 +130,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
           _selectedExtension = p.extension;
           _selectedBirthdate = p.birthdate;
           _selectedSex = p.sex;
+          _selectedRole = p.role;
+          _selectedDepartment = p.department;
           _selectedSymptoms.clear();
           _selectedSymptoms.addAll(p.selectedSymptoms);
         });
@@ -177,6 +183,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
       _selectedExtension = 'None';
       _selectedBirthdate = null;
       _selectedSex = null;
+      _selectedRole = null;
+      _selectedDepartment = null;
       _selectedSymptoms.clear();
       _hasAttemptedSubmit = false;
     });
@@ -319,6 +327,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
         guardian2Contact: _guardian2ContactCtrl.text.trim(),
         allergicTo: _allergicToCtrl.text.trim(),
         symptoms: _selectedSymptoms.toList(),
+        role: _selectedRole ?? '',
+        department: _selectedDepartment ?? '',
         existingPatientId: PersistentFormService.instance.existingPatientId,
       );
 
@@ -654,6 +664,130 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       ),
                     ),
                   ],
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Role & Department
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedRole,
+                      hint: Text(
+                        'Select role',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      decoration: InputDecoration(
+                        label: RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Role ',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                              TextSpan(
+                                text: "*",
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
+                          ),
+                        ),
+                        prefixIcon: Icon(Icons.work_outline),
+                      ),
+                      items: ['Student', 'Employee'].map((r) {
+                        return DropdownMenuItem(
+                          value: r,
+                          child: Text(
+                            r,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                              fontSize: 14,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      validator: (v) => v == null ? 'Required' : null,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedRole = val;
+                          PersistentFormService.instance.role = val;
+                          // Reset department if switching to a role
+                          // where current selection is invalid
+                          if (val == 'Student' &&
+                              _selectedDepartment == 'General') {
+                            _selectedDepartment = null;
+                            PersistentFormService.instance.department = null;
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedDepartment,
+                      hint: Text(
+                        'Select department',
+                        style: GoogleFonts.inter(
+                          color: AppTheme.textMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      decoration: InputDecoration(
+                        label: RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Department ',
+                                style: GoogleFonts.inter(
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                              TextSpan(
+                                text: "*",
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
+                          ),
+                        ),
+                        prefixIcon: Icon(Icons.school_outlined),
+                      ),
+                      items:
+                          [
+                            if (_selectedRole == 'Employee') 'General',
+                            'Pre-school',
+                            'Grade School',
+                            'Junior High School',
+                            'Senior High School',
+                            'College',
+                          ].map((d) {
+                            return DropdownMenuItem(
+                              value: d,
+                              child: Text(
+                                d,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                      validator: (v) => v == null ? 'Required' : null,
+                      onChanged: (val) {
+                        setState(() => _selectedDepartment = val);
+                        PersistentFormService.instance.department = val;
+                      },
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),

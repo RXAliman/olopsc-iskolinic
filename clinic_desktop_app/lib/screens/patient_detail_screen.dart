@@ -247,6 +247,33 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                         children: [
                                           Expanded(
                                             child: _InfoCell(
+                                              icon:
+                                                  Icons.person_outline_outlined,
+                                              label: 'Role',
+                                              value: patient.role.trim() != ''
+                                                  ? patient.role
+                                                  : '—',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Expanded(
+                                            child: _InfoCell(
+                                              icon: Icons.groups,
+                                              label: 'Department',
+                                              value:
+                                                  patient.department.trim() !=
+                                                      ''
+                                                  ? patient.department
+                                                  : '—',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _InfoCell(
                                               icon: Icons.cake_outlined,
                                               label: 'Birthdate',
                                               value: patient.birthdate != null
@@ -433,7 +460,39 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                               bottom: 12,
                                             ),
                                             padding: const EdgeInsets.all(16),
-                                            decoration: AppTheme.glassCard(),
+                                            decoration:
+                                                DateUtils.isSameDay(
+                                                  visit.dateTime,
+                                                  DateTime.now(),
+                                                )
+                                                ? AppTheme.glassCard().copyWith(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          0,
+                                                        ),
+                                                    border: Border(
+                                                      left: BorderSide(
+                                                        color: AppTheme.accent,
+                                                        width: 4,
+                                                      ),
+                                                      right: BorderSide(
+                                                        color: AppTheme
+                                                            .dividerColor,
+                                                        width: 1,
+                                                      ),
+                                                      top: BorderSide(
+                                                        color: AppTheme
+                                                            .dividerColor,
+                                                        width: 1,
+                                                      ),
+                                                      bottom: BorderSide(
+                                                        color: AppTheme
+                                                            .dividerColor,
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                  )
+                                                : AppTheme.glassCard(),
                                             child: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
@@ -459,48 +518,54 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                       ),
                                                     ),
                                                     const Spacer(),
-                                                    ElevatedButton(
-                                                      style: ElevatedButton.styleFrom(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 4,
-                                                            ),
-                                                        backgroundColor:
-                                                            Colors.white,
-                                                        foregroundColor:
-                                                            AppTheme.accent,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                8,
+                                                    if (DateUtils.isSameDay(
+                                                      visit.dateTime,
+                                                      DateTime.now(),
+                                                    )) ...[
+                                                      ElevatedButton(
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4,
                                                               ),
-                                                          side: BorderSide(
-                                                            color:
-                                                                AppTheme.accent,
+                                                          backgroundColor:
+                                                              Colors.white,
+                                                          foregroundColor:
+                                                              AppTheme.accent,
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                            side: BorderSide(
+                                                              color: AppTheme
+                                                                  .accent,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        onPressed: () {
+                                                          showDialog(
+                                                            context: context,
+                                                            builder: (_) =>
+                                                                VisitationFormScreen(
+                                                                  patientId:
+                                                                      patient
+                                                                          .id,
+                                                                  visitation:
+                                                                      visit,
+                                                                ),
+                                                          );
+                                                        },
+                                                        child: const Text(
+                                                          'Edit/View',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
                                                           ),
                                                         ),
                                                       ),
-                                                      onPressed: () {
-                                                        showDialog(
-                                                          context: context,
-                                                          builder: (_) =>
-                                                              VisitationFormScreen(
-                                                                patientId:
-                                                                    patient.id,
-                                                                visitation:
-                                                                    visit,
-                                                              ),
-                                                        );
-                                                      },
-                                                      child: const Text(
-                                                        'Edit/View',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
+                                                      const SizedBox(width: 8),
+                                                    ],
                                                     ElevatedButton(
                                                       style: ElevatedButton.styleFrom(
                                                         foregroundColor:

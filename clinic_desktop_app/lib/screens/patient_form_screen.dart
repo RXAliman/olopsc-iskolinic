@@ -34,7 +34,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   DateTime? _selectedBirthdate;
   late TextEditingController _birthdateCtrl;
   String? _selectedSex;
-  late TextEditingController _customSexCtrl;
+  String? _selectedRole;
+  String? _selectedDepartment;
   late TextEditingController _contactCtrl;
   late TextEditingController _guardian2NameCtrl;
   late TextEditingController _guardian2ContactCtrl;
@@ -117,7 +118,6 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     final sex = widget.patient?.sex ?? '';
     if (sex.isEmpty) {
       _selectedSex = null;
-      _customSexCtrl = TextEditingController();
     } else if (['Male', 'Female', 'Intersex'].contains(sex)) {
       _selectedSex = sex;
     } else {
@@ -126,6 +126,11 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _contactCtrl = TextEditingController(
       text: widget.patient?.contactNumber ?? '',
     );
+
+    final role = widget.patient?.role ?? '';
+    _selectedRole = role.isEmpty ? null : role;
+    final department = widget.patient?.department ?? '';
+    _selectedDepartment = department.isEmpty ? null : department;
     _guardian2NameCtrl = TextEditingController(
       text: widget.patient?.guardian2Name ?? '',
     );
@@ -194,7 +199,6 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _addressCtrl.dispose();
     _guardianNameCtrl.dispose();
     _guardianContactCtrl.dispose();
-    _customSexCtrl.dispose();
     _contactCtrl.dispose();
     _guardian2NameCtrl.dispose();
     _guardian2ContactCtrl.dispose();
@@ -231,6 +235,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         .replaceAll(RegExp(r'\s+'), ' ');
 
     String finalSex = _selectedSex ?? '';
+    String finalRole = _selectedRole ?? '';
+    String finalDepartment = _selectedDepartment ?? '';
 
     final permissionsMap = {
       'suddenIllness': _suddenIllness,
@@ -268,6 +274,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         allergicTo: _allergicToCtrl.text.trim(),
         patientRemarks: _patientRemarksCtrl.text.trim(),
         permissions: permissionsMap,
+        role: finalRole,
+        department: finalDepartment,
       );
       await provider.updatePatient(updated);
       if (mounted) Navigator.pop(context);
@@ -297,6 +305,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         allergicTo: _allergicToCtrl.text.trim(),
         patientRemarks: _patientRemarksCtrl.text.trim(),
         permissions: permissionsMap,
+        role: finalRole,
+        department: finalDepartment,
       );
       await provider.addPatient(patient);
       if (mounted) Navigator.pop(context, patient);
@@ -608,6 +618,127 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Role & Department
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedRole,
+                    hint: Text(
+                      'Select role',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textMuted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    decoration: InputDecoration(
+                      label: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Role ',
+                              style: GoogleFonts.inter(
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: "*",
+                              style: TextStyle(color: AppTheme.danger),
+                            ),
+                          ],
+                        ),
+                      ),
+                      prefixIcon: Icon(Icons.work_outline),
+                    ),
+                    items: ['Student', 'Employee'].map((r) {
+                      return DropdownMenuItem(
+                        value: r,
+                        child: Text(
+                          r,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    validator: (v) => v == null ? 'Required' : null,
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedRole = val;
+                        // Reset department if switching to a role
+                        // where current selection is invalid
+                        if (val == 'Student' &&
+                            _selectedDepartment == 'General') {
+                          _selectedDepartment = null;
+                        }
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedDepartment,
+                    hint: Text(
+                      'Select department',
+                      style: GoogleFonts.inter(
+                        color: AppTheme.textMuted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    decoration: InputDecoration(
+                      label: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Department ',
+                              style: GoogleFonts.inter(
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            TextSpan(
+                              text: "*",
+                              style: TextStyle(color: AppTheme.danger),
+                            ),
+                          ],
+                        ),
+                      ),
+                      prefixIcon: Icon(Icons.school_outlined),
+                    ),
+                    items:
+                        [
+                          if (_selectedRole == 'Employee') 'General',
+                          'Pre-school',
+                          'Grade School',
+                          'Junior High School',
+                          'Senior High School',
+                          'College',
+                        ].map((d) {
+                          return DropdownMenuItem(
+                            value: d,
+                            child: Text(
+                              d,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w400,
+                                fontSize: 14,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                    validator: (v) => v == null ? 'Required' : null,
+                    onChanged: (val) {
+                      setState(() => _selectedDepartment = val);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
             // Birthdate & Sex
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -632,6 +763,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         });
                       }
                     },
+                    validator: (v) =>
+                        (_hasAttemptedSave && _selectedBirthdate == null)
+                        ? 'Required'
+                        : null,
                     decoration: InputDecoration(
                       label: RichText(
                         text: TextSpan(
@@ -649,16 +784,12 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         ),
                       ),
                       prefixIcon: const Icon(Icons.cake_outlined),
-                      errorText:
-                          (_hasAttemptedSave && _selectedBirthdate == null)
-                          ? 'Required'
-                          : null,
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  flex: _selectedSex == 'Others' ? 1 : 1,
+                  flex: 1,
                   child: DropdownButtonFormField<String>(
                     initialValue: _selectedSex,
                     hint: Text(

@@ -46,6 +46,35 @@ class PersistentFormService {
       sex = 'Intersex';
     }
 
+    // Role validation
+    final incomingRole = data['role'] as String?;
+    const allowedRoles = ['Student', 'Employee'];
+    if (incomingRole == null || incomingRole.isEmpty) {
+      role = null;
+    } else if (allowedRoles.contains(incomingRole)) {
+      role = incomingRole;
+    } else {
+      role = null;
+    }
+
+    // Department validation
+    final incomingDept = data['department'] as String?;
+    const allowedDepts = [
+      'General',
+      'Pre-school',
+      'Grade School',
+      'Junior High School',
+      'Senior High School',
+      'College',
+    ];
+    if (incomingDept == null || incomingDept.isEmpty) {
+      department = null;
+    } else if (allowedDepts.contains(incomingDept)) {
+      department = incomingDept;
+    } else {
+      department = null;
+    }
+
     contactNumber = data['contactNumber'] as String? ?? '';
     address = data['address'] as String? ?? '';
     guardianName = data['guardianName'] as String? ?? '';
@@ -65,6 +94,8 @@ class PersistentFormService {
   String customExtension = '';
   DateTime? birthdate;
   String? sex;
+  String? role;
+  String? department;
   String contactNumber = '';
   String address = '';
   String guardianName = '';
@@ -94,6 +125,8 @@ class PersistentFormService {
     customExtension = '';
     birthdate = null;
     sex = null;
+    role = null;
+    department = null;
     contactNumber = '';
     address = '';
     guardianName = '';
