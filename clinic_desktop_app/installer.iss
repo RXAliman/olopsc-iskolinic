@@ -128,6 +128,17 @@ begin
     OldAppDataDir := ExpandConstant('{userappdata}\com.olopsc\OLOPSC Iskolinic');
     OldParentDir := ExpandConstant('{userappdata}\com.olopsc');
 
+    // DEBUG: Remove this MsgBox after confirming the correct path
+    MsgBox(
+      'DEBUG: Checking paths...' + #13#10 + #13#10 +
+      'New path: ' + NewAppDataDir + #13#10 +
+      'Exists: ' + IntToStr(Ord(DirExists(NewAppDataDir))) + #13#10 + #13#10 +
+      'Old path: ' + OldAppDataDir + #13#10 +
+      'Exists: ' + IntToStr(Ord(DirExists(OldAppDataDir))),
+      mbInformation,
+      MB_OK
+    );
+
     // Determine which path exists
     FoundDir := '';
     if DirExists(NewAppDataDir) then
