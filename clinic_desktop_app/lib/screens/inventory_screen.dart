@@ -132,7 +132,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       final qty = int.tryParse(qtyCtrl.text) ?? 0;
                       if (qty <= 0) return;
                       context.read<InventoryProvider>().addStock(
-                        item.itemName,
+                        item.id,
                         qty,
                       );
                       Navigator.pop(ctx);
@@ -151,384 +151,430 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _showAddNewItemDialog() {
     final nameCtrl = TextEditingController();
     final qtyCtrl = TextEditingController();
-    final aduCtrl = TextEditingController();
-    final ltCtrl = TextEditingController();
-    final ssCtrl = TextEditingController();
+    final lowStockCtrl = TextEditingController();
+    String selectedClinic = 'Pre-school Clinic';
+    String selectedType = 'piece';
     final formKey = GlobalKey<FormState>();
+
+    final clinics = [
+      'Pre-school Clinic',
+      'Grade School Clinic',
+      'Junior High School Clinic',
+      'Senior High School Clinic',
+      'College Clinic',
+    ];
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(28),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            child: Container(
+              width: 500,
+              padding: const EdgeInsets.all(28),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.accentGradient,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.post_add_rounded,
-                        size: 20,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.accentGradient,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.post_add_rounded,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'New Supply Item',
+                          style: Theme.of(ctx).textTheme.headlineMedium,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(height: 24),
                     Text(
-                      'New Supply Item',
-                      style: Theme.of(ctx).textTheme.headlineMedium,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "Fields with asterisks (*) are required to be filled up.",
-                  style: TextStyle(
-                    color: AppTheme.danger,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
-                          TextSpan(
-                            text: 'Supply Name ',
-                            style: TextStyle(color: AppTheme.textSecondary),
-                          ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
-                          ),
-                        ],
+                      "Fields with asterisks (*) are required to be filled up.",
+                      style: TextStyle(
+                        color: AppTheme.danger,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
-                    prefixIcon: const Icon(Icons.medical_services_outlined),
-                  ),
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: qtyCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        label: Text.rich(
                           TextSpan(
-                            text: 'Initial Quantity ',
-                            style: TextStyle(color: AppTheme.textSecondary),
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'Supply Name ',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
                           ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
-                          ),
-                        ],
+                        ),
+                        prefixIcon: const Icon(Icons.medical_services_outlined),
                       ),
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null,
                     ),
-                    prefixIcon: const Icon(Icons.inventory_2_outlined),
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: ssCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
-                          TextSpan(
-                            text: 'Safety Stock ',
-                            style: TextStyle(color: AppTheme.textSecondary),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: qtyCtrl,
+                            decoration: InputDecoration(
+                              label: Text.rich(
+                                TextSpan(
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Initial Quantity ',
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: '*',
+                                      style: TextStyle(color: AppTheme.danger),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.inventory_2_outlined,
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Required' : null,
                           ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextFormField(
+                            controller: lowStockCtrl,
+                            decoration: InputDecoration(
+                              label: Text.rich(
+                                TextSpan(
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Low Stock At ',
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: '*',
+                                      style: TextStyle(color: AppTheme.danger),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.warning_amber_rounded,
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Required' : null,
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedClinic,
+                      decoration: const InputDecoration(
+                        labelText: 'Clinic Location *',
+                        prefixIcon: Icon(Icons.location_on_outlined),
                       ),
-                    ),
-                    prefixIcon: const Icon(Icons.shield_outlined),
-                    helperText: 'Minimum number of units to keep in reserve',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: aduCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
-                          TextSpan(
-                            text: 'Avg. Daily Use ',
-                            style: TextStyle(color: AppTheme.textSecondary),
-                          ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
-                          ),
-                        ],
-                      ),
-                    ),
-                    prefixIcon: const Icon(Icons.trending_up_outlined),
-                    helperText: 'Average number of units used per day',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: ltCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
-                          TextSpan(
-                            text: 'Lead Time (Days) ',
-                            style: TextStyle(color: AppTheme.textSecondary),
-                          ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
-                          ),
-                        ],
-                      ),
-                    ),
-                    prefixIcon: const Icon(Icons.timer_outlined),
-                    helperText: 'Number of days it takes to receive supply',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (formKey.currentState!.validate()) {
-                          context.read<InventoryProvider>().addNewSupplyItem(
-                            itemName: nameCtrl.text.trim(),
-                            initialQuantity: int.parse(qtyCtrl.text),
-                            averageDailyUse: int.parse(aduCtrl.text),
-                            leadTime: int.parse(ltCtrl.text),
-                            safetyStock: int.parse(ssCtrl.text),
-                          );
-                          Navigator.pop(ctx);
-                        }
+                      items: clinics.map((c) {
+                        return DropdownMenuItem(value: c, child: Text(c));
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => selectedClinic = v);
                       },
-                      child: const Text('Create Item'),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedType,
+                      decoration: const InputDecoration(
+                        labelText: 'Item Type *',
+                        prefixIcon: Icon(Icons.category_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'piece',
+                          child: Text('Piece (Individual)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'bottle',
+                          child: Text('Bottle / Roll'),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setState(() => selectedType = v);
+                      },
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (formKey.currentState!.validate()) {
+                              context
+                                  .read<InventoryProvider>()
+                                  .addNewSupplyItem(
+                                    itemName: nameCtrl.text.trim(),
+                                    initialQuantity: int.parse(qtyCtrl.text),
+                                    lowStockAmount: int.parse(
+                                      lowStockCtrl.text,
+                                    ),
+                                    clinic: selectedClinic,
+                                    itemType: selectedType,
+                                  );
+                              Navigator.pop(ctx);
+                            }
+                          },
+                          child: const Text('Create Item'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  void _showEditROPDialog(InventoryItem item) {
-    final aduCtrl = TextEditingController(
-      text: item.averageDailyUse.toString(),
+  void _showEditItemDialog(InventoryItem item) {
+    final nameCtrl = TextEditingController(text: item.itemName);
+    final lowStockCtrl = TextEditingController(
+      text: item.lowStockAmount.toString(),
     );
-    final ltCtrl = TextEditingController(text: item.leadTime.toString());
-    final ssCtrl = TextEditingController(text: item.safetyStock.toString());
+    String selectedClinic = item.clinic.isNotEmpty
+        ? item.clinic
+        : 'Pre-school Clinic';
+    String selectedType = item.itemType.isNotEmpty ? item.itemType : 'piece';
     final formKey = GlobalKey<FormState>();
+
+    final clinics = [
+      'Pre-school Clinic',
+      'Grade School Clinic',
+      'Junior High School Clinic',
+      'Senior High School Clinic',
+      'College Clinic',
+    ];
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(28),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            child: Container(
+              width: 500,
+              padding: const EdgeInsets.all(28),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.accentGradient,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.settings_suggest_rounded,
-                        size: 20,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.accentGradient,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.settings_suggest_rounded,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'Edit Supply Item',
+                          style: Theme.of(ctx).textTheme.headlineMedium,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(height: 24),
                     Text(
-                      'Edit ROP Variables',
-                      style: Theme.of(ctx).textTheme.headlineMedium,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "Fields with asterisks (*) are required to be filled up.",
-                  style: TextStyle(
-                    color: AppTheme.danger,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Supply: ${item.itemName}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: ssCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
-                          TextSpan(
-                            text: 'Safety Stock ',
-                            style: TextStyle(color: AppTheme.textSecondary),
-                          ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
-                          ),
-                        ],
+                      "Fields with asterisks (*) are required to be filled up.",
+                      style: TextStyle(
+                        color: AppTheme.danger,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
-                    prefixIcon: const Icon(Icons.shield_outlined),
-                    helperText: 'Minimum allowance to keep in reserve',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: aduCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        label: Text.rich(
                           TextSpan(
-                            text: 'Average Daily Use ',
-                            style: TextStyle(color: AppTheme.textSecondary),
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'Supply Name ',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
                           ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
-                          ),
-                        ],
+                        ),
+                        prefixIcon: const Icon(Icons.medical_services_outlined),
                       ),
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null,
                     ),
-                    prefixIcon: const Icon(Icons.trending_up_outlined),
-                    helperText: 'Estimated units used per day',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: ltCtrl,
-                  decoration: InputDecoration(
-                    label: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                        children: [
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: lowStockCtrl,
+                      decoration: InputDecoration(
+                        label: Text.rich(
                           TextSpan(
-                            text: 'Lead Time (Days) ',
-                            style: TextStyle(color: AppTheme.textSecondary),
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'Low Stock At ',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
                           ),
-                          TextSpan(
-                            text: '*',
-                            style: TextStyle(color: AppTheme.danger),
-                          ),
-                        ],
+                        ),
+                        prefixIcon: const Icon(Icons.warning_amber_rounded),
                       ),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null,
                     ),
-                    prefixIcon: const Icon(Icons.timer_outlined),
-                    helperText: 'Days needed to receive new stock',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (formKey.currentState!.validate()) {
-                          final updated = item.copyWith(
-                            averageDailyUse: int.parse(aduCtrl.text),
-                            leadTime: int.parse(ltCtrl.text),
-                            safetyStock: int.parse(ssCtrl.text),
-                          );
-                          context.read<InventoryProvider>().updateInventoryItem(
-                            updated,
-                          );
-                          Navigator.pop(ctx);
-                        }
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedClinic,
+                      decoration: const InputDecoration(
+                        labelText: 'Clinic Location *',
+                        prefixIcon: Icon(Icons.location_on_outlined),
+                      ),
+                      items: clinics.map((c) {
+                        return DropdownMenuItem(value: c, child: Text(c));
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => selectedClinic = v);
                       },
-                      child: const Text('Update ROP'),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedType,
+                      decoration: const InputDecoration(
+                        labelText: 'Item Type *',
+                        prefixIcon: Icon(Icons.category_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'piece',
+                          child: Text('Piece (Individual)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'bottle',
+                          child: Text('Bottle / Roll'),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setState(() => selectedType = v);
+                      },
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (formKey.currentState!.validate()) {
+                              final updated = item.copyWith(
+                                itemName: nameCtrl.text.trim(),
+                                lowStockAmount: int.parse(lowStockCtrl.text),
+                                clinic: selectedClinic,
+                                itemType: selectedType,
+                              );
+                              context
+                                  .read<InventoryProvider>()
+                                  .updateInventoryItem(updated);
+                              Navigator.pop(ctx);
+                            }
+                          },
+                          child: const Text('Update Item'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -674,16 +720,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
               cmp = a.quantity.compareTo(b.quantity);
               break;
             case 2:
-              cmp = a.averageDailyUse.compareTo(b.averageDailyUse);
+              cmp = a.clinic.compareTo(b.clinic);
               break;
             case 3:
-              cmp = a.leadTime.compareTo(b.leadTime);
+              cmp = a.itemType.compareTo(b.itemType);
               break;
             case 4:
-              cmp = a.safetyStock.compareTo(b.safetyStock);
-              break;
-            case 5:
-              cmp = a.reorderPoint.compareTo(b.reorderPoint);
+              cmp = a.lowStockAmount.compareTo(b.lowStockAmount);
               break;
             default:
               cmp = 0;
@@ -823,32 +866,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                   ),
                                   DataColumn(
                                     label: const Tooltip(
-                                      message: 'Average Daily Use',
+                                      message: 'Location of the clinic',
                                       child: Text(
-                                        'Daily Use',
+                                        'Clinic',
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    numeric: true,
                                     onSort: (idx, asc) => _onSort(idx, asc),
                                   ),
                                   DataColumn(
                                     label: const Tooltip(
-                                      message:
-                                          'Number of days to receive new stock',
+                                      message: 'Type of supply item',
                                       child: Text(
-                                        'Lead Time',
+                                        'Type',
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    numeric: true,
                                     onSort: (idx, asc) => _onSort(idx, asc),
                                   ),
                                   DataColumn(
                                     label: const Tooltip(
-                                      message: 'Safety Stock Buffer',
+                                      message: 'Low Stock Threshold',
                                       child: Text(
-                                        'Safety',
+                                        'Low Stock At',
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -887,12 +927,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         ),
                                       ),
                                       DataCell(Text(item.quantity.toString())),
+                                      DataCell(Text(item.clinic)),
+                                      DataCell(Text(item.itemType)),
                                       DataCell(
-                                        Text(item.averageDailyUse.toString()),
-                                      ),
-                                      DataCell(Text('${item.leadTime}d')),
-                                      DataCell(
-                                        Text(item.safetyStock.toString()),
+                                        Text(item.lowStockAmount.toString()),
                                       ),
                                       DataCell(
                                         Container(
@@ -954,13 +992,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                             ),
                                             IconButton(
                                               icon: const Icon(
-                                                Icons.settings_outlined,
+                                                Icons.edit_note_rounded,
                                                 color: AppTheme.textMuted,
                                                 size: 20,
                                               ),
-                                              tooltip: 'Edit ROP',
+                                              tooltip: 'Edit Item',
                                               onPressed: () =>
-                                                  _showEditROPDialog(item),
+                                                  _showEditItemDialog(item),
                                             ),
                                             IconButton(
                                               icon: const Icon(

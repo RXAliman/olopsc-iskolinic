@@ -333,6 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               data['patientName'] as String? ?? '';
                           final firstName = data['firstName'] as String? ?? '';
                           final visit = Visitation.fromMap(data);
+                          final inventoryProvider = context.read<InventoryProvider>();
 
                           return ListTile(
                             onTap: () async {
@@ -433,7 +434,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       visit.suppliesUsed.isNotEmpty) ...[
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Treatment: ${[...visit.suppliesUsed, if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',
+                                      'Intervention: ${[...visit.suppliesUsed.map((s) => inventoryProvider.getFormattedSupplyName(s)), if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',
                                       style: const TextStyle(
                                         fontSize: 13,
                                         color: AppTheme.textSecondary,
@@ -576,7 +577,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               ),
                               subtitle: Text(
-                                'Current: ${item.quantity} units (ROP: ${item.reorderPoint})',
+                                'Current: ${item.quantity} units (Low Stock At: ${item.lowStockAmount})',
                               ),
                               trailing: const Icon(
                                 Icons.chevron_right_rounded,

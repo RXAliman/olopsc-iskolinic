@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/patient_provider.dart';
+import '../providers/inventory_provider.dart';
 import '../theme/app_theme.dart';
 import 'visitation_form_screen.dart';
 import 'patient_form_screen.dart';
@@ -718,16 +719,18 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                       Expanded(
                                                         child: Text(
                                                           [
-                                                            ...visit
-                                                                .suppliesUsed,
-                                                            if (visit
-                                                                .treatment
-                                                                .isNotEmpty)
+                                                            ...visit.suppliesUsed.map(
+                                                              (s) => context
+                                                                  .read<InventoryProvider>()
+                                                                  .getFormattedSupplyName(
+                                                                    s,
+                                                                  ),
+                                                            ),
+                                                            if (visit.treatment.isNotEmpty)
                                                               visit.treatment,
                                                           ].join(', '),
                                                           style: const TextStyle(
-                                                            color: AppTheme
-                                                                .textPrimary,
+                                                            color: AppTheme.textPrimary,
                                                             fontSize: 13,
                                                           ),
                                                         ),

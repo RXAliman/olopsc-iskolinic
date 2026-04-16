@@ -4,6 +4,7 @@ class Visitation {
   final DateTime dateTime;
   final List<String> symptoms;
   final List<String> suppliesUsed;
+  final List<String> consumedSupplies;
   final String treatment;
   final String remarks;
 
@@ -18,6 +19,7 @@ class Visitation {
     DateTime? dateTime,
     this.symptoms = const [],
     this.suppliesUsed = const [],
+    this.consumedSupplies = const [],
     this.treatment = '',
     this.remarks = '',
     this.hlc = '',
@@ -31,6 +33,7 @@ class Visitation {
     DateTime? dateTime,
     List<String>? symptoms,
     List<String>? suppliesUsed,
+    List<String>? consumedSupplies,
     String? treatment,
     String? remarks,
     String? hlc,
@@ -43,6 +46,7 @@ class Visitation {
       dateTime: dateTime ?? this.dateTime,
       symptoms: symptoms ?? this.symptoms,
       suppliesUsed: suppliesUsed ?? this.suppliesUsed,
+      consumedSupplies: consumedSupplies ?? this.consumedSupplies,
       treatment: treatment ?? this.treatment,
       remarks: remarks ?? this.remarks,
       hlc: hlc ?? this.hlc,
@@ -58,6 +62,7 @@ class Visitation {
       'dateTime': dateTime.toIso8601String(),
       'symptoms': symptoms.join('|'),
       'suppliesUsed': suppliesUsed.join('|'),
+      'consumedSupplies': consumedSupplies.join('|'),
       'treatment': treatment,
       'remarks': remarks,
       'hlc': hlc,
@@ -69,12 +74,14 @@ class Visitation {
   factory Visitation.fromMap(Map<String, dynamic> map) {
     final symptomsStr = map['symptoms'] as String? ?? '';
     final suppliesStr = map['suppliesUsed'] as String? ?? '';
+    final consumedStr = map['consumedSupplies'] as String? ?? '';
     return Visitation(
       id: map['id'] as String,
       patientId: map['patientId'] as String,
       dateTime: DateTime.parse(map['dateTime'] as String),
       symptoms: symptomsStr.isEmpty ? [] : symptomsStr.split('|'),
       suppliesUsed: suppliesStr.isEmpty ? [] : suppliesStr.split('|'),
+      consumedSupplies: consumedStr.isEmpty ? [] : consumedStr.split('|'),
       treatment: map['treatment'] as String? ?? '',
       remarks: map['remarks'] as String? ?? '',
       hlc: map['hlc'] as String? ?? '',

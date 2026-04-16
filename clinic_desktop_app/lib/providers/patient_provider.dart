@@ -263,6 +263,7 @@ class PatientProvider extends ChangeNotifier {
     required String patientId,
     required List<String> symptoms,
     List<String> suppliesUsed = const [],
+    List<String> consumedSupplies = const [],
     required String treatment,
     required String remarks,
   }) async {
@@ -279,8 +280,8 @@ class PatientProvider extends ChangeNotifier {
     );
     await _db.insertVisitation(visit);
 
-    // Auto-deduct supplies from inventory (1 unit per supply, FEFO)
-    for (final supply in suppliesUsed) {
+    // Conditionally deduct stock
+    for (final supply in consumedSupplies) {
       await _inventoryProvider?.deductStock(supply, 1);
     }
 

@@ -3,11 +3,15 @@ import '../crdt/sync_client.dart';
 import '../crdt/data_compactor.dart';
 import '../crdt/node_id.dart';
 import 'patient_provider.dart';
+import 'inventory_provider.dart';
+import 'custom_symptom_provider.dart';
 
 /// Manages the CRDT sync lifecycle and exposes connection status to the UI.
 class SyncProvider extends ChangeNotifier {
   SyncClient? _client;
   PatientProvider? _patientProvider;
+  InventoryProvider? _inventoryProvider;
+  CustomSymptomProvider? _customSymptomProvider;
 
   SyncConnectionState _connectionState = SyncConnectionState.disconnected;
   SyncConnectionState get connectionState => _connectionState;
@@ -17,8 +21,18 @@ class SyncProvider extends ChangeNotifier {
 
   /// Initialize the sync system.
   /// Call this after PatientProvider.initCrdt() has been called.
-  Future<void> init(PatientProvider patientProvider, {String? wsUrl}) async {
+  Future<void> init(
+    PatientProvider patientProvider,
+    InventoryProvider inventoryProvider,
+    CustomSymptomProvider customSymptomProvider, {
+    String? wsUrl,
+  }) async {
     _patientProvider = patientProvider;
+    _inventoryProvider = inventoryProvider;
+    _customSymptomProvider = customSymptomProvider;
+    
+    _inventoryProvider?.onLocalChange = pushChanges;
+    _customSymptomProvider?.onLocalChange = pushChanges;
 
     if (wsUrl == null || wsUrl.isEmpty) {
       debugPrint('SyncProvider: no wsUrl configured, running offline');
@@ -34,7 +48,11 @@ class SyncProvider extends ChangeNotifier {
     };
 
     _client!.onSyncComplete = (changedIds) {
+      // The easiest way is to just call `load()` unconditionally when sync pushes anything.
+      
       _patientProvider?.onSyncComplete(changedIds);
+      _inventoryProvider?.loadInventory();
+      _customSymptomProvider?.loadSymptoms();
     };
 
     // Run data compaction on startup

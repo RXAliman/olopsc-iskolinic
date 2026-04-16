@@ -5,6 +5,7 @@ import 'providers/patient_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/inventory_provider.dart';
+import 'providers/custom_symptom_provider.dart';
 import 'providers/local_server_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/splash_screen.dart';
@@ -36,18 +37,21 @@ class _AppRootState extends State<AppRoot> {
   PatientProvider? _patientProvider;
   SyncProvider? _syncProvider;
   InventoryProvider? _inventoryProvider;
+  CustomSymptomProvider? _customSymptomProvider;
   LocalServerProvider? _localServerProvider;
 
   void _onInitComplete({
     required PatientProvider patientProvider,
     required SyncProvider syncProvider,
     required InventoryProvider inventoryProvider,
+    required CustomSymptomProvider customSymptomProvider,
     required LocalServerProvider localServerProvider,
   }) {
     setState(() {
       _patientProvider = patientProvider;
       _syncProvider = syncProvider;
       _inventoryProvider = inventoryProvider;
+      _customSymptomProvider = customSymptomProvider;
       _localServerProvider = localServerProvider;
     });
   }
@@ -69,6 +73,7 @@ class _AppRootState extends State<AppRoot> {
       patientProvider: _patientProvider!,
       syncProvider: _syncProvider!,
       inventoryProvider: _inventoryProvider!,
+      customSymptomProvider: _customSymptomProvider!,
       localServerProvider: _localServerProvider!,
     );
   }
@@ -78,6 +83,7 @@ class ClinicApp extends StatelessWidget {
   final PatientProvider patientProvider;
   final SyncProvider syncProvider;
   final InventoryProvider inventoryProvider;
+  final CustomSymptomProvider customSymptomProvider;
   final LocalServerProvider localServerProvider;
 
   const ClinicApp({
@@ -85,6 +91,7 @@ class ClinicApp extends StatelessWidget {
     required this.patientProvider,
     required this.syncProvider,
     required this.inventoryProvider,
+    required this.customSymptomProvider,
     required this.localServerProvider,
   });
 
@@ -96,6 +103,7 @@ class ClinicApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider.value(value: syncProvider),
         ChangeNotifierProvider.value(value: inventoryProvider),
+        ChangeNotifierProvider.value(value: customSymptomProvider),
         ChangeNotifierProvider.value(value: localServerProvider),
       ],
       child: MaterialApp(

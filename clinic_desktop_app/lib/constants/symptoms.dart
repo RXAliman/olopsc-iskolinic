@@ -28,12 +28,9 @@ const List<String> kMedicalSymptoms = [
   'Allergy',
   'Rashes',
   'Acidic',
-  'Due Meds Given',
 ];
 
-const List<String> kBehavioralSymptoms = [
-  'Panic Attacks',
-];
+const List<String> kBehavioralSymptoms = ['Panic Attacks'];
 
 const List<String> kSymptomsList = [
   ...kTraumaticSymptoms,

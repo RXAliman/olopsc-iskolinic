@@ -38,5 +38,9 @@ class AppConfig {
       isProduction ? _prodVersionUrl : _devVersionUrl;
 
   // ── Sync ────────────────────────────────────────────────────────
-  static const String relayServerUrl = 'wss://olopsc-iskolinic.onrender.com/ws';
+  static String get relayServerUrl => isProduction
+      ? 'wss://olopsc-iskolinic.onrender.com/ws'
+      : 'wss://dev-olopsc-iskolinic.onrender.com/ws';
+
+  static String get databaseName => isProduction ? 'clinic.db' : 'clinic_dev.db';
 }

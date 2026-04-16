@@ -2,27 +2,44 @@ import 'dart:async';
 import '../models/patient.dart';
 import '../models/visitation.dart';
 import '../services/database_helper.dart';
+import '../models/inventory_item.dart';
+import '../models/custom_symptom.dart';
 
 /// Message sent to the sync isolate with a batch of remote records.
 class SyncBatch {
   final List<Map<String, dynamic>> patients;
   final List<Map<String, dynamic>> visitations;
+  final List<Map<String, dynamic>> inventory;
+  final List<Map<String, dynamic>> customSymptoms;
 
-  SyncBatch({this.patients = const [], this.visitations = const []});
+  SyncBatch({
+    this.patients = const [],
+    this.visitations = const [],
+    this.inventory = const [],
+    this.customSymptoms = const [],
+  });
 }
 
 /// Result returned from the sync isolate after merging.
 class SyncResult {
   final Set<String> changedPatientIds;
   final Set<String> changedVisitationIds;
+  final Set<String> changedInventoryIds;
+  final Set<String> changedCustomSymptomIds;
   final int patientsProcessed;
   final int visitationsProcessed;
+  final int inventoryProcessed;
+  final int customSymptomsProcessed;
 
   SyncResult({
     this.changedPatientIds = const {},
     this.changedVisitationIds = const {},
+    this.changedInventoryIds = const {},
+    this.changedCustomSymptomIds = const {},
     this.patientsProcessed = 0,
     this.visitationsProcessed = 0,
+    this.inventoryProcessed = 0,
+    this.customSymptomsProcessed = 0,
   });
 }
 
@@ -45,6 +62,8 @@ class SyncIsolate {
     final db = DatabaseHelper.instance;
     final changedPatientIds = <String>{};
     final changedVisitationIds = <String>{};
+    final changedInventoryIds = <String>{};
+    final changedCustomSymptomIds = <String>{};
 
     // Process patients in micro-batches
     for (int i = 0; i < batch.patients.length; i++) {
@@ -69,11 +88,33 @@ class SyncIsolate {
       }
     }
 
+    // Process inventory
+    for (int i = 0; i < batch.inventory.length; i++) {
+      final item = InventoryItem.fromSyncMap(batch.inventory[i]);
+      final changed = await db.upsertInventoryFromRemote(item);
+      if (changed) changedInventoryIds.add(item.id);
+
+      if (i % 10 == 0) await Future.delayed(Duration.zero);
+    }
+
+    // Process custom symptoms
+    for (int i = 0; i < batch.customSymptoms.length; i++) {
+      final symptom = CustomSymptom.fromSyncMap(batch.customSymptoms[i]);
+      final changed = await db.upsertCustomSymptomFromRemote(symptom);
+      if (changed) changedCustomSymptomIds.add(symptom.id);
+
+      if (i % 10 == 0) await Future.delayed(Duration.zero);
+    }
+
     return SyncResult(
       changedPatientIds: changedPatientIds,
       changedVisitationIds: changedVisitationIds,
+      changedInventoryIds: changedInventoryIds,
+      changedCustomSymptomIds: changedCustomSymptomIds,
       patientsProcessed: batch.patients.length,
       visitationsProcessed: batch.visitations.length,
+      inventoryProcessed: batch.inventory.length,
+      customSymptomsProcessed: batch.customSymptoms.length,
     );
   }
 }

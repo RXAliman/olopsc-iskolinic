@@ -45,17 +45,23 @@ class AnalyticsProvider extends ChangeNotifier {
 
     // Count each supply used
     final supplyMap = <String, int>{};
-    
+
     // Initialize with all current inventory items (to show 0 counts)
     final inventory = await _db.getAllInventory();
+    final idToNameMap = <String, String>{};
     for (final item in inventory) {
-      supplyMap[item.itemName] = 0;
+      final formattedName = item.clinic.isEmpty
+          ? item.itemName
+          : "${item.itemName} (${item.clinic})";
+      supplyMap[formattedName] = 0;
+      idToNameMap[item.id] = formattedName;
     }
 
     for (final visit in visitations) {
-      for (final supply in visit.suppliesUsed) {
-        // If it's a legacy item not in current inventory or new item, still count it
-        supplyMap[supply] = (supplyMap[supply] ?? 0) + 1;
+      for (final supplyId in visit.suppliesUsed) {
+        // Resolve ID to name if possible, otherwise use legacy name
+        final displayName = idToNameMap[supplyId] ?? supplyId;
+        supplyMap[displayName] = (supplyMap[displayName] ?? 0) + 1;
       }
     }
     _supplyCounts = supplyMap;
