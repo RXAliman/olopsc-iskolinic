@@ -270,6 +270,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       );
                       await context.read<PatientProvider>().refreshAll();
                       if (context.mounted) {
+                        await context.read<InventoryProvider>().loadInventory();
+                      }
+                      if (context.mounted) {
+                        await context.read<AnalyticsProvider>().loadAnalytics();
+                      }
+                      if (context.mounted) {
                         context.read<SyncProvider>().forceSync();
                       }
                     },
@@ -333,7 +339,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               data['patientName'] as String? ?? '';
                           final firstName = data['firstName'] as String? ?? '';
                           final visit = Visitation.fromMap(data);
-                          final inventoryProvider = context.read<InventoryProvider>();
+                          final inventoryProvider = context
+                              .read<InventoryProvider>();
 
                           return ListTile(
                             onTap: () async {
@@ -434,7 +441,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       visit.suppliesUsed.isNotEmpty) ...[
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Intervention: ${[...visit.suppliesUsed.map((s) => inventoryProvider.getFormattedSupplyName(s)), if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',
+                                      'Intervention: ${[...visit.suppliesUsed.map((s) => s.contains(':') ? s.split(':')[1] : inventoryProvider.getFormattedSupplyName(s)), if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',
                                       style: const TextStyle(
                                         fontSize: 13,
                                         color: AppTheme.textSecondary,

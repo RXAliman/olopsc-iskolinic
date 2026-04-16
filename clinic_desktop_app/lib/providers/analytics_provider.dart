@@ -58,9 +58,14 @@ class AnalyticsProvider extends ChangeNotifier {
     }
 
     for (final visit in visitations) {
-      for (final supplyId in visit.suppliesUsed) {
-        // Resolve ID to name if possible, otherwise use legacy name
-        final displayName = idToNameMap[supplyId] ?? supplyId;
+      for (final supplyStr in visit.suppliesUsed) {
+        // Extract ID if it's in ID:Name format
+        final idPart =
+            supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+        // Resolve ID to current formatted name, or use the snapped/legacy name as fallback
+        final displayName = idToNameMap[idPart] ??
+            (supplyStr.contains(':') ? supplyStr.split(':')[1] : supplyStr);
+        
         supplyMap[displayName] = (supplyMap[displayName] ?? 0) + 1;
       }
     }

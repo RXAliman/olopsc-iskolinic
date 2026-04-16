@@ -720,11 +720,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                         child: Text(
                                                           [
                                                             ...visit.suppliesUsed.map(
-                                                              (s) => context
-                                                                  .read<InventoryProvider>()
-                                                                  .getFormattedSupplyName(
-                                                                    s,
-                                                                  ),
+                                                              (s) => s.contains(':')
+                                                                  ? s.split(':')[1]
+                                                                  : context
+                                                                      .read<InventoryProvider>()
+                                                                      .getFormattedSupplyName(
+                                                                        s,
+                                                                      ),
                                                             ),
                                                             if (visit.treatment.isNotEmpty)
                                                               visit.treatment,

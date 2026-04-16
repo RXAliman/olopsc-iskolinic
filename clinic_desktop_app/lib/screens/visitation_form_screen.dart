@@ -115,10 +115,24 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     }
 
     final inventoryProvider = context.read<InventoryProvider>();
-    final consumedSupplies = _selectedSupplies.where((supplyId) {
+    
+    // Transform selected supplies to ID:Name format for snapshotting
+    final mappedSupplies = _selectedSupplies.map((supplyIdOrLegacy) {
       try {
         final item = inventoryProvider.items.firstWhere(
-          (i) => i.id == supplyId || i.itemName == supplyId,
+          (i) => i.id == supplyIdOrLegacy || i.itemName == supplyIdOrLegacy,
+        );
+        return "${item.id}:${item.itemName}";
+      } catch (_) {
+        return supplyIdOrLegacy;
+      }
+    }).toList();
+
+    final consumedSupplies = mappedSupplies.where((supplyStr) {
+      try {
+        final idPart = supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+        final item = inventoryProvider.items.firstWhere(
+          (i) => i.id == idPart || i.itemName == idPart,
         );
         return item.itemType == 'piece' ||
             _fullyConsumedSupplies.contains(item.id) ||
@@ -136,7 +150,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
 
       final updated = widget.visitation!.copyWith(
         symptoms: _selectedSymptoms.toList(),
-        suppliesUsed: _selectedSupplies.toList(),
+        suppliesUsed: mappedSupplies,
         consumedSupplies: consumedSupplies,
         treatment: _treatmentCtrl.text.trim(),
         remarks: _remarksCtrl.text.trim(),
@@ -145,11 +159,12 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
 
       // Deduct stock only for newly consumed supplies
       if (newlyConsumed.isNotEmpty) {
-        for (final supplyId in newlyConsumed) {
-          // Resolve ID if it's a legacy name
+        for (final supplyStr in newlyConsumed) {
+          // Resolve ID if it's in ID:Name format or legacy name
+          final idPart = supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
           try {
             final item = inventoryProvider.items.firstWhere(
-              (i) => i.id == supplyId || i.itemName == supplyId,
+              (i) => i.id == idPart || i.itemName == idPart,
             );
             await inventoryProvider.deductStock(item.id, 1);
           } catch (_) {
@@ -161,7 +176,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       await context.read<PatientProvider>().addVisitation(
         patientId: _selectedPatient!.id,
         symptoms: _selectedSymptoms.toList(),
-        suppliesUsed: _selectedSupplies.toList(),
+        suppliesUsed: mappedSupplies,
         consumedSupplies: consumedSupplies,
         treatment: _treatmentCtrl.text.trim(),
         remarks: _remarksCtrl.text.trim(),

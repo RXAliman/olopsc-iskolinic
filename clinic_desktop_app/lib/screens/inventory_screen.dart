@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../models/inventory_item.dart';
 import '../providers/inventory_provider.dart';
+import '../providers/sync_provider.dart';
 import '../theme/app_theme.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -131,10 +132,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     onPressed: () {
                       final qty = int.tryParse(qtyCtrl.text) ?? 0;
                       if (qty <= 0) return;
-                      context.read<InventoryProvider>().addStock(
-                        item.id,
-                        qty,
-                      );
+                      context.read<InventoryProvider>().addStock(item.id, qty);
                       Navigator.pop(ctx);
                     },
                     child: const Text('Add Stock'),
@@ -772,7 +770,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     style: ElevatedButton.styleFrom(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: AppTheme.accent),
+                        side: const BorderSide(color: AppTheme.accent),
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -781,6 +779,32 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       backgroundColor: AppTheme.accent,
                       foregroundColor: Colors.white,
                     ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Reloading...'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                      await context.read<InventoryProvider>().loadInventory();
+                      if (context.mounted) {
+                        context.read<SyncProvider>().forceSync();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppTheme.accent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: AppTheme.accent),
+                      ),
+                    ),
+                    icon: const Icon(Icons.sync_rounded, size: 18),
+                    label: const Text('Refresh'),
                   ),
                 ],
               ),
