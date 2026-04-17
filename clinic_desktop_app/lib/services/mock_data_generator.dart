@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:uuid/uuid.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
+import '../models/inventory_item.dart';
 import '../constants/symptoms.dart';
 import '../crdt/hlc.dart';
 import 'database_helper.dart';
@@ -196,67 +197,114 @@ class MockDataGenerator {
   ];
 
   static const _streets = [
-    'Rizal St.',
-    'Mabini St.',
-    'Bonifacio Ave.',
-    'Aguinaldo Blvd.',
-    'Quezon Ave.',
-    'Laurel St.',
-    'Osmena Blvd.',
-    'Roxas Blvd.',
-    'Magallanes St.',
-    'Luna St.',
-    'Del Pilar St.',
-    'Jacinto St.',
-    'Silang St.',
-    'Plaridel St.',
-    'Tandang Sora Ave.',
-    'Katipunan Ave.',
-    'Commonwealth Ave.',
-    'Aurora Blvd.',
-    'España Blvd.',
-    'Taft Ave.',
+    'RIZAL ST.',
+    'MABINI ST.',
+    'BONIFACIO AVE.',
+    'AGUINALDO BLVD.',
+    'QUEZON AVE.',
+    'LAUREL ST.',
+    'OSMENA BLVD.',
+    'ROXAS BLVD.',
+    'MAGALLANES ST.',
+    'LUNA ST.',
+    'DEL PILAR ST.',
+    'JACINTO ST.',
+    'SILANG ST.',
+    'PLARIDEL ST.',
+    'TANDANG SORA AVE.',
+    'KATIPUNAN AVE.',
+    'COMMONWEALTH AVE.',
+    'AURORA BLVD.',
+    'ESPAÑA BLVD.',
+    'TAFT AVE.',
   ];
 
   static const _barangays = [
-    'Brgy. San Antonio',
-    'Brgy. Poblacion',
-    'Brgy. Bagumbayan',
-    'Brgy. Sta. Cruz',
-    'Brgy. San Isidro',
-    'Brgy. Malanday',
-    'Brgy. Pinyahan',
-    'Brgy. Krus na Ligas',
-    'Brgy. UP Campus',
-    'Brgy. Loyola Heights',
-    'Brgy. Teachers Village',
-    'Brgy. Diliman',
-    'Brgy. Commonwealth',
-    'Brgy. Batasan Hills',
-    'Brgy. Holy Spirit',
+    'BRGY. SAN ANTONIO',
+    'BRGY. POBLACION',
+    'BRGY. BAGUMBAYAN',
+    'BRGY. STA. CRUZ',
+    'BRGY. SAN ISIDRO',
+    'BRGY. MALANDAY',
+    'BRGY. PINYAHAN',
+    'BRGY. KRUS NA LIGAS',
+    'BRGY. UP CAMPUS',
+    'BRGY. LOYOLA HEIGHTS',
+    'BRGY. TEACHERS VILLAGE',
+    'BRGY. DILIMAN',
+    'BRGY. COMMONWEALTH',
+    'BRGY. BATASAN HILLS',
+    'BRGY. HOLY SPIRIT',
   ];
 
   static const _cities = [
-    'Quezon City',
-    'Manila',
-    'Makati',
-    'Pasig',
-    'Taguig',
-    'Caloocan',
-    'Las Piñas',
-    'Parañaque',
-    'Valenzuela',
-    'Marikina',
-    'San Juan',
-    'Mandaluyong',
-    'Muntinlupa',
-    'Pasay',
-    'Malabon',
+    'QUEZON CITY',
+    'MANILA',
+    'MAKATI',
+    'PASIG',
+    'TAGUIG',
+    'CALOOCAN',
+    'LAS PIÑAS',
+    'PARAÑAQUE',
+    'VALENZUELA',
+    'MARIKINA',
+    'SAN JUAN',
+    'MANDALUYONG',
+    'MUNTINLUPA',
+    'PASAY',
+    'MALABON',
   ];
 
   static String _pick(List<String> list) => list[_random.nextInt(list.length)];
 
   static const _extensions = ['', 'JR.', 'SR.', 'I', 'II', 'III'];
+
+  static const _clinics = [
+    'Pre-school Clinic',
+    'Grade School Clinic',
+    'Junior High School Clinic',
+    'Senior High School Clinic',
+    'College Clinic',
+  ];
+
+  static const _roles = ['Student', 'Employee'];
+
+  static const _departments = [
+    'Pre-school',
+    'Grade School',
+    'Junior High School',
+    'Senior High School',
+    'College',
+  ];
+
+  static const _treatments = [
+    'Sent home',
+    'Rested in clinic',
+    'Given medication',
+    'Wound cleaned and dressed',
+    'Referred to hospital',
+    'Observation',
+  ];
+
+  /// Supply definitions with name, type, and typical clinic assignments.
+  static const _supplyDefinitions = [
+    {'name': 'Alcohol', 'type': 'bottle'},
+    {'name': 'Betadine', 'type': 'bottle'},
+    {'name': 'Hydrogen Peroxide', 'type': 'bottle'},
+    {'name': 'Cotton Balls', 'type': 'pack'},
+    {'name': 'Bandage Roll', 'type': 'roll'},
+    {'name': 'Gauze Pad', 'type': 'pack'},
+    {'name': 'Adhesive Tape', 'type': 'roll'},
+    {'name': 'Band-Aid', 'type': 'box'},
+    {'name': 'Paracetamol', 'type': 'piece'},
+    {'name': 'Mefenamic Acid', 'type': 'piece'},
+    {'name': 'Ibuprofen', 'type': 'piece'},
+    {'name': 'Thermometer', 'type': 'piece'},
+    {'name': 'Ice Pack', 'type': 'piece'},
+    {'name': 'Disposable Gloves', 'type': 'pair'},
+    {'name': 'Face Mask', 'type': 'box'},
+    {'name': 'First Aid Kit', 'type': 'set'},
+  ];
 
   static Map<String, String> _generateNameComponents() {
     final first = _pick(_firstNames);
@@ -319,6 +367,17 @@ class MockDataGenerator {
     return '${_pick(prefix)}$num7';
   }
 
+  static DateTime _generateBirthdate() {
+    // Ages between 4 and 25
+    final age = 4 + _random.nextInt(22);
+    final now = DateTime.now();
+    return DateTime(
+      now.year - age,
+      1 + _random.nextInt(12),
+      1 + _random.nextInt(28),
+    );
+  }
+
   static List<Patient> generate({int count = 500}) {
     final patients = <Patient>[];
     for (int i = 0; i < count; i++) {
@@ -326,6 +385,7 @@ class MockDataGenerator {
         Duration(days: _random.nextInt(365)),
       );
       final nameProvider = _generateNameComponents();
+      final isMale = _random.nextBool();
 
       patients.add(
         Patient(
@@ -336,9 +396,14 @@ class MockDataGenerator {
           extension: nameProvider['extension'] ?? '',
           patientName: nameProvider['patientName'] ?? '',
           idNumber: _generateIdNumber(i),
+          birthdate: _generateBirthdate(),
+          sex: isMale ? 'Male' : 'Female',
+          contactNumber: _generatePhone(),
           address: _generateAddress(),
           guardianName: _generateNameComponents()['patientName'] ?? '',
           guardianContact: _generatePhone(),
+          role: _pick(_roles),
+          department: _pick(_departments),
           createdAt: createdAt,
           updatedAt: createdAt,
         ),
@@ -347,7 +412,35 @@ class MockDataGenerator {
     return patients;
   }
 
-  /// Inserts mock patients and visitations into the database.
+  /// Generates inventory items across all clinics.
+  static List<InventoryItem> _generateInventory() {
+    final items = <InventoryItem>[];
+
+    for (final clinic in _clinics) {
+      // Each clinic gets a random subset of supplies
+      final supplies = List.of(_supplyDefinitions)..shuffle(_random);
+      final subsetCount = 8 + _random.nextInt(supplies.length - 8 + 1);
+
+      for (int i = 0; i < subsetCount; i++) {
+        final supply = supplies[i];
+        items.add(
+          InventoryItem(
+            id: _uuid.v4(),
+            itemName: supply['name']!,
+            quantity: 5 + _random.nextInt(96), // 5–100
+            lowStockAmount: 3 + _random.nextInt(8), // 3–10
+            clinic: clinic,
+            itemType: supply['type']!,
+            hlc: HLC.now('mock-node').toString(),
+            nodeId: 'mock-node',
+          ),
+        );
+      }
+    }
+    return items;
+  }
+
+  /// Inserts mock patients, inventory, and visitations into the database.
   /// Call this once from a debug button or startup check.
   static Future<void> seedDatabase({
     int count = 50,
@@ -356,6 +449,12 @@ class MockDataGenerator {
     final db = DatabaseHelper.instance;
     final existing = await db.getPatients();
     if (existing.isNotEmpty) return; // Don't seed if data already exists
+
+    // Seed inventory first so visitations can reference items
+    final inventoryItems = _generateInventory();
+    for (final item in inventoryItems) {
+      await db.insertInventoryItem(item);
+    }
 
     final patients = generate(count: count);
     for (final patient in patients) {
@@ -368,18 +467,42 @@ class MockDataGenerator {
         final visitDate = DateTime.now().subtract(
           Duration(days: _random.nextInt(365)),
         );
+
+        // Pick 1–3 random symptoms
+        final symptomCount = 1 + _random.nextInt(3);
+        final shuffledSymptoms = List.of(kSymptomsList)..shuffle(_random);
+        final symptoms = shuffledSymptoms.take(symptomCount).toList();
+
+        // Pick 0–3 random supplies from inventory (in ID:Name format)
+        final supplyCount = _random.nextInt(4); // 0–3
+        final shuffledItems = List.of(inventoryItems)..shuffle(_random);
+        final selectedItems = shuffledItems.take(supplyCount).toList();
+        final suppliesUsed = selectedItems
+            .map((i) => '${i.id}:${i.itemName}')
+            .toList();
+
+        // Determine consumed supplies (pieces are always consumed, others might be)
+        final consumedSupplies = selectedItems
+            .where((i) {
+              if (i.itemType == 'piece') return true;
+              return _random.nextDouble() < 0.2; // 20% chance of fully consumed
+            })
+            .map((i) => '${i.id}:${i.itemName}')
+            .toList();
+
+        // Pick 1–2 treatment strings
+        final treatmentCount = 1 + _random.nextInt(2);
+        final shuffledTreatments = List.of(_treatments)..shuffle(_random);
+        final treatment = shuffledTreatments.take(treatmentCount).join(', ');
+
         final visit = Visitation(
           id: _uuid.v4(),
           patientId: patient.id,
           dateTime: visitDate,
-          symptoms: [_pick(kSymptomsList)],
-          treatment: _pick([
-            'Rest and Hydration',
-            'Pain Reliever',
-            'Cold Compress',
-            'Antibiotics',
-            'Observation',
-          ]),
+          symptoms: symptoms,
+          suppliesUsed: suppliesUsed,
+          consumedSupplies: consumedSupplies,
+          treatment: treatment,
           remarks: 'Mock data $j',
           hlc: HLC.now('mock-node').toString(),
           nodeId: 'mock-node',

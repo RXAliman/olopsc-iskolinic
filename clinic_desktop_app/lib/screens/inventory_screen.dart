@@ -332,14 +332,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         prefixIcon: Icon(Icons.category_outlined),
                       ),
                       items: const [
-                        DropdownMenuItem(
-                          value: 'piece',
-                          child: Text('Piece (Individual)'),
-                        ),
+                        DropdownMenuItem(value: 'piece', child: Text('Piece')),
                         DropdownMenuItem(
                           value: 'bottle',
-                          child: Text('Bottle / Roll'),
+                          child: Text('Bottle'),
                         ),
+                        DropdownMenuItem(value: 'roll', child: Text('Roll')),
+                        DropdownMenuItem(value: 'box', child: Text('Box')),
+                        DropdownMenuItem(value: 'pack', child: Text('Pack')),
+                        DropdownMenuItem(value: 'pair', child: Text('Pair')),
+                        DropdownMenuItem(value: 'set', child: Text('Set')),
                       ],
                       onChanged: (v) {
                         if (v != null) setState(() => selectedType = v);

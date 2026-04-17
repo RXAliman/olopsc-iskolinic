@@ -9,6 +9,7 @@ import '../providers/sync_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/custom_symptom_provider.dart';
 import '../providers/local_server_provider.dart';
+import '../services/mock_data_generator.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 
@@ -134,7 +135,14 @@ class _SplashScreenState extends State<SplashScreen>
       await patientProvider.loadPatients();
       if (!mounted) return;
 
-
+      // Step 2: Seed mock data (dev mode only, skips if data already exists)
+      if (!AppConfig.isProduction) {
+        _setStatus('Seeding mock data...');
+        await MockDataGenerator.seedDatabase();
+        // Reload patients after seeding
+        await patientProvider.loadPatients();
+        if (!mounted) return;
+      }
 
       // Step 3: Inventory
       _setStatus('Loading inventory...');

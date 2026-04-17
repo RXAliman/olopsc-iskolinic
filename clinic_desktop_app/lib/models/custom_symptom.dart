@@ -57,7 +57,9 @@ class CustomSymptom {
       category: map['category'] as String,
       hlc: map['hlc'] as String,
       nodeId: map['nodeId'] as String,
-      isDeleted: map['isDeleted'] as bool? ?? false,
+      isDeleted: map['isDeleted'] is bool
+          ? map['isDeleted'] as bool
+          : (map['isDeleted'] as int? ?? 0) == 1,
     );
   }
 

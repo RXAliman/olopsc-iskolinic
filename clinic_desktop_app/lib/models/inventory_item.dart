@@ -83,7 +83,9 @@ class InventoryItem {
       createdAt: DateTime.parse(map['createdAt'] as String),
       hlc: map['hlc'] as String,
       nodeId: map['nodeId'] as String,
-      isDeleted: map['isDeleted'] as bool? ?? false,
+      isDeleted: map['isDeleted'] is bool
+          ? map['isDeleted'] as bool
+          : (map['isDeleted'] as int? ?? 0) == 1,
     );
   }
 

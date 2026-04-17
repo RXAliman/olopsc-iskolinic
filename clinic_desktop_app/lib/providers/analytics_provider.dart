@@ -36,9 +36,7 @@ class AnalyticsProvider extends ChangeNotifier {
     }
     for (final visit in visitations) {
       for (final symptom in visit.symptoms) {
-        if (symptomMap.containsKey(symptom)) {
-          symptomMap[symptom] = symptomMap[symptom]! + 1;
-        }
+        symptomMap[symptom] = (symptomMap[symptom] ?? 0) + 1;
       }
     }
     _symptomCounts = symptomMap;

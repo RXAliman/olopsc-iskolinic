@@ -115,7 +115,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     }
 
     final inventoryProvider = context.read<InventoryProvider>();
-    
+
     // Transform selected supplies to ID:Name format for snapshotting
     final mappedSupplies = _selectedSupplies.map((supplyIdOrLegacy) {
       try {
@@ -130,7 +130,9 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
 
     final consumedSupplies = mappedSupplies.where((supplyStr) {
       try {
-        final idPart = supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+        final idPart = supplyStr.contains(':')
+            ? supplyStr.split(':')[0]
+            : supplyStr;
         final item = inventoryProvider.items.firstWhere(
           (i) => i.id == idPart || i.itemName == idPart,
         );
@@ -161,7 +163,9 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       if (newlyConsumed.isNotEmpty) {
         for (final supplyStr in newlyConsumed) {
           // Resolve ID if it's in ID:Name format or legacy name
-          final idPart = supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+          final idPart = supplyStr.contains(':')
+              ? supplyStr.split(':')[0]
+              : supplyStr;
           try {
             final item = inventoryProvider.items.firstWhere(
               (i) => i.id == idPart || i.itemName == idPart,
@@ -907,9 +911,12 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       );
     }
 
+    // Multi-use item types that need a "fully consumed?" checkbox
+    const multiUseTypes = {'bottle', 'roll', 'box', 'pack', 'pair', 'set'};
+
     if (isSupplies &&
         isSelected &&
-        (item as InventoryItem).itemType == 'bottle') {
+        multiUseTypes.contains((item as InventoryItem).itemType)) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
