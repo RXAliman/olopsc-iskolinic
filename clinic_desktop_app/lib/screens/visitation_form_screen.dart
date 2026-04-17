@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../constants/symptoms.dart';
 import '../providers/inventory_provider.dart';
@@ -119,7 +120,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     // Transform selected supplies to ID:Name format for snapshotting
     final mappedSupplies = _selectedSupplies.map((supplyIdOrLegacy) {
       try {
-        final item = inventoryProvider.items.firstWhere(
+        final item = inventoryProvider.allItems.firstWhere(
           (i) => i.id == supplyIdOrLegacy || i.itemName == supplyIdOrLegacy,
         );
         return "${item.id}:${item.itemName}";
@@ -133,7 +134,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         final idPart = supplyStr.contains(':')
             ? supplyStr.split(':')[0]
             : supplyStr;
-        final item = inventoryProvider.items.firstWhere(
+        final item = inventoryProvider.allItems.firstWhere(
           (i) => i.id == idPart || i.itemName == idPart,
         );
         return item.itemType == 'piece' ||
@@ -167,7 +168,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
               ? supplyStr.split(':')[0]
               : supplyStr;
           try {
-            final item = inventoryProvider.items.firstWhere(
+            final item = inventoryProvider.allItems.firstWhere(
               (i) => i.id == idPart || i.itemName == idPart,
             );
             await inventoryProvider.deductStock(item.id, 1);
@@ -293,7 +294,16 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 8),
+                      Text(
+                        "Fields with asterisks (*) are required to be filled up.",
+                        style: TextStyle(
+                          color: AppTheme.danger,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       // Patient Search (Autocomplete)
                       Autocomplete<Patient>(
                         initialValue: TextEditingValue(
@@ -332,8 +342,23 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                                       controller: controller,
                                       focusNode: focusNode,
                                       readOnly: widget.patientId != null,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Patient Name / ID Number *',
+                                      decoration: InputDecoration(
+                                        label: RichText(
+                                          text: TextSpan(
+                                            text: 'Patient Name / ID Number ',
+                                            style: GoogleFonts.inter(
+                                              color: AppTheme.textPrimary,
+                                            ),
+                                            children: [
+                                              TextSpan(
+                                                text: '*',
+                                                style: GoogleFonts.inter(
+                                                  color: AppTheme.danger,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                         prefixIcon: Icon(
                                           Icons.person_search_rounded,
                                         ),
@@ -439,9 +464,20 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                       if (_selectedPatient != null) ...[
                         const SizedBox(height: 24),
                         // Symptoms label
-                        Text(
-                          'Chief Complaints / Symptoms *',
-                          style: Theme.of(context).textTheme.titleMedium,
+                        RichText(
+                          text: TextSpan(
+                            text: 'Chief Complaints / Symptoms ',
+                            style: Theme.of(context).textTheme.titleMedium,
+                            children: [
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Consumer<CustomSymptomProvider>(
@@ -519,7 +555,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
 
                         Consumer<InventoryProvider>(
                           builder: (context, inventory, _) {
-                            final allItems = inventory.items;
+                            final allItems = inventory.allItems;
                             return _buildSection(
                               title: 'Clinic Supplies Used',
                               overrideItems: allItems,

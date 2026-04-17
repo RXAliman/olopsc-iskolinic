@@ -110,14 +110,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const Spacer(),
                   ElevatedButton.icon(
                     onPressed: () => _showPatientForm(context),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
+                      padding: const EdgeInsets.all(16),
                     ),
                     icon: const Icon(Icons.person_add_rounded, size: 18),
                     label: const Text('Add Patient'),

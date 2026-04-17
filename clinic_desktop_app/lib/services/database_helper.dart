@@ -793,6 +793,16 @@ class DatabaseHelper {
     return maps.map((m) => InventoryItem.fromMap(m)).toList();
   }
 
+  Future<List<InventoryItem>> getAllInventoryItems() async {
+    final db = await database;
+    final maps = await db.query(
+      'inventory',
+      where: 'isDeleted = 0',
+      orderBy: 'itemName ASC',
+    );
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+  }
+
   Future<List<InventoryItem>> getLowStockItems() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(

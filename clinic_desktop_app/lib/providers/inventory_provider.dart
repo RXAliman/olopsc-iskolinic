@@ -20,6 +20,7 @@ class InventoryProvider extends ChangeNotifier {
   bool _sortAscending = true;
   bool _loading = false;
   List<InventoryItem> _lowStockItems = []; // Global list of all low stock items
+  List<InventoryItem> _allItems = []; // Global list of all inventory items
 
   List<InventoryItem> get items => _items;
   int get totalItems => _totalItems;
@@ -31,6 +32,7 @@ class InventoryProvider extends ChangeNotifier {
   bool get sortAscending => _sortAscending;
   bool get loading => _loading;
   List<InventoryItem> get lowStockItems => _lowStockItems;
+  List<InventoryItem> get allItems => _allItems;
 
   Future<void> loadInventory() async {
     _loading = true;
@@ -48,6 +50,7 @@ class InventoryProvider extends ChangeNotifier {
     
     _totalItems = await _db.getInventoryCount(_searchQuery);
     _lowStockItems = await _db.getLowStockItems();
+    _allItems = await _db.getAllInventoryItems();
     
     _loading = false;
     notifyListeners();

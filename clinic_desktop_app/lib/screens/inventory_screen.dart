@@ -528,14 +528,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         prefixIcon: Icon(Icons.category_outlined),
                       ),
                       items: const [
-                        DropdownMenuItem(
-                          value: 'piece',
-                          child: Text('Piece (Individual)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'bottle',
-                          child: Text('Bottle / Roll'),
-                        ),
+                        DropdownMenuItem(value: 'piece', child: Text('Piece')),
+                        DropdownMenuItem(value: 'bottle', child: Text('Bottle')),
+                        DropdownMenuItem(value: 'roll', child: Text('Roll')),
+                        DropdownMenuItem(value: 'box', child: Text('Box')),
+                        DropdownMenuItem(value: 'pack', child: Text('Pack')),
+                        DropdownMenuItem(value: 'pair', child: Text('Pair')),
+                        DropdownMenuItem(value: 'set', child: Text('Set')),
                       ],
                       onChanged: (v) {
                         if (v != null) setState(() => selectedType = v);
@@ -769,10 +768,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         borderRadius: BorderRadius.circular(12),
                         side: const BorderSide(color: AppTheme.accent),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
+                      padding: const EdgeInsets.all(16),
                       backgroundColor: AppTheme.accent,
                       foregroundColor: Colors.white,
                     ),
@@ -801,7 +797,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                     ),
                     icon: const Icon(Icons.sync_rounded, size: 18),
-                    label: const Text('Refresh'),
+                    label: const Text('Reload'),
                   ),
                 ],
               ),
@@ -938,7 +934,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          onSort: (idx, asc) => _onSort(idx, asc),
+                                          onSort: (idx, asc) =>
+                                              _onSort(idx, asc),
                                         ),
                                         DataColumn(
                                           label: const Tooltip(
