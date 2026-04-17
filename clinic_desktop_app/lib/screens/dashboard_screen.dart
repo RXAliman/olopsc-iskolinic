@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import '../models/visitation.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
@@ -20,7 +19,7 @@ import 'visitation_form_screen.dart';
 import 'analytics_screen.dart';
 import 'inventory_screen.dart';
 import 'connection_screen.dart';
-import '../constants/app_config.dart';
+import 'settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -33,7 +32,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   bool _focusSearchOnNextTab = false;
   bool _isSidebarCollapsed = false;
-  String _appVersion = '';
 
   static const double _expandedWidth = 250;
   static const double _collapsedWidth = 72;
@@ -49,6 +47,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.inventory_2_rounded, 'Inventory'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
     _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
+    _NavItem(Icons.settings_rounded, 'Settings'),
   ];
 
   @override
@@ -63,7 +62,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDashboardData();
     });
-    _loadAppVersion();
   }
 
   @override
@@ -71,13 +69,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _lifecycleListener.dispose();
     _clockTimer.cancel();
     super.dispose();
-  }
-
-  Future<void> _loadAppVersion() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      if (mounted) setState(() => _appVersion = info.version);
-    } catch (_) {}
   }
 
   Future<AppExitResponse> _handleExitRequest() async {
@@ -156,6 +147,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const AnalyticsScreen();
       case 4:
         return const ConnectionScreen();
+      case 5:
+        return const SettingsScreen();
       default:
         return _buildDashboardHome();
     }
@@ -1090,61 +1083,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                       ),
-
-                      // ── Version info (visible when expanded) ──
-                      if (!_isSidebarCollapsed && _appVersion.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'Version $_appVersion',
-                                  overflow: TextOverflow.clip,
-                                  softWrap: false,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: AppTheme.textMuted.withValues(
-                                      alpha: 0.6,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (!AppConfig.isProduction) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.warning.withValues(
-                                      alpha: 0.15,
-                                    ),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: AppTheme.warning.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'DEV',
-                                    overflow: TextOverflow.clip,
-                                    softWrap: false,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.warning,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
                     ],
                   ),
                 ),
