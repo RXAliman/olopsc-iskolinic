@@ -255,10 +255,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 16),
                   ElevatedButton.icon(
                     onPressed: () async {
+                      final syncProvider = context.read<SyncProvider>();
+                      final isOffline = syncProvider.currentMode == 0;
+                      
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Reloading...'),
-                          duration: Duration(seconds: 1),
+                        SnackBar(
+                          content: Text(isOffline ? 'Refreshing local data...' : 'Reloading and syncing...'),
+                          duration: const Duration(seconds: 1),
                         ),
                       );
                       await context.read<PatientProvider>().refreshAll();
@@ -269,7 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         await context.read<AnalyticsProvider>().loadAnalytics();
                       }
                       if (context.mounted) {
-                        context.read<SyncProvider>().forceSync();
+                        syncProvider.forceSync();
                       }
                     },
                     style: ElevatedButton.styleFrom(

@@ -134,15 +134,17 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       ),
                     ),
                     onPressed: () async {
+                      final syncProvider = context.read<SyncProvider>();
+                      final isOffline = syncProvider.currentMode == 0;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Reloading...'),
-                          duration: Duration(seconds: 1),
+                        SnackBar(
+                          content: Text(isOffline ? 'Refreshing local data...' : 'Reloading and syncing...'),
+                          duration: const Duration(seconds: 1),
                         ),
                       );
                       await context.read<PatientProvider>().refreshAll();
                       if (context.mounted) {
-                        context.read<SyncProvider>().forceSync();
+                        syncProvider.forceSync();
                       }
                     },
                     icon: const Icon(Icons.sync_rounded),

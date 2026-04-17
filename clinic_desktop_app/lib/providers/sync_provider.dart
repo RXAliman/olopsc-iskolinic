@@ -14,6 +14,7 @@ class SyncProvider extends ChangeNotifier {
   InventoryProvider? _inventoryProvider;
   CustomSymptomProvider? _customSymptomProvider;
   int _currentMode = 0; // 0: Offline, 2: Relay
+  int get currentMode => _currentMode;
 
   SyncConnectionState _connectionState = SyncConnectionState.disconnected;
   SyncConnectionState get connectionState => _connectionState;
@@ -87,6 +88,7 @@ class SyncProvider extends ChangeNotifier {
 
   /// Manually connect to the relay server.
   Future<void> connect() async {
+    if (_currentMode != 2) return;
     await _client?.connect();
   }
 
@@ -98,12 +100,14 @@ class SyncProvider extends ChangeNotifier {
   /// Force a manual sync by reconnecting
   Future<void> forceSync() async {
     disconnect();
+    if (_currentMode != 2) return;
     await Future.delayed(const Duration(milliseconds: 50));
     await connect();
   }
 
   /// Push local changes after a write.
   Future<void> pushChanges() async {
+    if (_currentMode != 2) return;
     await _client?.pushChanges();
   }
 
