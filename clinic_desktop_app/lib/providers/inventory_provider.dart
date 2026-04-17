@@ -12,15 +12,94 @@ class InventoryProvider extends ChangeNotifier {
   Future<void> Function()? onLocalChange;
 
   List<InventoryItem> _items = [];
+  int _totalItems = 0;
+  int _currentPage = 0;
+  final int _pageSize = 10;
+  String _searchQuery = '';
+  int _sortColumnIndex = 0;
+  bool _sortAscending = true;
+  bool _loading = false;
+  List<InventoryItem> _lowStockItems = []; // Global list of all low stock items
 
   List<InventoryItem> get items => _items;
-
-  List<InventoryItem> get lowStockItems =>
-      _items.where((item) => item.isLowStock).toList();
+  int get totalItems => _totalItems;
+  int get currentPage => _currentPage;
+  int get pageSize => _pageSize;
+  int get totalPages => (_totalItems / _pageSize).ceil();
+  String get searchQuery => _searchQuery;
+  int get sortColumnIndex => _sortColumnIndex;
+  bool get sortAscending => _sortAscending;
+  bool get loading => _loading;
+  List<InventoryItem> get lowStockItems => _lowStockItems;
 
   Future<void> loadInventory() async {
-    _items = await _db.getAllInventory();
+    _loading = true;
     notifyListeners();
+
+    final orderBy = _getSortColumn(_sortColumnIndex);
+    
+    _items = await _db.searchInventoryPaginated(
+      query: _searchQuery,
+      limit: _pageSize,
+      offset: _currentPage * _pageSize,
+      orderBy: orderBy,
+      ascending: _sortAscending,
+    );
+    
+    _totalItems = await _db.getInventoryCount(_searchQuery);
+    _lowStockItems = await _db.getLowStockItems();
+    
+    _loading = false;
+    notifyListeners();
+  }
+
+  String _getSortColumn(int index) {
+    switch (index) {
+      case 0: return 'itemName';
+      case 1: return 'quantity';
+      case 2: return 'clinic';
+      case 3: return 'itemType';
+      case 4: return 'lowStockAmount';
+      case 5: return '(quantity <= lowStockAmount)';
+      default: return 'itemName';
+    }
+  }
+
+  void setSearchQuery(String query) {
+    _searchQuery = query;
+    _currentPage = 0;
+    loadInventory();
+  }
+
+  void setSort(int index, bool ascending) {
+    _sortColumnIndex = index;
+    _sortAscending = ascending;
+    _currentPage = 0;
+    loadInventory();
+  }
+
+  void nextPage() {
+    if (_currentPage < totalPages - 1) {
+      _currentPage++;
+      loadInventory();
+    }
+  }
+
+  void previousPage() {
+    if (_currentPage > 0) {
+      _currentPage--;
+      loadInventory();
+    }
+  }
+
+  void firstPage() {
+    _currentPage = 0;
+    loadInventory();
+  }
+
+  void lastPage() {
+    _currentPage = totalPages - 1;
+    loadInventory();
   }
 
   Future<void> addNewSupplyItem({

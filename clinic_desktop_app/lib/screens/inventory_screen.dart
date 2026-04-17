@@ -17,13 +17,12 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final _searchCtrl = TextEditingController();
   final _horizontalScrollCtrl = ScrollController();
-  String _searchQuery = '';
-  int _sortColumnIndex = 0;
-  bool _sortAscending = true;
+  final _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.text = context.read<InventoryProvider>().searchQuery;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<InventoryProvider>().loadInventory();
     });
@@ -33,6 +32,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void dispose() {
     _searchCtrl.dispose();
     _horizontalScrollCtrl.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -702,37 +702,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget build(BuildContext context) {
     return Consumer<InventoryProvider>(
       builder: (context, inventory, _) {
-        var filteredItems = inventory.items.where((item) {
-          if (_searchQuery.isEmpty) return true;
-          return item.itemName.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          );
-        }).toList();
+        final filteredItems = inventory.items;
+        final currentPage = inventory.currentPage;
+        final totalPages = inventory.totalPages;
+        final pageSize = inventory.pageSize;
+        final totalItems = inventory.totalItems;
 
-        // Sorting
-        filteredItems.sort((a, b) {
-          int cmp;
-          switch (_sortColumnIndex) {
-            case 0:
-              cmp = a.itemName.compareTo(b.itemName);
-              break;
-            case 1:
-              cmp = a.quantity.compareTo(b.quantity);
-              break;
-            case 2:
-              cmp = a.clinic.compareTo(b.clinic);
-              break;
-            case 3:
-              cmp = a.itemType.compareTo(b.itemType);
-              break;
-            case 4:
-              cmp = a.lowStockAmount.compareTo(b.lowStockAmount);
-              break;
-            default:
-              cmp = 0;
-          }
-          return _sortAscending ? cmp : -cmp;
-        });
+        final start = currentPage * pageSize;
+        final end = (start + filteredItems.length);
 
         return Padding(
           padding: const EdgeInsets.all(32),
@@ -745,7 +722,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Track and manage clinic supplies',
+                inventory.searchQuery.isNotEmpty
+                    ? '$totalItems search results'
+                    : '$totalItems total items',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
@@ -754,17 +733,33 @@ class _InventoryScreenState extends State<InventoryScreen> {
               Row(
                 children: [
                   SizedBox(
-                    width: 320,
+                    width: 400,
                     child: TextField(
                       controller: _searchCtrl,
-                      decoration: const InputDecoration(
+                      focusNode: _searchFocusNode,
+                      onChanged: (v) => inventory.setSearchQuery(v),
+                      decoration: InputDecoration(
                         hintText: 'Search supplies...',
-                        prefixIcon: Icon(Icons.search_rounded, size: 20),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        suffixIcon: inventory.searchQuery.isNotEmpty
+                            ? Tooltip(
+                                message: 'Clear search',
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 18,
+                                  ),
+                                  onPressed: () {
+                                    _searchCtrl.clear();
+                                    inventory.setSearchQuery('');
+                                  },
+                                ),
+                              )
+                            : null,
                       ),
-                      onChanged: (v) => setState(() => _searchQuery = v),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const Spacer(),
                   ElevatedButton.icon(
                     onPressed: _showAddNewItemDialog,
                     icon: const Icon(Icons.add_rounded, size: 18),
@@ -850,7 +845,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
               Expanded(
                 child: Card(
                   clipBehavior: Clip.antiAlias,
-                  child: filteredItems.isEmpty
+                  child: inventory.loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : filteredItems.isEmpty
                       ? const Center(child: Text('No supplies found'))
                       : Scrollbar(
                           controller: _horizontalScrollCtrl,
@@ -859,197 +856,229 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               notification.depth == 1,
                           child: SingleChildScrollView(
                             scrollDirection: Axis.vertical,
-                            child: SingleChildScrollView(
-                              controller: _horizontalScrollCtrl,
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
-                                sortColumnIndex: _sortColumnIndex,
-                                sortAscending: _sortAscending,
-                                headingRowColor: WidgetStateProperty.all(
-                                  AppTheme.cardLight,
-                                ),
-                                columns: [
-                                  DataColumn(
-                                    label: const Tooltip(
-                                      message: 'Supply Item Name',
-                                      child: Text(
-                                        'Supply Item',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SingleChildScrollView(
+                                  controller: _horizontalScrollCtrl,
+                                  scrollDirection: Axis.horizontal,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      minWidth: constraints.maxWidth,
                                     ),
-                                    onSort: (idx, asc) => _onSort(idx, asc),
-                                  ),
-                                  DataColumn(
-                                    label: const Tooltip(
-                                      message: 'Current Stock Level',
-                                      child: Text(
-                                        'In Stock',
-                                        overflow: TextOverflow.ellipsis,
+                                    child: DataTable(
+                                      sortColumnIndex:
+                                          inventory.sortColumnIndex,
+                                      sortAscending: inventory.sortAscending,
+                                      headingRowColor: WidgetStateProperty.all(
+                                        AppTheme.cardLight,
                                       ),
-                                    ),
-                                    numeric: true,
-                                    onSort: (idx, asc) => _onSort(idx, asc),
-                                  ),
-                                  DataColumn(
-                                    label: const Tooltip(
-                                      message: 'Location of the clinic',
-                                      child: Text(
-                                        'Clinic',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    onSort: (idx, asc) => _onSort(idx, asc),
-                                  ),
-                                  DataColumn(
-                                    label: const Tooltip(
-                                      message: 'Type of supply item',
-                                      child: Text(
-                                        'Type',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    onSort: (idx, asc) => _onSort(idx, asc),
-                                  ),
-                                  DataColumn(
-                                    label: const Tooltip(
-                                      message: 'Low Stock Threshold',
-                                      child: Text(
-                                        'Low Stock At',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    numeric: true,
-                                    onSort: (idx, asc) => _onSort(idx, asc),
-                                  ),
-                                  DataColumn(
-                                    label: const Tooltip(
-                                      message: 'Inventory Status',
-                                      child: Text(
-                                        'Status',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                                  DataColumn(
-                                    label: const Tooltip(
-                                      message: 'Available Actions',
-                                      child: Text(
-                                        'Actions',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                rows: filteredItems.map((item) {
-                                  final isLow = item.isLowStock;
-                                  return DataRow(
-                                    cells: [
-                                      DataCell(
-                                        Text(
-                                          item.itemName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(Text(item.quantity.toString())),
-                                      DataCell(Text(item.clinic)),
-                                      DataCell(Text(item.itemType)),
-                                      DataCell(
-                                        Text(item.lowStockAmount.toString()),
-                                      ),
-                                      DataCell(
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isLow
-                                                ? AppTheme.danger.withValues(
-                                                    alpha: 0.1,
-                                                  )
-                                                : Colors.green.withValues(
-                                                    alpha: 0.1,
-                                                  ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                      columns: [
+                                        DataColumn(
+                                          label: const Tooltip(
+                                            message: 'Supply Item Name',
+                                            child: Text(
+                                              'Supply Item',
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          child: Text(
-                                            isLow ? 'LOW STOCK' : 'HEALTHY',
-                                            style: TextStyle(
-                                              color: isLow
-                                                  ? AppTheme.danger
-                                                  : Colors.green,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
+                                          onSort: (idx, asc) =>
+                                              _onSort(idx, asc),
+                                        ),
+                                        DataColumn(
+                                          label: const Tooltip(
+                                            message: 'Current Stock Level',
+                                            child: Text(
+                                              'In Stock',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          numeric: true,
+                                          onSort: (idx, asc) =>
+                                              _onSort(idx, asc),
+                                        ),
+                                        DataColumn(
+                                          label: const Tooltip(
+                                            message: 'Location of the clinic',
+                                            child: Text(
+                                              'Clinic',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          onSort: (idx, asc) =>
+                                              _onSort(idx, asc),
+                                        ),
+                                        DataColumn(
+                                          label: const Tooltip(
+                                            message: 'Type of supply item',
+                                            child: Text(
+                                              'Type',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          onSort: (idx, asc) =>
+                                              _onSort(idx, asc),
+                                        ),
+                                        DataColumn(
+                                          label: const Tooltip(
+                                            message: 'Low Stock Threshold',
+                                            child: Text(
+                                              'Low Stock At',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          numeric: true,
+                                          onSort: (idx, asc) =>
+                                              _onSort(idx, asc),
+                                        ),
+                                        DataColumn(
+                                          label: const Tooltip(
+                                            message: 'Inventory Status',
+                                            child: Text(
+                                              'Status',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          onSort: (idx, asc) => _onSort(idx, asc),
+                                        ),
+                                        DataColumn(
+                                          label: const Tooltip(
+                                            message: 'Available Actions',
+                                            child: Text(
+                                              'Actions',
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      DataCell(
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons
-                                                    .add_circle_outline_rounded,
-                                                color: AppTheme.accent,
-                                                size: 20,
+                                      ],
+                                      rows: filteredItems.map((item) {
+                                        final isLow = item.isLowStock;
+                                        return DataRow(
+                                          cells: [
+                                            DataCell(
+                                              Text(
+                                                item.itemName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
-                                              tooltip: 'Add Stock',
-                                              onPressed: () =>
-                                                  _showAddStockDialog(item),
                                             ),
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons
-                                                    .remove_circle_outline_rounded,
-                                                color: AppTheme.danger,
-                                                size: 20,
-                                              ),
-                                              tooltip: 'Remove Stock',
-                                              onPressed: () =>
-                                                  _showRemoveDialog(item),
+                                            DataCell(
+                                              Text(item.quantity.toString()),
                                             ),
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.edit_note_rounded,
-                                                color: AppTheme.textMuted,
-                                                size: 20,
+                                            DataCell(Text(item.clinic)),
+                                            DataCell(Text(item.itemType)),
+                                            DataCell(
+                                              Text(
+                                                item.lowStockAmount.toString(),
                                               ),
-                                              tooltip: 'Edit Item',
-                                              onPressed: () =>
-                                                  _showEditItemDialog(item),
                                             ),
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.delete_outline_rounded,
-                                                color: AppTheme.danger,
-                                                size: 20,
-                                              ),
-                                              tooltip: 'Delete Item',
-                                              onPressed: () =>
-                                                  _showDeleteConfirmationDialog(
-                                                    item,
+                                            DataCell(
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: isLow
+                                                      ? AppTheme.danger
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            )
+                                                      : Colors.green.withValues(
+                                                          alpha: 0.1,
+                                                        ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  isLow
+                                                      ? 'LOW STOCK'
+                                                      : 'HEALTHY',
+                                                  style: TextStyle(
+                                                    color: isLow
+                                                        ? AppTheme.danger
+                                                        : Colors.green,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
                                                   ),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons
+                                                          .add_circle_outline_rounded,
+                                                      color: AppTheme.accent,
+                                                      size: 20,
+                                                    ),
+                                                    tooltip: 'Add Stock',
+                                                    onPressed: () =>
+                                                        _showAddStockDialog(
+                                                          item,
+                                                        ),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons
+                                                          .remove_circle_outline_rounded,
+                                                      color: AppTheme.danger,
+                                                      size: 20,
+                                                    ),
+                                                    tooltip: 'Remove Stock',
+                                                    onPressed: () =>
+                                                        _showRemoveDialog(item),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.edit_note_rounded,
+                                                      color: AppTheme.textMuted,
+                                                      size: 20,
+                                                    ),
+                                                    tooltip: 'Edit Item',
+                                                    onPressed: () =>
+                                                        _showEditItemDialog(
+                                                          item,
+                                                        ),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons
+                                                          .delete_outline_rounded,
+                                                      color: AppTheme.danger,
+                                                      size: 20,
+                                                    ),
+                                                    tooltip: 'Delete Item',
+                                                    onPressed: () =>
+                                                        _showDeleteConfirmationDialog(
+                                                          item,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }).toList(),
-                              ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ),
                 ),
               ),
+              if (totalPages > 1) ...[
+                const SizedBox(height: 16),
+                _buildPagination(inventory, totalItems, totalPages, start, end),
+              ],
             ],
           ),
         );
@@ -1057,12 +1086,94 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  Widget _buildPagination(
+    InventoryProvider provider,
+    int totalItems,
+    int totalPages,
+    int start,
+    int end,
+  ) {
+    final currentPage = provider.currentPage;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Showing ${start + 1}–$end of $totalItems items',
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: currentPage > 0 ? () => provider.firstPage() : null,
+                icon: const Icon(Icons.first_page_rounded, size: 20),
+                tooltip: 'First page',
+                splashRadius: 18,
+              ),
+              IconButton(
+                onPressed: currentPage > 0
+                    ? () => provider.previousPage()
+                    : null,
+                icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                tooltip: 'Previous',
+                splashRadius: 18,
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 64,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.accent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${currentPage + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: currentPage < totalPages - 1
+                    ? () => provider.nextPage()
+                    : null,
+                icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                tooltip: 'Next',
+                splashRadius: 18,
+              ),
+              IconButton(
+                onPressed: currentPage < totalPages - 1
+                    ? () => provider.lastPage()
+                    : null,
+                icon: const Icon(Icons.last_page_rounded, size: 20),
+                tooltip: 'Last page',
+                splashRadius: 18,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   void _onSort(int columnIndex, bool ascending) {
-    setState(() {
-      _sortColumnIndex = columnIndex;
-      _sortAscending = ascending;
-    });
+    context.read<InventoryProvider>().setSort(columnIndex, ascending);
   }
 }
-
-// _InventoryRow class removed in favor of DataTable rows

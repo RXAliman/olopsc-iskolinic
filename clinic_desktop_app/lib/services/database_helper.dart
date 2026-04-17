@@ -765,6 +765,44 @@ class DatabaseHelper {
     return maps.map((m) => InventoryItem.fromMap(m)).toList();
   }
 
+  Future<int> getInventoryCount(String query) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM inventory WHERE isDeleted = 0 AND itemName LIKE ?',
+      ['%$query%'],
+    );
+    return result.first['count'] as int? ?? 0;
+  }
+
+  Future<List<InventoryItem>> searchInventoryPaginated({
+    required String query,
+    required int limit,
+    required int offset,
+    required String orderBy,
+    required bool ascending,
+  }) async {
+    final db = await database;
+    final maps = await db.query(
+      'inventory',
+      where: 'isDeleted = 0 AND itemName LIKE ?',
+      whereArgs: ['%$query%'],
+      orderBy: '$orderBy ${ascending ? 'ASC' : 'DESC'}',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+  }
+
+  Future<List<InventoryItem>> getLowStockItems() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory',
+      where: 'quantity <= lowStockAmount AND isDeleted = 0',
+      orderBy: 'itemName ASC',
+    );
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+  }
+
   Future<void> deleteInventoryItemSoft(
     String id, {
     required String hlc,
