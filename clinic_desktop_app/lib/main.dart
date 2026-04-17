@@ -10,6 +10,7 @@ import 'providers/local_server_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/security_gate.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -118,7 +119,7 @@ class ClinicApp extends StatelessWidget {
         title: 'IskoLinic App',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const DashboardScreen(),
+        home: const SecurityGate(child: DashboardScreen()),
       ),
     );
   }

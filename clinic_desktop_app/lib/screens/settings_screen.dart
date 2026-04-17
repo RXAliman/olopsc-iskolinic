@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../constants/app_config.dart';
 import '../providers/settings_provider.dart';
 import '../providers/sync_provider.dart';
+import '../services/auth_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -94,6 +95,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               );
             },
+          ),
+
+          const SizedBox(height: 48),
+
+          // ── Sync Security ─────────────────────────────────────────────
+          _buildSectionHeader('Sync Security', Icons.vignette_rounded),
+          const SizedBox(height: 16),
+          Container(
+            decoration: AppTheme.glassCard(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Relay Sync Secret',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'The shared secret key used to authenticate with the cloud relay server.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                FutureBuilder<String?>(
+                  future: AuthService.instance.getSyncSecret(),
+                  builder: (context, snapshot) {
+                    final currentSecret = snapshot.data ?? '';
+                    final controller = TextEditingController(text: currentSecret);
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: controller,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              hintText: 'Enter secret key',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () async {
+                            await AuthService.instance.updateSyncSecret(controller.text);
+                            
+                            // Re-initialize sync client with the new secret immediately
+                            if (context.mounted) {
+                              Provider.of<SyncProvider>(context, listen: false)
+                                  .reconnectWithNewSecret();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Sync secret updated and reconnecting...')),
+                              );
+                            }
+                          },
+                          child: const Text('UPDATE'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 48),

@@ -19,6 +19,7 @@ enum SyncConnectionState { disconnected, connecting, connected }
 class SyncClient {
   final String wsUrl;
   final String nodeId;
+  final String? authSecret;
   final DatabaseHelper _db = DatabaseHelper.instance;
 
   WebSocketChannel? _channel;
@@ -42,7 +43,7 @@ class SyncClient {
   int _reconnectAttempts = 0;
   static const int _maxReconnectDelaySec = 30;
 
-  SyncClient({required this.wsUrl, required this.nodeId});
+  SyncClient({required this.wsUrl, required this.nodeId, this.authSecret});
 
   // ── Connection lifecycle ────────────────────────────────────────
 
@@ -294,6 +295,10 @@ class SyncClient {
   void _send(Map<String, dynamic> data) {
     if (_channel == null) return;
     try {
+      // Inject the secret if it exists
+      if (authSecret != null) {
+        data['authSecret'] = authSecret;
+      }
       _channel!.sink.add(jsonEncode(data));
     } catch (e) {
       debugPrint('SyncClient: send error: $e');

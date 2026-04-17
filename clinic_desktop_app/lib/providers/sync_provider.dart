@@ -5,6 +5,7 @@ import '../crdt/node_id.dart';
 import 'patient_provider.dart';
 import 'inventory_provider.dart';
 import 'custom_symptom_provider.dart';
+import '../services/auth_service.dart';
 
 /// Manages the CRDT sync lifecycle and exposes connection status to the UI.
 class SyncProvider extends ChangeNotifier {
@@ -43,7 +44,8 @@ class SyncProvider extends ChangeNotifier {
     }
 
     final nodeId = await NodeId.get();
-    _client = SyncClient(wsUrl: wsUrl, nodeId: nodeId);
+    final authSecret = await AuthService.instance.getSyncSecret();
+    _client = SyncClient(wsUrl: wsUrl, nodeId: nodeId, authSecret: authSecret);
 
     _client!.onStateChanged = () {
       _connectionState = _client!.state;
@@ -103,6 +105,34 @@ class SyncProvider extends ChangeNotifier {
   /// Push local changes after a write.
   Future<void> pushChanges() async {
     await _client?.pushChanges();
+  }
+
+  /// Re-initialize the client with the latest secret from storage.
+  /// Used when the user updates the secret in settings.
+  Future<void> reconnectWithNewSecret() async {
+    final wsUrl = _client?.wsUrl;
+    if (wsUrl == null) return;
+    
+    disconnect();
+    
+    final nodeId = await NodeId.get();
+    final authSecret = await AuthService.instance.getSyncSecret();
+    _client = SyncClient(wsUrl: wsUrl, nodeId: nodeId, authSecret: authSecret);
+
+    _client!.onStateChanged = () {
+      _connectionState = _client!.state;
+      notifyListeners();
+    };
+
+    _client!.onSyncComplete = (changedIds) {
+      _patientProvider?.onSyncComplete(changedIds);
+      _inventoryProvider?.loadInventory();
+      _customSymptomProvider?.loadSymptoms();
+    };
+
+    if (_currentMode == 2) {
+      await connect();
+    }
   }
 
   @override
