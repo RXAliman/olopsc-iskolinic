@@ -7,7 +7,6 @@ import '../models/inventory_item.dart';
 import '../models/custom_symptom.dart';
 import '../crdt/hlc.dart';
 import '../constants/app_config.dart';
-import 'package:uuid/uuid.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -29,11 +28,7 @@ class DatabaseHelper {
     final dbPath = p.join(dir.path, AppConfig.databaseName);
     return await databaseFactory.openDatabase(
       dbPath,
-      options: OpenDatabaseOptions(
-        version: 15,
-        onCreate: _onCreate,
-        onUpgrade: _onUpgrade,
-      ),
+      options: OpenDatabaseOptions(version: 1, onCreate: _onCreate),
     );
   }
 
@@ -119,9 +114,6 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_inventory_hlc ON inventory (hlc)',
     );
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory (itemName)',
-    );
     // Custom Symptoms table
     await db.execute('''
       CREATE TABLE IF NOT EXISTS custom_symptoms (
@@ -136,233 +128,6 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_custom_symptoms_hlc ON custom_symptoms (hlc)',
     );
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('ALTER TABLE visitations ADD COLUMN suppliesUsed TEXT');
-      await db.execute('DROP TABLE IF EXISTS emergency_alerts');
-    }
-    if (oldVersion < 3) {
-      // Add CRDT columns to patients
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN hlc TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN nodeId TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        'ALTER TABLE patients ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0',
-      );
-      // Add CRDT columns to visitations
-      await db.execute(
-        "ALTER TABLE visitations ADD COLUMN hlc TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE visitations ADD COLUMN nodeId TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        'ALTER TABLE visitations ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0',
-      );
-      // Create meta table
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS meta (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      ''');
-      // Indexes
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_patients_hlc ON patients (hlc)',
-      );
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_visitations_hlc ON visitations (hlc)',
-      );
-    }
-    if (oldVersion < 4) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS stock_batches (
-          id TEXT PRIMARY KEY,
-          itemName TEXT NOT NULL,
-          quantity INTEGER NOT NULL DEFAULT 0,
-          expirationDate TEXT NOT NULL,
-          createdAt TEXT NOT NULL
-        )
-      ''');
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_batches (itemName, expirationDate)',
-      );
-    }
-    if (oldVersion < 5) {
-      // Add the 4 new name fields to patients (safely wrap in try-catch in case they already exist)
-      for (final col in ['firstName', 'lastName', 'middleName', 'extension']) {
-        try {
-          await db.execute(
-            "ALTER TABLE patients ADD COLUMN $col TEXT NOT NULL DEFAULT ''",
-          );
-        } catch (_) {}
-      }
-
-      // Basic migration: move existing patientName to firstName to avoid empty required fields
-      try {
-        await db.execute(
-          "UPDATE patients SET firstName = patientName WHERE firstName = ''",
-        );
-      } catch (_) {}
-    }
-    if (oldVersion < 6) {
-      // Add the 5 new fields to patients
-      await db.execute("ALTER TABLE patients ADD COLUMN birthdate TEXT");
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN sex TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN contactNumber TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN guardian2Name TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN guardian2Contact TEXT NOT NULL DEFAULT ''",
-      );
-    }
-    if (oldVersion < 7) {
-      // Add the 2 new JSON fields to patients
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN medicalHistory TEXT NOT NULL DEFAULT '[]'",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN vaccinationHistory TEXT NOT NULL DEFAULT '[]'",
-      );
-    }
-    if (oldVersion < 8) {
-      try {
-        await db.execute(
-          'ALTER TABLE patients ADD COLUMN "allergic to" TEXT NOT NULL DEFAULT ""',
-        );
-        await db.execute(
-          'ALTER TABLE patients ADD COLUMN "patient remarks" TEXT NOT NULL DEFAULT ""',
-        );
-      } catch (_) {}
-    }
-    if (oldVersion < 9) {
-      await db.execute(
-        'ALTER TABLE patients ADD COLUMN allergicTo TEXT NOT NULL DEFAULT ""',
-      );
-      await db.execute(
-        'ALTER TABLE patients ADD COLUMN patientRemarks TEXT NOT NULL DEFAULT ""',
-      );
-    }
-    if (oldVersion < 10) {
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'",
-      );
-    }
-    if (oldVersion < 11) {
-      // Create new inventory table
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS inventory (
-          id TEXT PRIMARY KEY,
-          itemName TEXT NOT NULL,
-          quantity INTEGER NOT NULL DEFAULT 0,
-          averageDailyUse INTEGER NOT NULL DEFAULT 0,
-          leadTime INTEGER NOT NULL DEFAULT 0,
-          safetyStock INTEGER NOT NULL DEFAULT 0,
-          createdAt TEXT NOT NULL
-        )
-      ''');
-
-      // Migrate data from stock_batches if it exists
-      try {
-        final List<Map<String, dynamic>> batchMaps = await db.query(
-          'stock_batches',
-        );
-        if (batchMaps.isNotEmpty) {
-          final summary = <String, int>{};
-          for (final row in batchMaps) {
-            final name = row['itemName'] as String;
-            final qty = row['quantity'] as int;
-            summary[name] = (summary[name] ?? 0) + qty;
-          }
-
-          for (final entry in summary.entries) {
-            await db.insert('inventory', {
-              'id': const Uuid().v4(),
-              'itemName': entry.key,
-              'quantity': entry.value,
-              'averageDailyUse': 0,
-              'leadTime': 0,
-              'safetyStock': 0,
-              'createdAt': DateTime.now().toIso8601String(),
-            });
-          }
-        }
-        await db.execute('DROP TABLE IF EXISTS stock_batches');
-      } catch (e) {
-        // Table might not exist or migration failed, continue
-      }
-    }
-    if (oldVersion < 12) {
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN role TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN department TEXT NOT NULL DEFAULT ''",
-      );
-    }
-    if (oldVersion < 13) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS custom_symptoms (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          category TEXT NOT NULL,
-          hlc TEXT NOT NULL DEFAULT '',
-          nodeId TEXT NOT NULL DEFAULT '',
-          isDeleted INTEGER NOT NULL DEFAULT 0
-        )
-      ''');
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_custom_symptoms_hlc ON custom_symptoms (hlc)',
-      );
-
-      // Rebuild inventory table
-      await db.execute('ALTER TABLE inventory RENAME TO inventory_old');
-      await db.execute('''
-        CREATE TABLE inventory (
-          id TEXT PRIMARY KEY,
-          itemName TEXT NOT NULL,
-          quantity INTEGER NOT NULL DEFAULT 0,
-          lowStockAmount INTEGER NOT NULL DEFAULT 0,
-          clinic TEXT NOT NULL DEFAULT '',
-          itemType TEXT NOT NULL DEFAULT 'piece',
-          createdAt TEXT NOT NULL,
-          hlc TEXT NOT NULL DEFAULT '',
-          nodeId TEXT NOT NULL DEFAULT '',
-          isDeleted INTEGER NOT NULL DEFAULT 0
-        )
-      ''');
-      await db.execute('''
-        INSERT INTO inventory (id, itemName, quantity, lowStockAmount, createdAt)
-        SELECT id, itemName, quantity, safetyStock, createdAt
-        FROM inventory_old
-      ''');
-      await db.execute('DROP TABLE inventory_old');
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory (itemName)',
-      );
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_inventory_hlc ON inventory (hlc)',
-      );
-    }
-    if (oldVersion < 15) {
-      try {
-        await db.execute(
-          "ALTER TABLE visitations ADD COLUMN consumedSupplies TEXT NOT NULL DEFAULT ''",
-        );
-      } catch (e) {
-        // Column might already exist if version 14 partially succeeded
-      }
-    }
   }
 
   // ── Meta (key-value store) ──────────────────────────────────────
