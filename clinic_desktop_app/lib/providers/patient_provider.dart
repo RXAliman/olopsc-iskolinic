@@ -229,8 +229,22 @@ class PatientProvider extends ChangeNotifier {
       goToVisitPage((totalVisitPages > 0 ? totalVisitPages : 1) - 1);
 
   Future<void> updateVisitation(Visitation visit) async {
+    // Before updating, get original to see if new supplies were added
+    final original = await _db.getVisitation(visit.id);
+    
     final updatedVisit = visit.copyWith(hlc: _tick());
     await _db.updateVisitation(updatedVisit);
+
+    // If it's a new consumption (not in original), deduct stock
+    if (original != null) {
+      final originalSet = original.consumedSupplies.toSet();
+      for (final supplyStr in visit.consumedSupplies) {
+        if (!originalSet.contains(supplyStr)) {
+          final id = supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+          await _inventoryProvider?.deductStock(id, 1);
+        }
+      }
+    }
     
     await loadTodayVisits();
     if (_selectedPatient?.id == visit.patientId) {
@@ -263,6 +277,7 @@ class PatientProvider extends ChangeNotifier {
     required String patientId,
     required List<String> symptoms,
     List<String> suppliesUsed = const [],
+    List<String> consumedSupplies = const [],
     required String treatment,
     required String remarks,
   }) async {
@@ -279,9 +294,11 @@ class PatientProvider extends ChangeNotifier {
     );
     await _db.insertVisitation(visit);
 
-    // Auto-deduct supplies from inventory (1 unit per supply, FEFO)
-    for (final supply in suppliesUsed) {
-      await _inventoryProvider?.deductStock(supply, 1);
+    // Conditionally deduct stock
+    for (final supplyStr in consumedSupplies) {
+      // Resolve ID if it's in ID:Name format
+      final id = supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+      await _inventoryProvider?.deductStock(id, 1);
     }
 
     await loadTodayVisits();

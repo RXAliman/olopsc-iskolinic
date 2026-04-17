@@ -5,9 +5,12 @@ import 'providers/patient_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/inventory_provider.dart';
+import 'providers/custom_symptom_provider.dart';
 import 'providers/local_server_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/security_gate.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -36,19 +39,25 @@ class _AppRootState extends State<AppRoot> {
   PatientProvider? _patientProvider;
   SyncProvider? _syncProvider;
   InventoryProvider? _inventoryProvider;
+  CustomSymptomProvider? _customSymptomProvider;
   LocalServerProvider? _localServerProvider;
+  SettingsProvider? _settingsProvider;
 
   void _onInitComplete({
     required PatientProvider patientProvider,
     required SyncProvider syncProvider,
     required InventoryProvider inventoryProvider,
+    required CustomSymptomProvider customSymptomProvider,
     required LocalServerProvider localServerProvider,
+    required SettingsProvider settingsProvider,
   }) {
     setState(() {
       _patientProvider = patientProvider;
       _syncProvider = syncProvider;
       _inventoryProvider = inventoryProvider;
+      _customSymptomProvider = customSymptomProvider;
       _localServerProvider = localServerProvider;
+      _settingsProvider = settingsProvider;
     });
   }
 
@@ -69,7 +78,9 @@ class _AppRootState extends State<AppRoot> {
       patientProvider: _patientProvider!,
       syncProvider: _syncProvider!,
       inventoryProvider: _inventoryProvider!,
+      customSymptomProvider: _customSymptomProvider!,
       localServerProvider: _localServerProvider!,
+      settingsProvider: _settingsProvider!,
     );
   }
 }
@@ -78,14 +89,18 @@ class ClinicApp extends StatelessWidget {
   final PatientProvider patientProvider;
   final SyncProvider syncProvider;
   final InventoryProvider inventoryProvider;
+  final CustomSymptomProvider customSymptomProvider;
   final LocalServerProvider localServerProvider;
+  final SettingsProvider settingsProvider;
 
   const ClinicApp({
     super.key,
     required this.patientProvider,
     required this.syncProvider,
     required this.inventoryProvider,
+    required this.customSymptomProvider,
     required this.localServerProvider,
+    required this.settingsProvider,
   });
 
   @override
@@ -96,13 +111,15 @@ class ClinicApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AnalyticsProvider()),
         ChangeNotifierProvider.value(value: syncProvider),
         ChangeNotifierProvider.value(value: inventoryProvider),
+        ChangeNotifierProvider.value(value: customSymptomProvider),
         ChangeNotifierProvider.value(value: localServerProvider),
+        ChangeNotifierProvider.value(value: settingsProvider),
       ],
       child: MaterialApp(
         title: 'IskoLinic App',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const DashboardScreen(),
+        home: const SecurityGate(child: DashboardScreen()),
       ),
     );
   }

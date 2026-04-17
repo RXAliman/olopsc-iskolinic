@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import '../models/visitation.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
@@ -20,7 +19,7 @@ import 'visitation_form_screen.dart';
 import 'analytics_screen.dart';
 import 'inventory_screen.dart';
 import 'connection_screen.dart';
-import '../constants/app_config.dart';
+import 'settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -33,7 +32,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   bool _focusSearchOnNextTab = false;
   bool _isSidebarCollapsed = false;
-  String _appVersion = '';
 
   static const double _expandedWidth = 250;
   static const double _collapsedWidth = 72;
@@ -49,6 +47,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.inventory_2_rounded, 'Inventory'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
     _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
+    _NavItem(Icons.settings_rounded, 'Settings'),
   ];
 
   @override
@@ -63,7 +62,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDashboardData();
     });
-    _loadAppVersion();
   }
 
   @override
@@ -71,13 +69,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _lifecycleListener.dispose();
     _clockTimer.cancel();
     super.dispose();
-  }
-
-  Future<void> _loadAppVersion() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      if (mounted) setState(() => _appVersion = info.version);
-    } catch (_) {}
   }
 
   Future<AppExitResponse> _handleExitRequest() async {
@@ -156,6 +147,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const AnalyticsScreen();
       case 4:
         return const ConnectionScreen();
+      case 5:
+        return const SettingsScreen();
       default:
         return _buildDashboardHome();
     }
@@ -262,15 +255,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 16),
                   ElevatedButton.icon(
                     onPressed: () async {
+                      final syncProvider = context.read<SyncProvider>();
+                      final isOffline = syncProvider.currentMode == 0;
+                      
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Reloading...'),
-                          duration: Duration(seconds: 1),
+                        SnackBar(
+                          content: Text(isOffline ? 'Refreshing local data...' : 'Reloading and syncing...'),
+                          duration: const Duration(seconds: 1),
                         ),
                       );
                       await context.read<PatientProvider>().refreshAll();
                       if (context.mounted) {
-                        context.read<SyncProvider>().forceSync();
+                        await context.read<InventoryProvider>().loadInventory();
+                      }
+                      if (context.mounted) {
+                        await context.read<AnalyticsProvider>().loadAnalytics();
+                      }
+                      if (context.mounted) {
+                        syncProvider.forceSync();
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -333,6 +335,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               data['patientName'] as String? ?? '';
                           final firstName = data['firstName'] as String? ?? '';
                           final visit = Visitation.fromMap(data);
+                          final inventoryProvider = context
+                              .read<InventoryProvider>();
 
                           return ListTile(
                             onTap: () async {
@@ -433,7 +437,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       visit.suppliesUsed.isNotEmpty) ...[
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Treatment: ${[...visit.suppliesUsed, if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',
+                                      'Intervention: ${[...visit.suppliesUsed.map((s) => s.contains(':') ? s.split(':')[1] : inventoryProvider.getFormattedSupplyName(s)), if (visit.treatment.isNotEmpty) visit.treatment].join(', ')}',
                                       style: const TextStyle(
                                         fontSize: 13,
                                         color: AppTheme.textSecondary,
@@ -576,7 +580,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               ),
                               subtitle: Text(
-                                'Current: ${item.quantity} units (ROP: ${item.reorderPoint})',
+                                'Current: ${item.quantity} units (Low Stock At: ${item.lowStockAmount})',
                               ),
                               trailing: const Icon(
                                 Icons.chevron_right_rounded,
@@ -1082,61 +1086,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                       ),
-
-                      // ── Version info (visible when expanded) ──
-                      if (!_isSidebarCollapsed && _appVersion.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'Version $_appVersion',
-                                  overflow: TextOverflow.clip,
-                                  softWrap: false,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: AppTheme.textMuted.withValues(
-                                      alpha: 0.6,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (!AppConfig.isProduction) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.warning.withValues(
-                                      alpha: 0.15,
-                                    ),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: AppTheme.warning.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'DEV',
-                                    overflow: TextOverflow.clip,
-                                    softWrap: false,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.warning,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
                     ],
                   ),
                 ),

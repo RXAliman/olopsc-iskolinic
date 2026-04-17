@@ -13,7 +13,7 @@
 #endif
 
 #define MyAppName "OLOPSC IskoLinic"
-#define MyAppPublisher "Rovic Aliman"
+#define MyAppPublisher "Iskolinic Team"
 #define MyAppExeName "olopsc-iskolinic.exe"
 #define MyAppId "{{A9F2D7E0-5B3C-4A1E-8D6F-2C9E7B4A3D1F}"
 

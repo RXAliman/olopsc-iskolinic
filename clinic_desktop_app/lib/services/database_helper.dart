@@ -4,8 +4,9 @@ import 'package:path_provider/path_provider.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
 import '../models/inventory_item.dart';
+import '../models/custom_symptom.dart';
 import '../crdt/hlc.dart';
-import 'package:uuid/uuid.dart';
+import '../constants/app_config.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -24,14 +25,10 @@ class DatabaseHelper {
     sqfliteFfiInit();
     final databaseFactory = databaseFactoryFfi;
     final dir = await getApplicationSupportDirectory();
-    final dbPath = p.join(dir.path, 'clinic.db');
+    final dbPath = p.join(dir.path, AppConfig.databaseName);
     return await databaseFactory.openDatabase(
       dbPath,
-      options: OpenDatabaseOptions(
-        version: 12,
-        onCreate: _onCreate,
-        onUpgrade: _onUpgrade,
-      ),
+      options: OpenDatabaseOptions(version: 1, onCreate: _onCreate),
     );
   }
 
@@ -74,6 +71,7 @@ class DatabaseHelper {
         dateTime TEXT NOT NULL,
         symptoms TEXT,
         suppliesUsed TEXT,
+        consumedSupplies TEXT NOT NULL DEFAULT '',
         treatment TEXT,
         remarks TEXT,
         hlc TEXT NOT NULL DEFAULT '',
@@ -101,157 +99,35 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         itemName TEXT NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 0,
-        averageDailyUse INTEGER NOT NULL DEFAULT 0,
-        leadTime INTEGER NOT NULL DEFAULT 0,
-        safetyStock INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL
+        lowStockAmount INTEGER NOT NULL DEFAULT 0,
+        clinic TEXT NOT NULL DEFAULT '',
+        itemType TEXT NOT NULL DEFAULT 'piece',
+        createdAt TEXT NOT NULL,
+        hlc TEXT NOT NULL DEFAULT '',
+        nodeId TEXT NOT NULL DEFAULT '',
+        isDeleted INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory (itemName)',
     );
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('ALTER TABLE visitations ADD COLUMN suppliesUsed TEXT');
-      await db.execute('DROP TABLE IF EXISTS emergency_alerts');
-    }
-    if (oldVersion < 3) {
-      // Add CRDT columns to patients
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN hlc TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE patients ADD COLUMN nodeId TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        'ALTER TABLE patients ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0',
-      );
-      // Add CRDT columns to visitations
-      await db.execute(
-        "ALTER TABLE visitations ADD COLUMN hlc TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        "ALTER TABLE visitations ADD COLUMN nodeId TEXT NOT NULL DEFAULT ''",
-      );
-      await db.execute(
-        'ALTER TABLE visitations ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0',
-      );
-      // Create meta table
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS meta (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-        )
-      ''');
-      // Indexes
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_patients_hlc ON patients (hlc)',
-      );
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_visitations_hlc ON visitations (hlc)',
-      );
-    }
-    if (oldVersion < 4) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS stock_batches (
-          id TEXT PRIMARY KEY,
-          itemName TEXT NOT NULL,
-          quantity INTEGER NOT NULL DEFAULT 0,
-          expirationDate TEXT NOT NULL,
-          createdAt TEXT NOT NULL
-        )
-      ''');
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_stock_item ON stock_batches (itemName, expirationDate)',
-      );
-    }
-    if (oldVersion < 5) {
-      // Add the 4 new name fields to patients (safely wrap in try-catch in case they already exist)
-      for (final col in ['firstName', 'lastName', 'middleName', 'extension']) {
-        try {
-          await db.execute("ALTER TABLE patients ADD COLUMN $col TEXT NOT NULL DEFAULT ''");
-        } catch (_) {}
-      }
-
-      // Basic migration: move existing patientName to firstName to avoid empty required fields
-      try {
-        await db.execute("UPDATE patients SET firstName = patientName WHERE firstName = ''");
-      } catch (_) {}
-    }
-    if (oldVersion < 6) {
-      // Add the 5 new fields to patients
-      await db.execute("ALTER TABLE patients ADD COLUMN birthdate TEXT");
-      await db.execute("ALTER TABLE patients ADD COLUMN sex TEXT NOT NULL DEFAULT ''");
-      await db.execute("ALTER TABLE patients ADD COLUMN contactNumber TEXT NOT NULL DEFAULT ''");
-      await db.execute("ALTER TABLE patients ADD COLUMN guardian2Name TEXT NOT NULL DEFAULT ''");
-      await db.execute("ALTER TABLE patients ADD COLUMN guardian2Contact TEXT NOT NULL DEFAULT ''");
-    }
-    if (oldVersion < 7) {
-      // Add the 2 new JSON fields to patients
-      await db.execute("ALTER TABLE patients ADD COLUMN medicalHistory TEXT NOT NULL DEFAULT '[]'");
-      await db.execute("ALTER TABLE patients ADD COLUMN vaccinationHistory TEXT NOT NULL DEFAULT '[]'");
-    }
-    if (oldVersion < 8) {
-      try {
-        await db.execute('ALTER TABLE patients ADD COLUMN "allergic to" TEXT NOT NULL DEFAULT ""');
-        await db.execute('ALTER TABLE patients ADD COLUMN "patient remarks" TEXT NOT NULL DEFAULT ""');
-      } catch (_) {}
-    }
-    if (oldVersion < 9) {
-      await db.execute('ALTER TABLE patients ADD COLUMN allergicTo TEXT NOT NULL DEFAULT ""');
-      await db.execute('ALTER TABLE patients ADD COLUMN patientRemarks TEXT NOT NULL DEFAULT ""');
-    }
-    if (oldVersion < 10) {
-      await db.execute("ALTER TABLE patients ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'");
-    }
-    if (oldVersion < 11) {
-      // Create new inventory table
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS inventory (
-          id TEXT PRIMARY KEY,
-          itemName TEXT NOT NULL,
-          quantity INTEGER NOT NULL DEFAULT 0,
-          averageDailyUse INTEGER NOT NULL DEFAULT 0,
-          leadTime INTEGER NOT NULL DEFAULT 0,
-          safetyStock INTEGER NOT NULL DEFAULT 0,
-          createdAt TEXT NOT NULL
-        )
-      ''');
-
-      // Migrate data from stock_batches if it exists
-      try {
-        final List<Map<String, dynamic>> batchMaps = await db.query('stock_batches');
-        if (batchMaps.isNotEmpty) {
-          final summary = <String, int>{};
-          for (final row in batchMaps) {
-            final name = row['itemName'] as String;
-            final qty = row['quantity'] as int;
-            summary[name] = (summary[name] ?? 0) + qty;
-          }
-
-          for (final entry in summary.entries) {
-            await db.insert('inventory', {
-              'id': const Uuid().v4(),
-              'itemName': entry.key,
-              'quantity': entry.value,
-              'averageDailyUse': 0,
-              'leadTime': 0,
-              'safetyStock': 0,
-              'createdAt': DateTime.now().toIso8601String(),
-            });
-          }
-        }
-        await db.execute('DROP TABLE IF EXISTS stock_batches');
-      } catch (e) {
-        // Table might not exist or migration failed, continue
-      }
-    }
-    if (oldVersion < 12) {
-      await db.execute("ALTER TABLE patients ADD COLUMN role TEXT NOT NULL DEFAULT ''");
-      await db.execute("ALTER TABLE patients ADD COLUMN department TEXT NOT NULL DEFAULT ''");
-    }
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_hlc ON inventory (hlc)',
+    );
+    // Custom Symptoms table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS custom_symptoms (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        hlc TEXT NOT NULL DEFAULT '',
+        nodeId TEXT NOT NULL DEFAULT '',
+        isDeleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_custom_symptoms_hlc ON custom_symptoms (hlc)',
+    );
   }
 
   // ── Meta (key-value store) ──────────────────────────────────────
@@ -421,6 +297,17 @@ class DatabaseHelper {
     );
   }
 
+  Future<Visitation?> getVisitation(String id) async {
+    final db = await database;
+    final maps = await db.query(
+      'visitations',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return Visitation.fromMap(maps.first);
+  }
+
   Future<List<Visitation>> getVisitationsForPatient(String patientId) async {
     final db = await database;
     final maps = await db.query(
@@ -483,12 +370,15 @@ class DatabaseHelper {
   }
 
   /// Gets today's visitations along with the patient's name, paginated.
-  Future<List<Map<String, dynamic>>> getTodayVisitationsPaginated(int limit, int offset) async {
+  Future<List<Map<String, dynamic>>> getTodayVisitationsPaginated(
+    int limit,
+    int offset,
+  ) async {
     final db = await database;
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).toIso8601String();
     final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
-    
+
     final maps = await db.rawQuery(
       '''
       SELECT v.*, p.patientName, p.firstName 
@@ -502,7 +392,7 @@ class DatabaseHelper {
       ''',
       [start, end, limit, offset],
     );
-    
+
     return maps;
   }
 
@@ -643,13 +533,74 @@ class DatabaseHelper {
 
   Future<List<InventoryItem>> getAllInventory() async {
     final db = await database;
-    final maps = await db.query('inventory', orderBy: 'itemName ASC');
+    final maps = await db.query(
+      'inventory',
+      where: 'isDeleted = 0',
+      orderBy: 'itemName ASC',
+    );
     return maps.map((m) => InventoryItem.fromMap(m)).toList();
   }
 
-  Future<void> deleteInventoryItem(String id) async {
+  Future<int> getInventoryCount(String query) async {
     final db = await database;
-    await db.delete('inventory', where: 'id = ?', whereArgs: [id]);
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM inventory WHERE isDeleted = 0 AND itemName LIKE ?',
+      ['%$query%'],
+    );
+    return result.first['count'] as int? ?? 0;
+  }
+
+  Future<List<InventoryItem>> searchInventoryPaginated({
+    required String query,
+    required int limit,
+    required int offset,
+    required String orderBy,
+    required bool ascending,
+  }) async {
+    final db = await database;
+    final maps = await db.query(
+      'inventory',
+      where: 'isDeleted = 0 AND itemName LIKE ?',
+      whereArgs: ['%$query%'],
+      orderBy: '$orderBy ${ascending ? 'ASC' : 'DESC'}',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+  }
+
+  Future<List<InventoryItem>> getAllInventoryItems() async {
+    final db = await database;
+    final maps = await db.query(
+      'inventory',
+      where: 'isDeleted = 0',
+      orderBy: 'itemName ASC',
+    );
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+  }
+
+  Future<List<InventoryItem>> getLowStockItems() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'inventory',
+      where: 'quantity <= lowStockAmount AND isDeleted = 0',
+      orderBy: 'itemName ASC',
+    );
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+  }
+
+  Future<void> deleteInventoryItemSoft(
+    String id, {
+    required String hlc,
+    required String nodeId,
+  }) async {
+    final db = await database;
+    await db.update(
+      'inventory',
+      {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> updateInventoryItem(InventoryItem item) async {
@@ -662,12 +613,17 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> deductStock(String itemName, int qty) async {
+  Future<int> deductStock(
+    String itemId,
+    int qty, {
+    required String hlc,
+    required String nodeId,
+  }) async {
     final db = await database;
     final List<Map<String, dynamic>> results = await db.query(
       'inventory',
-      where: 'itemName = ?',
-      whereArgs: [itemName],
+      where: 'id = ?',
+      whereArgs: [itemId],
     );
 
     if (results.isEmpty) return 0;
@@ -677,20 +633,25 @@ class DatabaseHelper {
 
     await db.update(
       'inventory',
-      {'quantity': newQty},
-      where: 'itemName = ?',
-      whereArgs: [itemName],
+      {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
+      where: 'id = ?',
+      whereArgs: [itemId],
     );
 
     return qty;
   }
 
-  Future<void> addStock(String itemName, int qty) async {
+  Future<void> addStock(
+    String itemId,
+    int qty, {
+    required String hlc,
+    required String nodeId,
+  }) async {
     final db = await database;
     final List<Map<String, dynamic>> results = await db.query(
       'inventory',
-      where: 'itemName = ?',
-      whereArgs: [itemName],
+      where: 'id = ?',
+      whereArgs: [itemId],
     );
 
     if (results.isEmpty) return;
@@ -700,9 +661,9 @@ class DatabaseHelper {
 
     await db.update(
       'inventory',
-      {'quantity': newQty},
-      where: 'itemName = ?',
-      whereArgs: [itemName],
+      {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
+      where: 'id = ?',
+      whereArgs: [itemId],
     );
   }
 
@@ -716,6 +677,116 @@ class DatabaseHelper {
       await txn.delete('inventory');
       await txn.delete('meta');
     });
+  }
+
+  // ── Custom Symptoms ───────────────────────────────────────────────
+
+  Future<int> insertCustomSymptom(CustomSymptom symptom) async {
+    final db = await database;
+    return await db.insert('custom_symptoms', symptom.toMap());
+  }
+
+  Future<List<CustomSymptom>> getCustomSymptomsByCategory(
+    String category,
+  ) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'custom_symptoms',
+      where: 'category = ? AND isDeleted = 0',
+      whereArgs: [category],
+    );
+    return maps.map((m) => CustomSymptom.fromMap(m)).toList();
+  }
+
+  Future<List<CustomSymptom>> getAllCustomSymptoms() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'custom_symptoms',
+      where: 'isDeleted = 0',
+    );
+    return maps.map((m) => CustomSymptom.fromMap(m)).toList();
+  }
+
+  Future<List<CustomSymptom>> getCustomSymptomChangesSince(
+    String sinceHlc,
+  ) async {
+    final db = await database;
+    final maps = await db.query(
+      'custom_symptoms',
+      where: 'hlc > ?',
+      whereArgs: [sinceHlc],
+      orderBy: 'hlc ASC',
+    );
+    return maps.map((m) => CustomSymptom.fromMap(m)).toList();
+  }
+
+  Future<bool> upsertCustomSymptomFromRemote(CustomSymptom remote) async {
+    final db = await database;
+    final existing = await db.query(
+      'custom_symptoms',
+      where: 'id = ?',
+      whereArgs: [remote.id],
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('custom_symptoms', remote.toMap());
+      return true;
+    }
+
+    final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
+    final remoteHlc = HLC.unpack(remote.hlc);
+
+    if (remoteHlc > localHlc) {
+      await db.update(
+        'custom_symptoms',
+        remote.toMap(),
+        where: 'id = ?',
+        whereArgs: [remote.id],
+      );
+      return true;
+    }
+    return false;
+  }
+
+  // ── Inventory CRDT ──────────────────────────────────────────────
+
+  Future<List<InventoryItem>> getInventoryChangesSince(String sinceHlc) async {
+    final db = await database;
+    final maps = await db.query(
+      'inventory',
+      where: 'hlc > ?',
+      whereArgs: [sinceHlc],
+      orderBy: 'hlc ASC',
+    );
+    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+  }
+
+  Future<bool> upsertInventoryFromRemote(InventoryItem remote) async {
+    final db = await database;
+    final existing = await db.query(
+      'inventory',
+      where: 'id = ?',
+      whereArgs: [remote.id],
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('inventory', remote.toMap());
+      return true;
+    }
+
+    final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
+    final remoteHlc = HLC.unpack(remote.hlc);
+
+    if (remoteHlc > localHlc) {
+      await db.update(
+        'inventory',
+        remote.toMap(),
+        where: 'id = ?',
+        whereArgs: [remote.id],
+      );
+      return true;
+    }
+    return false;
   }
 
   /// Close the database connection gracefully.

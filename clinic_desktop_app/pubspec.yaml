@@ -45,6 +45,9 @@ dependencies:
   shelf: ^1.4.2
   shelf_router: ^1.1.4
   package_info_plus: ^8.0.0
+  shared_preferences: ^2.5.5
+  flutter_secure_storage: ^10.0.0
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

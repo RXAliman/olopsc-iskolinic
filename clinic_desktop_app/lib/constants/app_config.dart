@@ -20,7 +20,7 @@ class AppConfig {
 
   // ── App Info ────────────────────────────────────────────────────
   static const String appName = 'OLOPSC IskoLinic';
-  static const String appPublisher = 'Rovic Aliman';
+  static const String appPublisher = 'Iskolinic Team';
 
   // ── GitHub Repository ───────────────────────────────────────────
   static const String _repoOwner = 'RXAliman';
@@ -38,5 +38,10 @@ class AppConfig {
       isProduction ? _prodVersionUrl : _devVersionUrl;
 
   // ── Sync ────────────────────────────────────────────────────────
-  static const String relayServerUrl = 'wss://olopsc-iskolinic.onrender.com/ws';
+  static String get relayServerUrl => isProduction
+      ? 'wss://olopsc-iskolinic.onrender.com/ws'
+      : 'wss://dev-olopsc-iskolinic.onrender.com/ws';
+
+  static String get databaseName =>
+      isProduction ? 'clinic.db' : 'clinic_dev.db';
 }

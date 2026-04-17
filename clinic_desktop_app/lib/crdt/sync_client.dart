@@ -19,6 +19,7 @@ enum SyncConnectionState { disconnected, connecting, connected }
 class SyncClient {
   final String wsUrl;
   final String nodeId;
+  final String? authSecret;
   final DatabaseHelper _db = DatabaseHelper.instance;
 
   WebSocketChannel? _channel;
@@ -42,7 +43,7 @@ class SyncClient {
   int _reconnectAttempts = 0;
   static const int _maxReconnectDelaySec = 30;
 
-  SyncClient({required this.wsUrl, required this.nodeId});
+  SyncClient({required this.wsUrl, required this.nodeId, this.authSecret});
 
   // ── Connection lifecycle ────────────────────────────────────────
 
@@ -156,6 +157,32 @@ class SyncClient {
       });
     }
 
+    // Send inventory
+    final inventoryItems = await _db.getInventoryChangesSince(lastSync);
+    for (int i = 0; i < inventoryItems.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, inventoryItems.length);
+      final batch = inventoryItems.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'inventory',
+        'records': batch.map((v) => v.toMap()).toList(),
+      });
+    }
+
+    // Send custom symptoms
+    final customSymptoms = await _db.getCustomSymptomChangesSince(lastSync);
+    for (int i = 0; i < customSymptoms.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, customSymptoms.length);
+      final batch = customSymptoms.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'custom_symptoms',
+        'records': batch.map((v) => v.toMap()).toList(),
+      });
+    }
+
     // Update our last sync marker
     final hlc = HLC.now(nodeId).send().pack();
     await _db.setMeta('lastSyncHlc', hlc);
@@ -199,12 +226,16 @@ class SyncClient {
           final batch = SyncBatch(
             patients: table == 'patients' ? records : [],
             visitations: table == 'visitations' ? records : [],
+            inventory: table == 'inventory' ? records : [],
+            customSymptoms: table == 'custom_symptoms' ? records : [],
           );
 
           final result = await SyncIsolate.mergeBatch(batch);
           final allChanged = {
             ...result.changedPatientIds,
             ...result.changedVisitationIds,
+            ...result.changedInventoryIds,
+            ...result.changedCustomSymptomIds,
           };
           if (allChanged.isNotEmpty) {
             onSyncComplete?.call(allChanged);
@@ -217,12 +248,23 @@ class SyncClient {
               (msg['patients'] as List?)?.cast<Map<String, dynamic>>() ?? [];
           final visitations =
               (msg['visitations'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final inventory =
+              (msg['inventory'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final customSymptoms =
+              (msg['custom_symptoms'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
-          final batch = SyncBatch(patients: patients, visitations: visitations);
+          final batch = SyncBatch(
+            patients: patients,
+            visitations: visitations,
+            inventory: inventory,
+            customSymptoms: customSymptoms,
+          );
           final result = await SyncIsolate.mergeBatch(batch);
           final allChanged = {
             ...result.changedPatientIds,
             ...result.changedVisitationIds,
+            ...result.changedInventoryIds,
+            ...result.changedCustomSymptomIds,
           };
           if (allChanged.isNotEmpty) {
             onSyncComplete?.call(allChanged);
@@ -253,6 +295,10 @@ class SyncClient {
   void _send(Map<String, dynamic> data) {
     if (_channel == null) return;
     try {
+      // Inject the secret if it exists
+      if (authSecret != null) {
+        data['authSecret'] = authSecret;
+      }
       _channel!.sink.add(jsonEncode(data));
     } catch (e) {
       debugPrint('SyncClient: send error: $e');
