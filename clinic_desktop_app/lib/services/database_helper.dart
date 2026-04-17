@@ -532,6 +532,17 @@ class DatabaseHelper {
     );
   }
 
+  Future<Visitation?> getVisitation(String id) async {
+    final db = await database;
+    final maps = await db.query(
+      'visitations',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return Visitation.fromMap(maps.first);
+  }
+
   Future<List<Visitation>> getVisitationsForPatient(String patientId) async {
     final db = await database;
     final maps = await db.query(

@@ -146,11 +146,6 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     }).toList();
 
     if (widget.visitation != null) {
-      final originalConsumed = widget.visitation!.consumedSupplies.toSet();
-      final newlyConsumed = consumedSupplies
-          .where((s) => !originalConsumed.contains(s))
-          .toList();
-
       final updated = widget.visitation!.copyWith(
         symptoms: _selectedSymptoms.toList(),
         suppliesUsed: mappedSupplies,
@@ -159,24 +154,6 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         remarks: _remarksCtrl.text.trim(),
       );
       await context.read<PatientProvider>().updateVisitation(updated);
-
-      // Deduct stock only for newly consumed supplies
-      if (newlyConsumed.isNotEmpty) {
-        for (final supplyStr in newlyConsumed) {
-          // Resolve ID if it's in ID:Name format or legacy name
-          final idPart = supplyStr.contains(':')
-              ? supplyStr.split(':')[0]
-              : supplyStr;
-          try {
-            final item = inventoryProvider.allItems.firstWhere(
-              (i) => i.id == idPart || i.itemName == idPart,
-            );
-            await inventoryProvider.deductStock(item.id, 1);
-          } catch (_) {
-            // Item not found or deleted
-          }
-        }
-      }
     } else {
       await context.read<PatientProvider>().addVisitation(
         patientId: _selectedPatient!.id,
