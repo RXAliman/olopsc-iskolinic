@@ -12,6 +12,7 @@ class SyncProvider extends ChangeNotifier {
   PatientProvider? _patientProvider;
   InventoryProvider? _inventoryProvider;
   CustomSymptomProvider? _customSymptomProvider;
+  int _currentMode = 0; // 0: Offline, 2: Relay
 
   SyncConnectionState _connectionState = SyncConnectionState.disconnected;
   SyncConnectionState get connectionState => _connectionState;
@@ -26,7 +27,9 @@ class SyncProvider extends ChangeNotifier {
     InventoryProvider inventoryProvider,
     CustomSymptomProvider customSymptomProvider, {
     String? wsUrl,
+    int initialMode = 2,
   }) async {
+    _currentMode = initialMode;
     _patientProvider = patientProvider;
     _inventoryProvider = inventoryProvider;
     _customSymptomProvider = customSymptomProvider;
@@ -61,8 +64,23 @@ class SyncProvider extends ChangeNotifier {
       debugPrint('SyncProvider: compacted $removed old tombstones');
     }
 
-    // Auto-connect to relay server
-    await connect();
+    // Auto-connect to relay server only if in Relay mode
+    if (_currentMode == 2) {
+      await connect();
+    }
+  }
+
+  /// Update the current connection mode and trigger connect/disconnect.
+  Future<void> setConnectionMode(int mode) async {
+    if (mode == _currentMode) return;
+    _currentMode = mode;
+    
+    if (mode == 2) {
+      await connect();
+    } else {
+      disconnect();
+    }
+    notifyListeners();
   }
 
   /// Manually connect to the relay server.

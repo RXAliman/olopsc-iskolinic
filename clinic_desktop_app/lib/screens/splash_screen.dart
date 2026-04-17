@@ -9,6 +9,7 @@ import '../providers/sync_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/custom_symptom_provider.dart';
 import '../providers/local_server_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/mock_data_generator.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
@@ -21,6 +22,7 @@ typedef InitCompleteCallback =
       required InventoryProvider inventoryProvider,
       required CustomSymptomProvider customSymptomProvider,
       required LocalServerProvider localServerProvider,
+      required SettingsProvider settingsProvider,
     });
 
 /// Startup splash screen that handles:
@@ -130,6 +132,11 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       // Step 1: Database & patients
       _setStatus('Loading patient database...');
+      
+      // Step 0: Settings & Persistence
+      final settingsProvider = SettingsProvider();
+      await settingsProvider.loadSettings();
+      
       final patientProvider = PatientProvider();
       await patientProvider.initCrdt();
       await patientProvider.loadPatients();
@@ -174,6 +181,7 @@ class _SplashScreenState extends State<SplashScreen>
         inventoryProvider,
         customSymptomProvider,
         wsUrl: AppConfig.relayServerUrl,
+        initialMode: settingsProvider.connectionMode,
       );
       patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());
       if (!mounted) return;
@@ -189,6 +197,7 @@ class _SplashScreenState extends State<SplashScreen>
         inventoryProvider: inventoryProvider,
         customSymptomProvider: customSymptomProvider,
         localServerProvider: localServerProvider,
+        settingsProvider: settingsProvider,
       );
     } catch (e) {
       if (mounted) {

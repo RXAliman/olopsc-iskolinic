@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_config.dart';
+import '../providers/settings_provider.dart';
+import '../providers/sync_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,10 +15,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // 0: Offline, 1: LAN, 2: Relay
-  int _connectionMode = 0;
   String _appVersion = '';
-
+  
   @override
   void initState() {
     super.initState();
@@ -47,41 +48,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // ── Connection Modes ──────────────────────────────────────────
           _buildSectionHeader('Connection Mode', Icons.sync_rounded),
           const SizedBox(height: 16),
-          RadioGroup<int>(
-            groupValue: _connectionMode,
-            onChanged: (v) {
-              if (v != null) setState(() => _connectionMode = v);
+          Consumer2<SettingsProvider, SyncProvider>(
+            builder: (context, settings, sync, _) {
+              return Container(
+                decoration: AppTheme.glassCard(),
+                child: Column(
+                  children: [
+                    _buildRadioTile(
+                      value: 1,
+                      groupValue: settings.connectionMode,
+                      title: 'Local Area Network (LAN)',
+                      subtitle:
+                          'Connect directly to other devices on the same Wi-Fi or Ethernet. Best for real-time local sync.',
+                      icon: Icons.router_rounded,
+                      disabled: true, // As requested, grayed out
+                      onChanged: null,
+                    ),
+                    const Divider(),
+                    _buildRadioTile(
+                      value: 2,
+                      groupValue: settings.connectionMode,
+                      title: 'Relay Server',
+                      subtitle:
+                          'Sync through a central secure server. Works across different networks and over the internet.',
+                      icon: Icons.cloud_done_rounded,
+                      onChanged: (v) {
+                        settings.updateConnectionMode(v);
+                        sync.setConnectionMode(v);
+                      },
+                    ),
+                    const Divider(),
+                    _buildRadioTile(
+                      value: 0,
+                      groupValue: settings.connectionMode,
+                      title: 'Work Offline',
+                      subtitle:
+                          'Keep all data on this device only. Synchronization is disabled.',
+                      icon: Icons.cloud_off_rounded,
+                      onChanged: (v) {
+                        settings.updateConnectionMode(v);
+                        sync.setConnectionMode(v);
+                      },
+                    ),
+                  ],
+                ),
+              );
             },
-            child: Container(
-              decoration: AppTheme.glassCard(),
-              child: Column(
-                children: [
-                  _buildRadioTile(
-                    value: 1,
-                    title: 'Local Area Network (LAN)',
-                    subtitle:
-                        'Connect directly to other devices on the same Wi-Fi or Ethernet. Best for real-time local sync.',
-                    icon: Icons.router_rounded,
-                  ),
-                  const Divider(),
-                  _buildRadioTile(
-                    value: 2,
-                    title: 'Relay Server',
-                    subtitle:
-                        'Sync through a central secure server. Works across different networks and over the internet.',
-                    icon: Icons.cloud_done_rounded,
-                  ),
-                  const Divider(),
-                  _buildRadioTile(
-                    value: 0,
-                    title: 'Work Offline',
-                    subtitle:
-                        'Keep all data on this device only. Synchronization is disabled.',
-                    icon: Icons.cloud_off_rounded,
-                  ),
-                ],
-              ),
-            ),
           ),
 
           const SizedBox(height: 48),
@@ -234,53 +246,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildRadioTile({
     required int value,
+    required int groupValue,
     required String title,
     required String subtitle,
     required IconData icon,
+    bool disabled = false,
+    ValueChanged<int>? onChanged,
   }) {
-    final isSelected = _connectionMode == value;
+    final isSelected = groupValue == value;
     return InkWell(
-      onTap: () => setState(() => _connectionMode = value),
+      onTap: (disabled || onChanged == null) ? null : () => onChanged(value),
       borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isSelected ? AppTheme.accent : AppTheme.cardLight,
-                borderRadius: BorderRadius.circular(12),
+      child: Opacity(
+        opacity: disabled ? 0.4 : 1.0,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.accent : AppTheme.cardLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? Colors.white : AppTheme.textMuted,
+                  size: 22,
+                ),
               ),
-              child: Icon(
-                icon,
-                color: isSelected ? Colors.white : AppTheme.textMuted,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Radio<int>(value: value, activeColor: AppTheme.accent),
-          ],
+              Radio<int>(
+                value: value,
+                groupValue: groupValue,
+                onChanged: (disabled || onChanged == null)
+                    ? null
+                    : (v) => onChanged(v!),
+                activeColor: AppTheme.accent,
+              ),
+            ],
+          ),
         ),
       ),
     );
