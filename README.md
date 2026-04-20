@@ -31,11 +31,11 @@ Precursor to the <a href="https://github.com/RXAliman/iskolinic">ISKOLINIC main 
       <sub>Researcher</sub>
     </td>
     <td align="center">
-      <b>Aiza Caballero</b><br>
+      <b>Marvin Uneta</b><br>
       <sub>Researcher</sub>
     </td>
     <td align="center">
-      <b>Marvin Uneta</b><br>
+      <b>Aiza Caballero</b><br>
       <sub>Researcher</sub>
     </td>
   </tr>
