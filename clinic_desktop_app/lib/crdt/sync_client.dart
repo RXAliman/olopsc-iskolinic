@@ -19,6 +19,7 @@ enum SyncConnectionState { disconnected, connecting, connected }
 class SyncClient {
   final String wsUrl;
   final String nodeId;
+  final String? authSecret;
   final DatabaseHelper _db = DatabaseHelper.instance;
 
   WebSocketChannel? _channel;
@@ -41,8 +42,33 @@ class SyncClient {
   // Exponential backoff for reconnect (1s → 2s → 4s → ... → max 30s)
   int _reconnectAttempts = 0;
   static const int _maxReconnectDelaySec = 30;
+  String _currentSyncMaxHlc = '';
 
-  SyncClient({required this.wsUrl, required this.nodeId});
+  SyncClient({required this.wsUrl, required this.nodeId, this.authSecret});
+
+  // ── HLC Data-Driven Safeguard ───────────────────────────────────
+
+  String _getBatchMaxHlc(List<dynamic> batchRecords, String currentMax) {
+    var max = currentMax;
+    for (final r in batchRecords) {
+      if (r is Map<String, dynamic>) {
+        final recHlc = r['hlc'] as String?;
+        if (recHlc != null && recHlc.isNotEmpty) {
+          try {
+            final unpacked = HLC.unpack(recHlc);
+            final nowMs = DateTime.now().millisecondsSinceEpoch;
+            // Sanity Check: Reject "Time Traveler" HLCs > 1 day in the future
+            if (unpacked.timestamp > nowMs + 86400000) continue;
+
+            if (max.isEmpty || unpacked > HLC.unpack(max)) {
+              max = recHlc;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+    return max;
+  }
 
   // ── Connection lifecycle ────────────────────────────────────────
 
@@ -68,6 +94,9 @@ class SyncClient {
         onDone: _onDisconnected,
         onError: (_) => _onDisconnected(),
       );
+
+      // Request Handshake for server resets
+      _send({'type': 'handshake_request', 'nodeId': nodeId});
 
       // Request initial sync — tell server our last known HLC
       await _requestSync();
@@ -156,13 +185,91 @@ class SyncClient {
       });
     }
 
-    // Update our last sync marker
-    final hlc = HLC.now(nodeId).send().pack();
-    await _db.setMeta('lastSyncHlc', hlc);
+    // Send inventory
+    final inventoryItems = await _db.getInventoryChangesSince(lastSync);
+    for (int i = 0; i < inventoryItems.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, inventoryItems.length);
+      final batch = inventoryItems.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'inventory',
+        'records': batch.map((v) => v.toMap()).toList(),
+      });
+    }
+
+    // Send custom symptoms
+    final customSymptoms = await _db.getCustomSymptomChangesSince(lastSync);
+    for (int i = 0; i < customSymptoms.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, customSymptoms.length);
+      final batch = customSymptoms.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'custom_symptoms',
+        'records': batch.map((v) => v.toMap()).toList(),
+      });
+    }
+
+    // We NO LONGER update lastSyncHlc based on our local push.
+    // Bookmarks are entirely data-driven based on incoming server batches.
+  }
+
+  Future<void> forcePushAllChanges() async {
+    if (_state != SyncConnectionState.connected) return;
+
+    final patients = await _db.getPatientChangesSince('');
+    for (int i = 0; i < patients.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, patients.length);
+      final batch = patients.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'patients',
+        'records': batch.map((p) => p.toSyncMap()).toList(),
+      });
+    }
+
+    final visitations = await _db.getVisitationChangesSince('');
+    for (int i = 0; i < visitations.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, visitations.length);
+      final batch = visitations.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'visitations',
+        'records': batch.map((v) => v.toSyncMap()).toList(),
+      });
+    }
+
+    final inventoryItems = await _db.getInventoryChangesSince('');
+    for (int i = 0; i < inventoryItems.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, inventoryItems.length);
+      final batch = inventoryItems.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'inventory',
+        'records': batch.map((v) => v.toMap()).toList(),
+      });
+    }
+
+    final customSymptoms = await _db.getCustomSymptomChangesSince('');
+    for (int i = 0; i < customSymptoms.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, customSymptoms.length);
+      final batch = customSymptoms.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'custom_symptoms',
+        'records': batch.map((v) => v.toMap()).toList(),
+      });
+    }
   }
 
   /// Request any changes we've missed from the server.
   Future<void> _requestSync() async {
+    _currentSyncMaxHlc = ''; // Reset when we begin a new request
     final lastSync = await _db.getMeta('lastSyncHlc') ?? '';
     _send({
       'type': 'sync_request',
@@ -199,12 +306,16 @@ class SyncClient {
           final batch = SyncBatch(
             patients: table == 'patients' ? records : [],
             visitations: table == 'visitations' ? records : [],
+            inventory: table == 'inventory' ? records : [],
+            customSymptoms: table == 'custom_symptoms' ? records : [],
           );
 
           final result = await SyncIsolate.mergeBatch(batch);
           final allChanged = {
             ...result.changedPatientIds,
             ...result.changedVisitationIds,
+            ...result.changedInventoryIds,
+            ...result.changedCustomSymptomIds,
           };
           if (allChanged.isNotEmpty) {
             onSyncComplete?.call(allChanged);
@@ -217,12 +328,29 @@ class SyncClient {
               (msg['patients'] as List?)?.cast<Map<String, dynamic>>() ?? [];
           final visitations =
               (msg['visitations'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final inventory =
+              (msg['inventory'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final customSymptoms =
+              (msg['custom_symptoms'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
-          final batch = SyncBatch(patients: patients, visitations: visitations);
+          // Track max HLC for data-driven bookmarking
+          _currentSyncMaxHlc = _getBatchMaxHlc(patients, _currentSyncMaxHlc);
+          _currentSyncMaxHlc = _getBatchMaxHlc(visitations, _currentSyncMaxHlc);
+          _currentSyncMaxHlc = _getBatchMaxHlc(inventory, _currentSyncMaxHlc);
+          _currentSyncMaxHlc = _getBatchMaxHlc(customSymptoms, _currentSyncMaxHlc);
+
+          final batch = SyncBatch(
+            patients: patients,
+            visitations: visitations,
+            inventory: inventory,
+            customSymptoms: customSymptoms,
+          );
           final result = await SyncIsolate.mergeBatch(batch);
           final allChanged = {
             ...result.changedPatientIds,
             ...result.changedVisitationIds,
+            ...result.changedInventoryIds,
+            ...result.changedCustomSymptomIds,
           };
           if (allChanged.isNotEmpty) {
             onSyncComplete?.call(allChanged);
@@ -237,9 +365,21 @@ class SyncClient {
               'batchSize': _batchSize,
             });
           } else {
-            // Full sync complete — update marker
-            final hlc = HLC.now(nodeId).send().pack();
-            await _db.setMeta('lastSyncHlc', hlc);
+            // Full sync complete — update marker conditionally based on received HLC
+            if (_currentSyncMaxHlc.isNotEmpty) {
+              final currentLocal = await _db.getMeta('lastSyncHlc') ?? '';
+              if (currentLocal.isEmpty || HLC.unpack(_currentSyncMaxHlc) > HLC.unpack(currentLocal)) {
+                await _db.setMeta('lastSyncHlc', _currentSyncMaxHlc);
+              }
+            }
+          }
+          break;
+          
+        case 'handshake_response':
+          final recognized = msg['recognized'] as bool? ?? true;
+          if (!recognized || (msg['server_reset'] == true)) {
+            debugPrint('Server reset indicated. Forcing full push of local data...');
+            await forcePushAllChanges();
           }
           break;
       }
@@ -253,6 +393,10 @@ class SyncClient {
   void _send(Map<String, dynamic> data) {
     if (_channel == null) return;
     try {
+      // Inject the secret if it exists
+      if (authSecret != null) {
+        data['authSecret'] = authSecret;
+      }
       _channel!.sink.add(jsonEncode(data));
     } catch (e) {
       debugPrint('SyncClient: send error: $e');

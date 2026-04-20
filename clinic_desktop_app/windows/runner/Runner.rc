@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "OLOPSC Iskolinic" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "olopsc-iskolinic" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 Rovic Aliman. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Rovic Xavier Aliman. All rights reserved." "\0"
             VALUE "OriginalFilename", "olopsc-iskolinic.exe" "\0"
             VALUE "ProductName", "OLOPSC Iskolinic" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

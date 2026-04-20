@@ -36,26 +36,35 @@ class AnalyticsProvider extends ChangeNotifier {
     }
     for (final visit in visitations) {
       for (final symptom in visit.symptoms) {
-        if (symptomMap.containsKey(symptom)) {
-          symptomMap[symptom] = symptomMap[symptom]! + 1;
-        }
+        symptomMap[symptom] = (symptomMap[symptom] ?? 0) + 1;
       }
     }
     _symptomCounts = symptomMap;
 
     // Count each supply used
     final supplyMap = <String, int>{};
-    
+
     // Initialize with all current inventory items (to show 0 counts)
     final inventory = await _db.getAllInventory();
+    final idToNameMap = <String, String>{};
     for (final item in inventory) {
-      supplyMap[item.itemName] = 0;
+      final formattedName = item.clinic.isEmpty
+          ? item.itemName
+          : "${item.itemName} (${item.clinic})";
+      supplyMap[formattedName] = 0;
+      idToNameMap[item.id] = formattedName;
     }
 
     for (final visit in visitations) {
-      for (final supply in visit.suppliesUsed) {
-        // If it's a legacy item not in current inventory or new item, still count it
-        supplyMap[supply] = (supplyMap[supply] ?? 0) + 1;
+      for (final supplyStr in visit.suppliesUsed) {
+        // Extract ID if it's in ID:Name format
+        final idPart =
+            supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+        // Resolve ID to current formatted name, or use the snapped/legacy name as fallback
+        final displayName = idToNameMap[idPart] ??
+            (supplyStr.contains(':') ? supplyStr.split(':')[1] : supplyStr);
+        
+        supplyMap[displayName] = (supplyMap[displayName] ?? 0) + 1;
       }
     }
     _supplyCounts = supplyMap;

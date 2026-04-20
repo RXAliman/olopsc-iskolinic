@@ -7,7 +7,9 @@ import '../constants/app_config.dart';
 import '../providers/patient_provider.dart';
 import '../providers/sync_provider.dart';
 import '../providers/inventory_provider.dart';
+import '../providers/custom_symptom_provider.dart';
 import '../providers/local_server_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 
@@ -17,7 +19,9 @@ typedef InitCompleteCallback =
       required PatientProvider patientProvider,
       required SyncProvider syncProvider,
       required InventoryProvider inventoryProvider,
+      required CustomSymptomProvider customSymptomProvider,
       required LocalServerProvider localServerProvider,
+      required SettingsProvider settingsProvider,
     });
 
 /// Startup splash screen that handles:
@@ -127,16 +131,14 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       // Step 1: Database & patients
       _setStatus('Loading patient database...');
+
+      // Step 2: Settings & Persistence
+      final settingsProvider = SettingsProvider();
+      await settingsProvider.loadSettings();
+
       final patientProvider = PatientProvider();
       await patientProvider.initCrdt();
       await patientProvider.loadPatients();
-      if (!mounted) return;
-
-      // Step 2: Sync service (fire-and-forget, don't block startup)
-      _setStatus('Starting sync service...');
-      final syncProvider = SyncProvider();
-      syncProvider.init(patientProvider, wsUrl: AppConfig.relayServerUrl);
-      patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());
       if (!mounted) return;
 
       // Step 3: Inventory
@@ -155,6 +157,25 @@ class _SplashScreenState extends State<SplashScreen>
       });
       if (!mounted) return;
 
+      // Step 5: Custom Symptoms
+      _setStatus('Loading custom symptoms...');
+      final customSymptomProvider = CustomSymptomProvider();
+      await customSymptomProvider.loadSymptoms();
+      if (!mounted) return;
+
+      // Step 6: Sync service (fire-and-forget, don't block startup)
+      _setStatus('Starting sync service...');
+      final syncProvider = SyncProvider();
+      syncProvider.init(
+        patientProvider,
+        inventoryProvider,
+        customSymptomProvider,
+        wsUrl: AppConfig.relayServerUrl,
+        initialMode: settingsProvider.connectionMode,
+      );
+      patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());
+      if (!mounted) return;
+
       // Brief pause so the user sees "Ready!" before the transition
       _setStatus('Ready!');
       await Future.delayed(const Duration(milliseconds: 400));
@@ -164,7 +185,9 @@ class _SplashScreenState extends State<SplashScreen>
         patientProvider: patientProvider,
         syncProvider: syncProvider,
         inventoryProvider: inventoryProvider,
+        customSymptomProvider: customSymptomProvider,
         localServerProvider: localServerProvider,
+        settingsProvider: settingsProvider,
       );
     } catch (e) {
       if (mounted) {
