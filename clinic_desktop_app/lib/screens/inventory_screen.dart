@@ -150,17 +150,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final nameCtrl = TextEditingController();
     final qtyCtrl = TextEditingController();
     final lowStockCtrl = TextEditingController();
-    String selectedClinic = 'Pre-school Clinic';
+    String selectedClinic = 'Clinic A';
     String selectedType = 'piece';
     final formKey = GlobalKey<FormState>();
 
-    final clinics = [
-      'Pre-school Clinic',
-      'Grade School Clinic',
-      'Junior High School Clinic',
-      'Senior High School Clinic',
-      'College Clinic',
-    ];
+    final clinics = ['Clinic A', 'Clinic B', 'Clinic C'];
 
     showDialog(
       context: context,
@@ -240,72 +234,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         Expanded(
                           child: TextFormField(
                             controller: qtyCtrl,
-                            decoration: InputDecoration(
-                              label: Text.rich(
-                                TextSpan(
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: 'Initial Quantity ',
-                                      style: TextStyle(
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: '*',
-                                      style: TextStyle(color: AppTheme.danger),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.inventory_2_outlined,
-                              ),
+                            decoration: const InputDecoration(
+                              labelText: 'Initial Quantity',
+                              prefixIcon: Icon(Icons.inventory_2_outlined),
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
-                            validator: (v) =>
-                                v == null || v.isEmpty ? 'Required' : null,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: TextFormField(
                             controller: lowStockCtrl,
-                            decoration: InputDecoration(
-                              label: Text.rich(
-                                TextSpan(
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: 'Low Stock At ',
-                                      style: TextStyle(
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: '*',
-                                      style: TextStyle(color: AppTheme.danger),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.warning_amber_rounded,
-                              ),
+                            decoration: const InputDecoration(
+                              labelText: 'Low Stock At',
+                              prefixIcon: Icon(Icons.warning_amber_rounded),
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
-                            validator: (v) =>
-                                v == null || v.isEmpty ? 'Required' : null,
                           ),
                         ),
                       ],
@@ -363,10 +313,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                   .read<InventoryProvider>()
                                   .addNewSupplyItem(
                                     itemName: nameCtrl.text.trim(),
-                                    initialQuantity: int.parse(qtyCtrl.text),
-                                    lowStockAmount: int.parse(
-                                      lowStockCtrl.text,
-                                    ),
+                                    initialQuantity:
+                                        int.tryParse(qtyCtrl.text) ?? 0,
+                                    lowStockAmount:
+                                        int.tryParse(lowStockCtrl.text) ?? 0,
                                     clinic: selectedClinic,
                                     itemType: selectedType,
                                   );
@@ -392,19 +342,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final lowStockCtrl = TextEditingController(
       text: item.lowStockAmount.toString(),
     );
-    String selectedClinic = item.clinic.isNotEmpty
-        ? item.clinic
-        : 'Pre-school Clinic';
+    String selectedClinic = item.clinic.isNotEmpty ? item.clinic : 'Clinic A';
     String selectedType = item.itemType.isNotEmpty ? item.itemType : 'piece';
     final formKey = GlobalKey<FormState>();
 
-    final clinics = [
-      'Pre-school Clinic',
-      'Grade School Clinic',
-      'Junior High School Clinic',
-      'Senior High School Clinic',
-      'College Clinic',
-    ];
+    final clinics = ['Clinic A', 'Clinic B', 'Clinic C'];
 
     showDialog(
       context: context,
@@ -481,30 +423,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: lowStockCtrl,
-                      decoration: InputDecoration(
-                        label: Text.rich(
-                          TextSpan(
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w400,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: 'Low Stock At ',
-                                style: TextStyle(color: AppTheme.textSecondary),
-                              ),
-                              TextSpan(
-                                text: '*',
-                                style: TextStyle(color: AppTheme.danger),
-                              ),
-                            ],
-                          ),
-                        ),
-                        prefixIcon: const Icon(Icons.warning_amber_rounded),
+                      decoration: const InputDecoration(
+                        labelText: 'Low Stock At',
+                        prefixIcon: Icon(Icons.warning_amber_rounded),
                       ),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
@@ -529,7 +453,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                       items: const [
                         DropdownMenuItem(value: 'piece', child: Text('Piece')),
-                        DropdownMenuItem(value: 'bottle', child: Text('Bottle')),
+                        DropdownMenuItem(
+                          value: 'bottle',
+                          child: Text('Bottle'),
+                        ),
                         DropdownMenuItem(value: 'roll', child: Text('Roll')),
                         DropdownMenuItem(value: 'box', child: Text('Box')),
                         DropdownMenuItem(value: 'pack', child: Text('Pack')),
@@ -554,7 +481,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             if (formKey.currentState!.validate()) {
                               final updated = item.copyWith(
                                 itemName: nameCtrl.text.trim(),
-                                lowStockAmount: int.parse(lowStockCtrl.text),
+                                lowStockAmount:
+                                    int.tryParse(lowStockCtrl.text) ?? 0,
                                 clinic: selectedClinic,
                                 itemType: selectedType,
                               );
@@ -655,7 +583,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       final qty = int.tryParse(qtyCtrl.text) ?? 0;
                       if (qty <= 0) return;
                       context.read<InventoryProvider>().deductStock(
-                        item.itemName,
+                        item.id,
                         qty,
                       );
                       Navigator.pop(ctx);
@@ -780,7 +708,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       final isOffline = syncProvider.currentMode == 0;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(isOffline ? 'Refreshing local data...' : 'Reloading and syncing...'),
+                          content: Text(
+                            isOffline
+                                ? 'Refreshing local data...'
+                                : 'Reloading and syncing...',
+                          ),
                           duration: const Duration(seconds: 1),
                         ),
                       );

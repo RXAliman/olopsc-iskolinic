@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
@@ -139,17 +140,34 @@ class _LockScreenState extends State<LockScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.textPrimary.withValues(alpha: 0.95),
-              AppTheme.textPrimary,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+      body: Focus(
+        autofocus: true,
+        onKeyEvent: (FocusNode node, KeyEvent event) {
+          if (event is KeyDownEvent) {
+            if (event.logicalKey == LogicalKeyboardKey.backspace ||
+                event.logicalKey == LogicalKeyboardKey.delete) {
+              _onDelete();
+              return KeyEventResult.handled;
+            }
+            final char = event.character;
+            if (char != null && RegExp(r'^[0-9]$').hasMatch(char)) {
+              _onKeyPress(char);
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.textPrimary.withValues(alpha: 0.95),
+                AppTheme.textPrimary,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -245,7 +263,7 @@ class _LockScreenState extends State<LockScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildKey(String value) {

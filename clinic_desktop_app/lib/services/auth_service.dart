@@ -7,9 +7,7 @@ class AuthService {
   AuthService._internal();
   static final AuthService instance = AuthService._internal();
 
-  final _storage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  final _storage = const FlutterSecureStorage(aOptions: AndroidOptions());
 
   static const String _keyPinHash = 'user_pin_hash';
   static const String _keyAdminHash = 'admin_password_hash';

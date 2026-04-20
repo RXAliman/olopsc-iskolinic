@@ -7,6 +7,7 @@ import '../constants/app_config.dart';
 import '../providers/settings_provider.dart';
 import '../providers/sync_provider.dart';
 import '../services/auth_service.dart';
+import '../services/database_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,7 +18,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '';
-  
+
   @override
   void initState() {
     super.initState();
@@ -111,9 +112,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   'Relay Sync Secret',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -121,38 +122,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 16),
-                FutureBuilder<String?>(
-                  future: AuthService.instance.getSyncSecret(),
-                  builder: (context, snapshot) {
-                    final currentSecret = snapshot.data ?? '';
-                    final controller = TextEditingController(text: currentSecret);
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.key_rounded, size: 18),
+                    label: const Text('Update Sync Secret'),
+                    onPressed: () => _showUpdateSecretDialog(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 48),
+
+          // ── Data Management ─────────────────────────────────────────────
+          _buildSectionHeader('Data Management', Icons.folder_delete_rounded),
+          const SizedBox(height: 16),
+          Container(
+            decoration: AppTheme.glassCard(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Data Retention Policy',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Automatically delete patient records securely after a specified number of years. This helps keep the database performant and secures unneeded historical data.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                Consumer<SettingsProvider>(
+                  builder: (context, settings, _) {
                     return Row(
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: controller,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              hintText: 'Enter secret key',
+                        const Text('Retention Period:'),
+                        const SizedBox(width: 16),
+                        DropdownButton<int>(
+                          value: settings.retentionYears,
+                          items: const [
+                            DropdownMenuItem(value: 5, child: Text('5 Years')),
+                            DropdownMenuItem(value: 7, child: Text('7 Years')),
+                            DropdownMenuItem(
+                              value: 10,
+                              child: Text('10 Years'),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: () async {
-                            await AuthService.instance.updateSyncSecret(controller.text);
-                            
-                            // Re-initialize sync client with the new secret immediately
-                            if (context.mounted) {
-                              Provider.of<SyncProvider>(context, listen: false)
-                                  .reconnectWithNewSecret();
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Sync secret updated and reconnecting...')),
-                              );
-                            }
+                          ],
+                          onChanged: (v) {
+                            if (v != null) settings.updateRetentionYears(v);
                           },
-                          child: const Text('UPDATE'),
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.danger,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => _showPurgeConfirmation(
+                            context,
+                            settings.retentionYears,
+                          ),
+                          icon: const Icon(
+                            Icons.delete_forever_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Delete Now'),
                         ),
                       ],
                     );
@@ -375,5 +415,130 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showUpdateSecretDialog(BuildContext context) async {
+    final controller = TextEditingController(text: '');
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Update Sync Secret'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter the new shared secret key used to authenticate with the cloud relay server.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: controller,
+                obscureText: true,
+                decoration: InputDecoration(
+                  label: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Sync Secret Key ',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.textPrimary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '*',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.danger,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Required' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                await AuthService.instance.updateSyncSecret(controller.text);
+
+                if (ctx.mounted) Navigator.pop(ctx);
+
+                if (context.mounted) {
+                  Provider.of<SyncProvider>(
+                    context,
+                    listen: false,
+                  ).reconnectWithNewSecret();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Sync secret updated and reconnecting...'),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPurgeConfirmation(BuildContext context, int years) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Data Deletion'),
+        content: Text(
+          'Are you sure you want to delete patient records and visitations older than $years years?\n\n'
+          'This action will mark the records as deleted across all synced devices. They will be permanently removed locally after 30 days.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Deleting old records...')));
+
+      await DatabaseHelper.instance.purgeOldRecords(years);
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Successfully deleted records older than $years years.',
+          ),
+        ),
+      );
+    }
   }
 }

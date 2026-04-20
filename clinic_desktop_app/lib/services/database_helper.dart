@@ -28,7 +28,11 @@ class DatabaseHelper {
     final dbPath = p.join(dir.path, AppConfig.databaseName);
     return await databaseFactory.openDatabase(
       dbPath,
-      options: OpenDatabaseOptions(version: 1, onCreate: _onCreate),
+      options: OpenDatabaseOptions(
+        version: 2,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      ),
     );
   }
 
@@ -128,6 +132,20 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_custom_symptoms_hlc ON custom_symptoms (hlc)',
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Migrate inventory clinic names to the new terminology
+      await db.execute(
+        "UPDATE inventory SET clinic = 'Clinic A' "
+        "WHERE clinic IN ('Pre-school Clinic', 'Junior High School Clinic', 'Senior High School Clinic', 'College Clinic')",
+      );
+      await db.execute(
+        "UPDATE inventory SET clinic = 'Clinic B' "
+        "WHERE clinic = 'Grade School Clinic'",
+      );
+    }
   }
 
   // ── Meta (key-value store) ──────────────────────────────────────
@@ -620,25 +638,27 @@ class DatabaseHelper {
     required String nodeId,
   }) async {
     final db = await database;
-    final List<Map<String, dynamic>> results = await db.query(
-      'inventory',
-      where: 'id = ?',
-      whereArgs: [itemId],
-    );
+    return await db.transaction<int>((txn) async {
+      final List<Map<String, dynamic>> results = await txn.query(
+        'inventory',
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
 
-    if (results.isEmpty) return 0;
+      if (results.isEmpty) return 0;
 
-    final currentQty = results.first['quantity'] as int;
-    final newQty = currentQty - qty;
+      final currentQty = results.first['quantity'] as int;
+      final newQty = currentQty - qty;
 
-    await db.update(
-      'inventory',
-      {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
-      where: 'id = ?',
-      whereArgs: [itemId],
-    );
+      await txn.update(
+        'inventory',
+        {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
 
-    return qty;
+      return qty;
+    });
   }
 
   Future<void> addStock(
@@ -648,23 +668,100 @@ class DatabaseHelper {
     required String nodeId,
   }) async {
     final db = await database;
-    final List<Map<String, dynamic>> results = await db.query(
-      'inventory',
-      where: 'id = ?',
-      whereArgs: [itemId],
-    );
+    await db.transaction((txn) async {
+      final List<Map<String, dynamic>> results = await txn.query(
+        'inventory',
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
 
-    if (results.isEmpty) return;
+      if (results.isEmpty) return;
 
-    final currentQty = results.first['quantity'] as int;
-    final newQty = currentQty + qty;
+      final currentQty = results.first['quantity'] as int;
+      final newQty = currentQty + qty;
 
-    await db.update(
-      'inventory',
-      {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
-      where: 'id = ?',
-      whereArgs: [itemId],
-    );
+      await txn.update(
+        'inventory',
+        {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+    });
+  }
+
+  Future<void> purgeOldRecords(int years) async {
+    final db = await database;
+    final thresholdDate = DateTime.now().subtract(Duration(days: years * 365));
+    final thresholdIso = thresholdDate.toIso8601String();
+
+    // Get node HLC to mark soft delete
+    final nodeIdStr = await getMeta('nodeId') ?? 'unknown';
+    final hlcStr = HLC.now(nodeIdStr).pack();
+
+    await db.transaction((txn) async {
+      // Find old patients
+      final oldPatients = await txn.query(
+        'patients',
+        columns: ['id'],
+        where: 'createdAt < ? AND isDeleted = 0',
+        whereArgs: [thresholdIso],
+      );
+
+      for (final p in oldPatients) {
+        final pid = p['id'] as String;
+        // Mark patient deleted
+        await txn.update(
+          'patients',
+          {'isDeleted': 1, 'hlc': hlcStr, 'nodeId': nodeIdStr},
+          where: 'id = ?',
+          whereArgs: [pid],
+        );
+        // Mark associated visitations deleted
+        await txn.update(
+          'visitations',
+          {'isDeleted': 1, 'hlc': hlcStr, 'nodeId': nodeIdStr},
+          where: 'patientId = ?',
+          whereArgs: [pid],
+        );
+      }
+    });
+  }
+
+  Future<void> garbageCollectTombstones() async {
+    final db = await database;
+    // 30 days in milliseconds
+    final cutoffTimestamp =
+        DateTime.now().millisecondsSinceEpoch - (30 * 24 * 60 * 60 * 1000);
+
+    await db.transaction((txn) async {
+      final tables = [
+        'patients',
+        'visitations',
+        'inventory',
+        'custom_symptoms',
+      ];
+      for (final table in tables) {
+        final deletedRecords = await txn.query(
+          table,
+          columns: ['id', 'hlc'],
+          where: 'isDeleted = 1',
+        );
+        for (final r in deletedRecords) {
+          final id = r['id'] as String;
+          final hlc = r['hlc'] as String;
+          try {
+            final unpacked = HLC.unpack(hlc);
+            // Verify timestamp is older than 30 days and valid (>0)
+            if (unpacked.timestamp > 0 &&
+                unpacked.timestamp < cutoffTimestamp) {
+              await txn.delete(table, where: 'id = ?', whereArgs: [id]);
+            }
+          } catch (e) {
+            // skip if malformed
+          }
+        }
+      }
+    });
   }
 
   // TODO: Delete this after testing
