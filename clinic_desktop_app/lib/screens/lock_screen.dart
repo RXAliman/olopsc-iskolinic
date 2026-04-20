@@ -112,7 +112,7 @@ class _LockScreenState extends State<LockScreen> {
                   passController.text,
                   newPinController.text,
                 );
-                if (mounted) {
+                if (context.mounted) {
                   if (success) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(

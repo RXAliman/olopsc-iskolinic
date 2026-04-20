@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import '../providers/sync_provider.dart';
 
 class InitialSetupScreen extends StatefulWidget {
   final VoidCallback onSetupComplete;
@@ -42,11 +44,19 @@ class _InitialSetupScreenState extends State<InitialSetupScreen> {
         adminPassword: _adminPassController.text,
         syncSecret: _syncSecretController.text,
       );
+
+      // Re-initialize the sync service with the newly created secret
+      if (mounted) {
+        Provider.of<SyncProvider>(context, listen: false).reconnectWithNewSecret();
+      }
+
       widget.onSetupComplete();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Setup failed: $e'), backgroundColor: AppTheme.danger),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Setup failed: $e'), backgroundColor: AppTheme.danger),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -137,7 +147,7 @@ class _InitialSetupScreenState extends State<InitialSetupScreen> {
                                 obscureText: _obscurePin,
                                 keyboardType: TextInputType.number,
                                 maxLength: 6,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Confirm PIN',
                                   prefixIcon: const Icon(Icons.check_circle_outline),
                                   counterText: '',
@@ -178,7 +188,7 @@ class _InitialSetupScreenState extends State<InitialSetupScreen> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _syncSecretController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Relay Sync Key',
                             prefixIcon: const Icon(Icons.vignette_rounded),
                             helperText: 'Shared secret for data synchronization.',
