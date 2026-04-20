@@ -21,6 +21,7 @@ class InventoryProvider extends ChangeNotifier {
   bool _loading = false;
   List<InventoryItem> _lowStockItems = []; // Global list of all low stock items
   List<InventoryItem> _allItems = []; // Global list of all inventory items
+  final Set<String> _pendingDeductions = {}; // Safeguard against duplicate requests
 
   List<InventoryItem> get items => _items;
   int get totalItems => _totalItems;
@@ -150,19 +151,25 @@ class InventoryProvider extends ChangeNotifier {
   }
 
   Future<void> deductStock(String itemId, int qty) async {
-    final nodeId = await NodeId.get();
-    final hlc = HLC.now(nodeId).pack();
-    await _db.deductStock(itemId, qty, hlc: hlc, nodeId: nodeId);
-    await loadInventory();
-    onLocalChange?.call();
+    if (_pendingDeductions.contains(itemId)) return;
+    _pendingDeductions.add(itemId);
+    try {
+      final nodeId = await NodeId.get();
+      final hlc = HLC.now(nodeId).pack();
+      await _db.deductStock(itemId, qty, hlc: hlc, nodeId: nodeId);
+      await loadInventory();
+      onLocalChange?.call();
+    } finally {
+      _pendingDeductions.remove(itemId);
+    }
   }
 
   /// Resolves a supply ID or a legacy name to a display string like "Alcohol (College Clinic)"
   String getFormattedSupplyName(String idOrName) {
     try {
-      final item = _items.firstWhere((i) => i.id == idOrName);
+      final item = _allItems.firstWhere((i) => i.id == idOrName);
       if (item.clinic.isEmpty) return item.itemName;
-      return "${item.itemName} (${item.clinic})";
+      return "${item.itemName} - ${item.clinic}";
     } catch (_) {
       // If not found by ID, it might be a legacy itemName string or newly deleted item
       return idOrName;
