@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/visitation.dart';
+import '../models/inventory_item.dart';
 import '../providers/patient_provider.dart';
 import '../providers/analytics_provider.dart';
 import '../providers/inventory_provider.dart';
@@ -505,90 +506,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               const SizedBox(height: 32),
 
-              // Low Stock Alerts
+              // Alerts Section (Low Stock & Expiring)
               Consumer<InventoryProvider>(
                 builder: (context, inventory, _) {
-                  final lowStock = inventory.lowStockItems;
-                  if (lowStock.isEmpty) return const SizedBox.shrink();
-
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Low Stock Alerts",
-                            style: Theme.of(context).textTheme.titleLarge,
+                          // Low Stock Column
+                          Expanded(
+                            child: _DashboardAlertSection(
+                              title: "Low Stock Alerts",
+                              items: inventory.lowStockItems,
+                              icon: Icons.warning_amber_rounded,
+                              accentColor: AppTheme.danger,
+                              onTap: () => setState(() => _selectedIndex = 2),
+                              subtitleBuilder: (item) => 'Current: ${item.quantity} (Low at: ${item.lowStockAmount})',
+                            ),
                           ),
-                          const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.danger,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${lowStock.length}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          const SizedBox(width: 24),
+                          // Expiring Column
+                          Expanded(
+                            child: _DashboardAlertSection(
+                              title: "Expiring Alerts",
+                              items: inventory.expiringItems,
+                              icon: Icons.timer_outlined,
+                              accentColor: Colors.orange,
+                              onTap: () => setState(() => _selectedIndex = 2),
+                              subtitleBuilder: (item) {
+                                final nearest = item.stocks.where((s) => s.expiryDate != null).toList()
+                                  ..sort((a,b) => a.expiryDate!.compareTo(b.expiryDate!));
+                                if (nearest.isEmpty) return 'No expiry date tracked';
+                                final exp = nearest.first.expiryDate!;
+                                return 'Earliest Expiry: ${exp.month}/${exp.year} (${nearest.first.amount} units)';
+                              },
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        decoration: AppTheme.glassCard(),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: lowStock.length,
-                          separatorBuilder: (_, __) => const Divider(
-                            height: 1,
-                            color: AppTheme.dividerColor,
-                          ),
-                          itemBuilder: (context, index) {
-                            final item = lowStock[index];
-                            return ListTile(
-                              onTap: () {
-                                setState(() {
-                                  _selectedIndex = 2; // Switch to Inventory tab
-                                });
-                              },
-                              leading: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.danger.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: AppTheme.danger,
-                                  size: 18,
-                                ),
-                              ),
-                              title: Text(
-                                item.itemName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'Current: ${item.quantity} units (Low Stock At: ${item.lowStockAmount})',
-                              ),
-                              trailing: const Icon(
-                                Icons.chevron_right_rounded,
-                                color: AppTheme.textMuted,
-                              ),
-                            );
-                          },
-                        ),
                       ),
                       const SizedBox(height: 32),
                     ],
@@ -1105,6 +1061,121 @@ class _NavItem {
   final IconData icon;
   final String label;
   _NavItem(this.icon, this.label);
+}
+
+class _DashboardAlertSection extends StatefulWidget {
+  final String title;
+  final List<InventoryItem> items;
+  final IconData icon;
+  final Color accentColor;
+  final VoidCallback onTap;
+  final String Function(InventoryItem) subtitleBuilder;
+
+  const _DashboardAlertSection({
+    required this.title,
+    required this.items,
+    required this.icon,
+    required this.accentColor,
+    required this.onTap,
+    required this.subtitleBuilder,
+  });
+
+  @override
+  State<_DashboardAlertSection> createState() => _DashboardAlertSectionState();
+}
+
+class _DashboardAlertSectionState extends State<_DashboardAlertSection> {
+  int _currentPage = 0;
+  static const int _pageSize = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+
+    final totalPages = (widget.items.length / _pageSize).ceil();
+    final start = _currentPage * _pageSize;
+    final end = (start + _pageSize) > widget.items.length ? widget.items.length : (start + _pageSize);
+    final displayedItems = widget.items.sublist(start, end);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: widget.accentColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${widget.items.length}',
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: AppTheme.glassCard(),
+          child: Column(
+            children: [
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: displayedItems.length,
+                separatorBuilder: (_, __) => const Divider(height: 1, color: AppTheme.dividerColor),
+                itemBuilder: (context, index) {
+                  final item = displayedItems[index];
+                  return ListTile(
+                    onTap: widget.onTap,
+                    leading: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: widget.accentColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(widget.icon, color: widget.accentColor, size: 18),
+                    ),
+                    title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(widget.subtitleBuilder(item), style: const TextStyle(fontSize: 12)),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 16),
+                  );
+                },
+              ),
+              if (totalPages > 1)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                        icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('${_currentPage + 1} / $totalPages', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+                        icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _SummaryCard extends StatelessWidget {

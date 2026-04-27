@@ -29,7 +29,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 3,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -132,6 +132,29 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_custom_symptoms_hlc ON custom_symptoms (hlc)',
     );
+    // Inventory Stocks table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS inventory_stocks (
+        id TEXT PRIMARY KEY,
+        itemId TEXT NOT NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        expiryDate TEXT,
+        createdAt TEXT NOT NULL,
+        hlc TEXT NOT NULL DEFAULT '',
+        nodeId TEXT NOT NULL DEFAULT '',
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (itemId) REFERENCES inventory (id)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_itemId ON inventory_stocks (itemId)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_expiry ON inventory_stocks (expiryDate)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_hlc ON inventory_stocks (hlc)',
+    );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -145,6 +168,67 @@ class DatabaseHelper {
         "UPDATE inventory SET clinic = 'Clinic B' "
         "WHERE clinic = 'Grade School Clinic'",
       );
+    }
+    if (oldVersion < 3) {
+      // 1. Create inventory_stocks table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_stocks (
+          id TEXT PRIMARY KEY,
+          itemId TEXT NOT NULL,
+          amount INTEGER NOT NULL DEFAULT 0,
+          expiryDate TEXT,
+          createdAt TEXT NOT NULL,
+          hlc TEXT NOT NULL DEFAULT '',
+          nodeId TEXT NOT NULL DEFAULT '',
+          isDeleted INTEGER NOT NULL DEFAULT 0,
+          FOREIGN KEY (itemId) REFERENCES inventory (id)
+        )
+      ''');
+
+      // 2. Migrate existing inventory to stocks
+      // We group by itemName + clinic to keep them separate per clinic as requested
+      final List<Map<String, dynamic>> items = await db.query('inventory');
+      
+      final Map<String, List<Map<String, dynamic>>> groups = {};
+      for (final item in items) {
+        final key = "${item['itemName']}_${item['clinic']}";
+        groups.putIfAbsent(key, () => []).add(item);
+      }
+
+      final now = DateTime.now().toIso8601String();
+      
+      for (final group in groups.values) {
+        // The first item in the group is our survivor
+        final survivor = group.first;
+        final survivorId = survivor['id'] as String;
+        
+        // 2a. Create a separate stock batch for EACH item in the group
+        for (final item in group) {
+          final qty = item['quantity'] as int? ?? 0;
+          if (qty > 0) {
+            await db.insert('inventory_stocks', {
+              'id': 'legacy_${item['id']}',
+              'itemId': survivorId,
+              'amount': qty,
+              'expiryDate': null,
+              'createdAt': now,
+              'hlc': item['hlc'],
+              'nodeId': item['nodeId'],
+              'isDeleted': 0,
+            });
+          }
+        }
+
+        // 2b. Delete all other items in the group from the inventory table
+        for (int i = 1; i < group.length; i++) {
+          await db.delete('inventory', where: 'id = ?', whereArgs: [group[i]['id']]);
+        }
+      }
+
+      // 3. Add indices for the new table
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_stocks_itemId ON inventory_stocks (itemId)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_stocks_expiry ON inventory_stocks (expiryDate)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_stocks_hlc ON inventory_stocks (hlc)');
     }
   }
 
@@ -551,12 +635,24 @@ class DatabaseHelper {
 
   Future<List<InventoryItem>> getAllInventory() async {
     final db = await database;
-    final maps = await db.query(
+    final itemMaps = await db.query(
       'inventory',
       where: 'isDeleted = 0',
       orderBy: 'itemName ASC',
     );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+    
+    final List<InventoryItem> items = [];
+    for (final itemMap in itemMaps) {
+      final itemId = itemMap['id'] as String;
+      final stockMaps = await db.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0',
+        whereArgs: [itemId],
+      );
+      final stocks = stockMaps.map((m) => StockBatch.fromMap(m)).toList();
+      items.add(InventoryItem.fromMap(itemMap, stocks: stocks));
+    }
+    return items;
   }
 
   Future<int> getInventoryCount(String query) async {
@@ -576,7 +672,7 @@ class DatabaseHelper {
     required bool ascending,
   }) async {
     final db = await database;
-    final maps = await db.query(
+    final itemMaps = await db.query(
       'inventory',
       where: 'isDeleted = 0 AND itemName LIKE ?',
       whereArgs: ['%$query%'],
@@ -584,27 +680,46 @@ class DatabaseHelper {
       limit: limit,
       offset: offset,
     );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+    
+    final List<InventoryItem> items = [];
+    for (final itemMap in itemMaps) {
+      final itemId = itemMap['id'] as String;
+      final stockMaps = await db.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0',
+        whereArgs: [itemId],
+      );
+      final stocks = stockMaps.map((m) => StockBatch.fromMap(m)).toList();
+      items.add(InventoryItem.fromMap(itemMap, stocks: stocks));
+    }
+    return items;
   }
 
   Future<List<InventoryItem>> getAllInventoryItems() async {
     final db = await database;
-    final maps = await db.query(
+    final itemMaps = await db.query(
       'inventory',
       where: 'isDeleted = 0',
       orderBy: 'itemName ASC',
     );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+    
+    final List<InventoryItem> items = [];
+    for (final itemMap in itemMaps) {
+      final itemId = itemMap['id'] as String;
+      final stockMaps = await db.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0',
+        whereArgs: [itemId],
+      );
+      final stocks = stockMaps.map((m) => StockBatch.fromMap(m)).toList();
+      items.add(InventoryItem.fromMap(itemMap, stocks: stocks));
+    }
+    return items;
   }
 
   Future<List<InventoryItem>> getLowStockItems() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'inventory',
-      where: 'quantity <= lowStockAmount AND isDeleted = 0',
-      orderBy: 'itemName ASC',
-    );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+    final allItems = await getAllInventoryItems();
+    return allItems.where((item) => item.isLowStock).toList();
   }
 
   Future<void> deleteInventoryItemSoft(
@@ -613,12 +728,20 @@ class DatabaseHelper {
     required String nodeId,
   }) async {
     final db = await database;
-    await db.update(
-      'inventory',
-      {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.transaction((txn) async {
+      await txn.update(
+        'inventory',
+        {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      await txn.update(
+        'inventory_stocks',
+        {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+        where: 'itemId = ?',
+        whereArgs: [id],
+      );
+    });
   }
 
   Future<void> updateInventoryItem(InventoryItem item) async {
@@ -631,6 +754,37 @@ class DatabaseHelper {
     );
   }
 
+  // ── Inventory Stock CRUD ────────────────────────────────────────
+
+  Future<void> insertStockBatch(StockBatch batch) async {
+    final db = await database;
+    await db.insert(
+      'inventory_stocks',
+      batch.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateStockBatch(StockBatch batch) async {
+    final db = await database;
+    await db.update(
+      'inventory_stocks',
+      batch.toMap(),
+      where: 'id = ?',
+      whereArgs: [batch.id],
+    );
+  }
+
+  Future<void> deleteStockBatch(String id, {required String hlc, required String nodeId}) async {
+    final db = await database;
+    await db.update(
+      'inventory_stocks',
+      {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<int> deductStock(
     String itemId,
     int qty, {
@@ -639,55 +793,52 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     return await db.transaction<int>((txn) async {
-      final List<Map<String, dynamic>> results = await txn.query(
-        'inventory',
-        where: 'id = ?',
+      // Fetch active batches, ordered by expiry date (null expiry at the end)
+      final List<Map<String, dynamic>> stockMaps = await txn.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0 AND amount > 0',
         whereArgs: [itemId],
+        orderBy: 'expiryDate ASC, createdAt ASC',
       );
 
-      if (results.isEmpty) return 0;
+      if (stockMaps.isEmpty) return 0;
 
-      final currentQty = results.first['quantity'] as int;
-      final newQty = currentQty - qty;
+      int remainingToDeduct = qty;
+      for (final map in stockMaps) {
+        if (remainingToDeduct <= 0) break;
 
-      await txn.update(
-        'inventory',
-        {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
-        where: 'id = ?',
-        whereArgs: [itemId],
-      );
+        final batchId = map['id'] as String;
+        final currentAmount = map['amount'] as int;
 
-      return qty;
+        if (currentAmount <= remainingToDeduct) {
+          // Consume whole batch
+          remainingToDeduct -= currentAmount;
+          await txn.update(
+            'inventory_stocks',
+            {'amount': 0, 'isDeleted': 0, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'id = ?',
+            whereArgs: [batchId],
+          );
+        } else {
+          // Partially consume batch
+          final newAmount = currentAmount - remainingToDeduct;
+          remainingToDeduct = 0;
+          await txn.update(
+            'inventory_stocks',
+            {'amount': newAmount, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'id = ?',
+            whereArgs: [batchId],
+          );
+        }
+      }
+
+      // Return the actual amount deducted
+      return qty - remainingToDeduct;
     });
   }
 
-  Future<void> addStock(
-    String itemId,
-    int qty, {
-    required String hlc,
-    required String nodeId,
-  }) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      final List<Map<String, dynamic>> results = await txn.query(
-        'inventory',
-        where: 'id = ?',
-        whereArgs: [itemId],
-      );
-
-      if (results.isEmpty) return;
-
-      final currentQty = results.first['quantity'] as int;
-      final newQty = currentQty + qty;
-
-      await txn.update(
-        'inventory',
-        {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
-        where: 'id = ?',
-        whereArgs: [itemId],
-      );
-    });
-  }
+  // addStock is no longer needed in this form because we use insertStockBatch
+  // to add new specific batches with expiries.
 
   Future<void> purgeOldRecords(int years) async {
     final db = await database;
@@ -877,6 +1028,47 @@ class DatabaseHelper {
     if (remoteHlc > localHlc) {
       await db.update(
         'inventory',
+        remote.toMap(),
+        where: 'id = ?',
+        whereArgs: [remote.id],
+      );
+      return true;
+    }
+    return false;
+  }
+
+  // ── Inventory Stocks CRDT ──────────────────────────────────────
+
+  Future<List<StockBatch>> getInventoryStockChangesSince(String sinceHlc) async {
+    final db = await database;
+    final maps = await db.query(
+      'inventory_stocks',
+      where: 'hlc > ?',
+      whereArgs: [sinceHlc],
+      orderBy: 'hlc ASC',
+    );
+    return maps.map((m) => StockBatch.fromMap(m)).toList();
+  }
+
+  Future<bool> upsertInventoryStockFromRemote(StockBatch remote) async {
+    final db = await database;
+    final existing = await db.query(
+      'inventory_stocks',
+      where: 'id = ?',
+      whereArgs: [remote.id],
+    );
+
+    if (existing.isEmpty) {
+      await db.insert('inventory_stocks', remote.toMap());
+      return true;
+    }
+
+    final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
+    final remoteHlc = HLC.unpack(remote.hlc);
+
+    if (remoteHlc > localHlc) {
+      await db.update(
+        'inventory_stocks',
         remote.toMap(),
         where: 'id = ?',
         whereArgs: [remote.id],

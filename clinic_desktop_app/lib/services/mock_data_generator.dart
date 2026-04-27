@@ -423,16 +423,25 @@ class MockDataGenerator {
 
       for (int i = 0; i < subsetCount; i++) {
         final supply = supplies[i];
+        final itemId = _uuid.v4();
         items.add(
           InventoryItem(
-            id: _uuid.v4(),
+            id: itemId,
             itemName: supply['name']!,
-            quantity: 5 + _random.nextInt(96), // 5–100
             lowStockAmount: 3 + _random.nextInt(8), // 3–10
             clinic: clinic,
             itemType: supply['type']!,
             hlc: HLC.now('mock-node').toString(),
             nodeId: 'mock-node',
+            stocks: [
+              StockBatch(
+                id: _uuid.v4(),
+                itemId: itemId,
+                amount: 5 + _random.nextInt(96),
+                hlc: HLC.now('mock-node').toString(),
+                nodeId: 'mock-node',
+              ),
+            ],
           ),
         );
       }
@@ -454,6 +463,9 @@ class MockDataGenerator {
     final inventoryItems = _generateInventory();
     for (final item in inventoryItems) {
       await db.insertInventoryItem(item);
+      for (final stock in item.stocks) {
+        await db.insertStockBatch(stock);
+      }
     }
 
     final patients = generate(count: count);

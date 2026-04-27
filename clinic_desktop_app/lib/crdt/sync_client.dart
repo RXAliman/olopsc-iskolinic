@@ -194,7 +194,20 @@ class SyncClient {
         'type': 'sync_push',
         'nodeId': nodeId,
         'table': 'inventory',
-        'records': batch.map((v) => v.toMap()).toList(),
+        'records': batch.map((v) => v.toSyncMap()).toList(),
+      });
+    }
+
+    // Send inventory stocks
+    final inventoryStocks = await _db.getInventoryStockChangesSince(lastSync);
+    for (int i = 0; i < inventoryStocks.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, inventoryStocks.length);
+      final batch = inventoryStocks.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'inventory_stocks',
+        'records': batch.map((v) => v.toSyncMap()).toList(),
       });
     }
 
@@ -250,7 +263,19 @@ class SyncClient {
         'type': 'sync_push',
         'nodeId': nodeId,
         'table': 'inventory',
-        'records': batch.map((v) => v.toMap()).toList(),
+        'records': batch.map((v) => v.toSyncMap()).toList(),
+      });
+    }
+
+    final inventoryStocks = await _db.getInventoryStockChangesSince('');
+    for (int i = 0; i < inventoryStocks.length; i += _batchSize) {
+      final end = (i + _batchSize).clamp(0, inventoryStocks.length);
+      final batch = inventoryStocks.sublist(i, end);
+      _send({
+        'type': 'sync_push',
+        'nodeId': nodeId,
+        'table': 'inventory_stocks',
+        'records': batch.map((v) => v.toSyncMap()).toList(),
       });
     }
 
@@ -307,6 +332,7 @@ class SyncClient {
             patients: table == 'patients' ? records : [],
             visitations: table == 'visitations' ? records : [],
             inventory: table == 'inventory' ? records : [],
+            inventoryStocks: table == 'inventory_stocks' ? records : [],
             customSymptoms: table == 'custom_symptoms' ? records : [],
           );
 
@@ -330,6 +356,8 @@ class SyncClient {
               (msg['visitations'] as List?)?.cast<Map<String, dynamic>>() ?? [];
           final inventory =
               (msg['inventory'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final inventoryStocks =
+              (msg['inventory_stocks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
           final customSymptoms =
               (msg['custom_symptoms'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
@@ -337,12 +365,14 @@ class SyncClient {
           _currentSyncMaxHlc = _getBatchMaxHlc(patients, _currentSyncMaxHlc);
           _currentSyncMaxHlc = _getBatchMaxHlc(visitations, _currentSyncMaxHlc);
           _currentSyncMaxHlc = _getBatchMaxHlc(inventory, _currentSyncMaxHlc);
+          _currentSyncMaxHlc = _getBatchMaxHlc(inventoryStocks, _currentSyncMaxHlc);
           _currentSyncMaxHlc = _getBatchMaxHlc(customSymptoms, _currentSyncMaxHlc);
 
           final batch = SyncBatch(
             patients: patients,
             visitations: visitations,
             inventory: inventory,
+            inventoryStocks: inventoryStocks,
             customSymptoms: customSymptoms,
           );
           final result = await SyncIsolate.mergeBatch(batch);

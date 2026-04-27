@@ -20,6 +20,7 @@ class InventoryProvider extends ChangeNotifier {
   bool _sortAscending = true;
   bool _loading = false;
   List<InventoryItem> _lowStockItems = []; // Global list of all low stock items
+  List<InventoryItem> _expiringItems = []; // Items with stocks expiring in < 3 months
   List<InventoryItem> _allItems = []; // Global list of all inventory items
   final Set<String> _pendingDeductions = {}; // Safeguard against duplicate requests
 
@@ -33,6 +34,7 @@ class InventoryProvider extends ChangeNotifier {
   bool get sortAscending => _sortAscending;
   bool get loading => _loading;
   List<InventoryItem> get lowStockItems => _lowStockItems;
+  List<InventoryItem> get expiringItems => _expiringItems;
   List<InventoryItem> get allItems => _allItems;
 
   Future<void> loadInventory() async {
@@ -50,21 +52,49 @@ class InventoryProvider extends ChangeNotifier {
     );
     
     _totalItems = await _db.getInventoryCount(_searchQuery);
-    _lowStockItems = await _db.getLowStockItems();
+    
+    // Refresh global lists for dashboard/helpers
     _allItems = await _db.getAllInventoryItems();
+    _lowStockItems = _allItems.where((i) => i.isLowStock).toList();
+    _updateExpiringItems();
     
     _loading = false;
     notifyListeners();
   }
 
+  void _updateExpiringItems() {
+    final now = DateTime.now();
+    final threshold = now.add(const Duration(days: 90)); // ~3 months
+
+    _expiringItems = _allItems.where((item) {
+      return item.stocks.any((stock) {
+        if (stock.expiryDate == null || stock.isDeleted || stock.amount <= 0) return false;
+        return stock.expiryDate!.isBefore(threshold);
+      });
+    }).toList();
+
+    // Sort expiring items by the earliest expiry date found in their stocks
+    _expiringItems.sort((a, b) {
+      final aEarliest = a.stocks
+          .where((s) => !s.isDeleted && s.amount > 0 && s.expiryDate != null)
+          .fold<DateTime?>(null, (min, s) => min == null || s.expiryDate!.isBefore(min) ? s.expiryDate : min);
+      final bEarliest = b.stocks
+          .where((s) => !s.isDeleted && s.amount > 0 && s.expiryDate != null)
+          .fold<DateTime?>(null, (min, s) => min == null || s.expiryDate!.isBefore(min) ? s.expiryDate : min);
+      
+      if (aEarliest == null) return 1;
+      if (bEarliest == null) return -1;
+      return aEarliest.compareTo(bEarliest);
+    });
+  }
+
   String _getSortColumn(int index) {
     switch (index) {
       case 0: return 'itemName';
-      case 1: return 'quantity';
+      case 1: return 'itemName'; // quantity is derived now, sort by name or we could do something more complex
       case 2: return 'clinic';
       case 3: return 'itemType';
       case 4: return 'lowStockAmount';
-      case 5: return '(quantity <= lowStockAmount)';
       default: return 'itemName';
     }
   }
@@ -108,18 +138,19 @@ class InventoryProvider extends ChangeNotifier {
 
   Future<void> addNewSupplyItem({
     required String itemName,
-    required int initialQuantity,
     required int lowStockAmount,
     required String clinic,
     required String itemType,
+    int? initialStockAmount,
+    DateTime? initialExpiry,
   }) async {
     final nodeId = await NodeId.get();
     final hlc = HLC.now(nodeId).pack();
+    final itemId = const Uuid().v4();
 
     final item = InventoryItem(
-      id: const Uuid().v4(),
+      id: itemId,
       itemName: itemName,
-      quantity: initialQuantity,
       lowStockAmount: lowStockAmount,
       clinic: clinic,
       itemType: itemType,
@@ -127,6 +158,19 @@ class InventoryProvider extends ChangeNotifier {
       nodeId: nodeId,
     );
     await _db.insertInventoryItem(item);
+
+    if (initialStockAmount != null && initialStockAmount > 0) {
+      final stock = StockBatch(
+        id: const Uuid().v4(),
+        itemId: itemId,
+        amount: initialStockAmount,
+        expiryDate: initialExpiry,
+        hlc: hlc,
+        nodeId: nodeId,
+      );
+      await _db.insertStockBatch(stock);
+    }
+
     await loadInventory();
     onLocalChange?.call();
   }
@@ -142,10 +186,42 @@ class InventoryProvider extends ChangeNotifier {
     onLocalChange?.call();
   }
 
-  Future<void> addStock(String itemId, int qty) async {
+  Future<void> addStockBatch({
+    required String itemId,
+    required int amount,
+    DateTime? expiryDate,
+  }) async {
     final nodeId = await NodeId.get();
     final hlc = HLC.now(nodeId).pack();
-    await _db.addStock(itemId, qty, hlc: hlc, nodeId: nodeId);
+
+    final stock = StockBatch(
+      id: const Uuid().v4(),
+      itemId: itemId,
+      amount: amount,
+      expiryDate: expiryDate,
+      hlc: hlc,
+      nodeId: nodeId,
+    );
+    await _db.insertStockBatch(stock);
+    await loadInventory();
+    onLocalChange?.call();
+  }
+
+  Future<void> updateStockBatch(StockBatch stock) async {
+    final nodeId = await NodeId.get();
+    final updated = stock.copyWith(
+      hlc: HLC.now(nodeId).pack(),
+      nodeId: nodeId,
+    );
+    await _db.updateStockBatch(updated);
+    await loadInventory();
+    onLocalChange?.call();
+  }
+
+  Future<void> deleteStockBatch(String id) async {
+    final nodeId = await NodeId.get();
+    final hlc = HLC.now(nodeId).pack();
+    await _db.deleteStockBatch(id, hlc: hlc, nodeId: nodeId);
     await loadInventory();
     onLocalChange?.call();
   }
@@ -156,6 +232,7 @@ class InventoryProvider extends ChangeNotifier {
     try {
       final nodeId = await NodeId.get();
       final hlc = HLC.now(nodeId).pack();
+      // FIFO deduction logic is implemented inside DatabaseHelper.deductStock
       await _db.deductStock(itemId, qty, hlc: hlc, nodeId: nodeId);
       await loadInventory();
       onLocalChange?.call();
