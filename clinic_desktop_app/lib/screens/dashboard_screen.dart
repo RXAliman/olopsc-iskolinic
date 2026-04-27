@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:ui';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -258,10 +257,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onPressed: () async {
                       final syncProvider = context.read<SyncProvider>();
                       final isOffline = syncProvider.currentMode == 0;
-                      
+
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(isOffline ? 'Refreshing local data...' : 'Reloading and syncing...'),
+                          content: Text(
+                            isOffline
+                                ? 'Refreshing local data...'
+                                : 'Reloading and syncing...',
+                          ),
                           duration: const Duration(seconds: 1),
                         ),
                       );
@@ -523,7 +526,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               icon: Icons.warning_amber_rounded,
                               accentColor: AppTheme.danger,
                               onTap: () => setState(() => _selectedIndex = 2),
-                              subtitleBuilder: (item) => 'Current: ${item.quantity} (Low at: ${item.lowStockAmount})',
+                              subtitleBuilder: (item) =>
+                                  'Current: ${item.quantity} (Low at: ${item.lowStockAmount})',
                             ),
                           ),
                           const SizedBox(width: 24),
@@ -536,9 +540,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               accentColor: Colors.orange,
                               onTap: () => setState(() => _selectedIndex = 2),
                               subtitleBuilder: (item) {
-                                final nearest = item.stocks.where((s) => s.expiryDate != null).toList()
-                                  ..sort((a,b) => a.expiryDate!.compareTo(b.expiryDate!));
-                                if (nearest.isEmpty) return 'No expiry date tracked';
+                                final nearest =
+                                    item.stocks
+                                        .where((s) => s.expiryDate != null)
+                                        .toList()
+                                      ..sort(
+                                        (a, b) => a.expiryDate!.compareTo(
+                                          b.expiryDate!,
+                                        ),
+                                      );
+                                if (nearest.isEmpty) {
+                                  return 'No expiry date tracked';
+                                }
                                 final exp = nearest.first.expiryDate!;
                                 return 'Earliest Expiry: ${exp.month}/${exp.year} (${nearest.first.amount} units)';
                               },
@@ -782,68 +795,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           builder: (context, sync, _) {
                             final isConnected = sync.isConnected;
                             final isConnecting = sync.isConnecting;
-                            return SizedBox(
-                              width: 120,
-                              child: Align(
-                                alignment: Alignment.center,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (isConnected)
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            const SpinKitPulse(
-                                              color: Colors.greenAccent,
-                                              size: 18,
-                                              duration: Duration(
-                                                milliseconds: 2000,
-                                              ),
-                                            ),
-                                            Container(
-                                              width: 8,
-                                              height: 8,
-                                              decoration: const BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: Colors.greenAccent,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    else
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: isConnecting
-                                              ? Colors.orangeAccent
-                                              : AppTheme.textMuted,
-                                        ),
-                                      ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      isConnected
-                                          ? 'Online'
-                                          : isConnecting
-                                          ? 'Connecting...'
-                                          : 'Offline',
-                                      style: TextStyle(
-                                        color: isConnected
-                                            ? Colors.green
-                                            : isConnecting
-                                            ? Colors.orange
-                                            : AppTheme.textMuted,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+
+                            final Color bgColor;
+                            final String label;
+                            final IconData icon;
+
+                            if (isConnected) {
+                              bgColor = Colors.green;
+                              label = 'Online';
+                              icon = Icons.cloud_done_rounded;
+                            } else if (isConnecting) {
+                              bgColor = Colors.orange;
+                              label = 'Connecting';
+                              icon = Icons.cloud_sync_rounded;
+                            } else {
+                              bgColor = AppTheme.textMuted;
+                              label = 'Offline';
+                              icon = Icons.cloud_off_rounded;
+                            }
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: bgColor,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(icon, size: 16, color: Colors.white),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    label,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             );
                           },
@@ -1090,11 +1083,40 @@ class _DashboardAlertSectionState extends State<_DashboardAlertSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.items.isEmpty) return const SizedBox.shrink();
+    if (widget.items.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            decoration: AppTheme.glassCard(),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: Colors.green.shade400,
+                  size: 36,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'All clear — no alerts',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     final totalPages = (widget.items.length / _pageSize).ceil();
     final start = _currentPage * _pageSize;
-    final end = (start + _pageSize) > widget.items.length ? widget.items.length : (start + _pageSize);
+    final end = (start + _pageSize) > widget.items.length
+        ? widget.items.length
+        : (start + _pageSize);
     final displayedItems = widget.items.sublist(start, end);
 
     return Column(
@@ -1112,7 +1134,11 @@ class _DashboardAlertSectionState extends State<_DashboardAlertSection> {
               ),
               child: Text(
                 '${widget.items.length}',
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -1126,7 +1152,8 @@ class _DashboardAlertSectionState extends State<_DashboardAlertSection> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: displayedItems.length,
-                separatorBuilder: (_, __) => const Divider(height: 1, color: AppTheme.dividerColor),
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: AppTheme.dividerColor),
                 itemBuilder: (context, index) {
                   final item = displayedItems[index];
                   return ListTile(
@@ -1138,11 +1165,25 @@ class _DashboardAlertSectionState extends State<_DashboardAlertSection> {
                         color: widget.accentColor.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(widget.icon, color: widget.accentColor, size: 18),
+                      child: Icon(
+                        widget.icon,
+                        color: widget.accentColor,
+                        size: 18,
+                      ),
                     ),
-                    title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(widget.subtitleBuilder(item), style: const TextStyle(fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 16),
+                    title: Text(
+                      item.itemName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      widget.subtitleBuilder(item),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppTheme.textMuted,
+                      size: 16,
+                    ),
                   );
                 },
               ),
@@ -1153,16 +1194,26 @@ class _DashboardAlertSectionState extends State<_DashboardAlertSection> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                        onPressed: _currentPage > 0
+                            ? () => setState(() => _currentPage--)
+                            : null,
                         icon: const Icon(Icons.chevron_left_rounded, size: 20),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 12),
-                      Text('${_currentPage + 1} / $totalPages', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      Text(
+                        '${_currentPage + 1} / $totalPages',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       IconButton(
-                        onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+                        onPressed: _currentPage < totalPages - 1
+                            ? () => setState(() => _currentPage++)
+                            : null,
                         icon: const Icon(Icons.chevron_right_rounded, size: 20),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),

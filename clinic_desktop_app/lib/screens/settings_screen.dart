@@ -54,45 +54,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
             builder: (context, settings, sync, _) {
               return Container(
                 decoration: AppTheme.glassCard(),
-                child: Column(
-                  children: [
-                    _buildRadioTile(
-                      value: 1,
-                      groupValue: settings.connectionMode,
-                      title: 'Local Area Network (LAN)',
-                      subtitle:
-                          'Connect directly to other devices on the same Wi-Fi or Ethernet. Best for real-time local sync.',
-                      icon: Icons.router_rounded,
-                      disabled: true, // As requested, grayed out
-                      onChanged: null,
-                    ),
-                    const Divider(),
-                    _buildRadioTile(
-                      value: 2,
-                      groupValue: settings.connectionMode,
-                      title: 'Relay Server',
-                      subtitle:
-                          'Sync through a central secure server. Works across different networks and over the internet.',
-                      icon: Icons.cloud_done_rounded,
-                      onChanged: (v) {
-                        settings.updateConnectionMode(v);
-                        sync.setConnectionMode(v);
-                      },
-                    ),
-                    const Divider(),
-                    _buildRadioTile(
-                      value: 0,
-                      groupValue: settings.connectionMode,
-                      title: 'Work Offline',
-                      subtitle:
-                          'Keep all data on this device only. Synchronization is disabled.',
-                      icon: Icons.cloud_off_rounded,
-                      onChanged: (v) {
-                        settings.updateConnectionMode(v);
-                        sync.setConnectionMode(v);
-                      },
-                    ),
-                  ],
+                child: RadioGroup<int>(
+                  groupValue: settings.connectionMode,
+                  onChanged: (v) {
+                    if (v == null || v == 1) return; // LAN is disabled
+                    settings.updateConnectionMode(v);
+                    sync.setConnectionMode(v);
+                  },
+                  child: Column(
+                    children: [
+                      _buildRadioTile(
+                        value: 1,
+                        isSelected: settings.connectionMode == 1,
+                        title: 'Local Area Network (LAN)',
+                        subtitle:
+                            'Connect directly to other devices on the same Wi-Fi or Ethernet. Best for real-time local sync.',
+                        icon: Icons.router_rounded,
+                        disabled: true, // As requested, grayed out
+                        onTap: null,
+                      ),
+                      const Divider(),
+                      _buildRadioTile(
+                        value: 2,
+                        isSelected: settings.connectionMode == 2,
+                        title: 'Relay Server',
+                        subtitle:
+                            'Sync through a central secure server. Works across different networks and over the internet.',
+                        icon: Icons.cloud_done_rounded,
+                        onTap: () {
+                          settings.updateConnectionMode(2);
+                          sync.setConnectionMode(2);
+                        },
+                      ),
+                      const Divider(),
+                      _buildRadioTile(
+                        value: 0,
+                        isSelected: settings.connectionMode == 0,
+                        title: 'Work Offline',
+                        subtitle:
+                            'Keep all data on this device only. Synchronization is disabled.',
+                        icon: Icons.cloud_off_rounded,
+                        onTap: () {
+                          settings.updateConnectionMode(0);
+                          sync.setConnectionMode(0);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -160,39 +168,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 16),
                 Consumer<SettingsProvider>(
                   builder: (context, settings, _) {
-                    return Row(
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Retention Period:'),
-                        const SizedBox(width: 16),
-                        DropdownButton<int>(
-                          value: settings.retentionYears,
-                          items: const [
-                            DropdownMenuItem(value: 5, child: Text('5 Years')),
-                            DropdownMenuItem(value: 7, child: Text('7 Years')),
-                            DropdownMenuItem(
-                              value: 10,
-                              child: Text('10 Years'),
+                        Row(
+                          children: [
+                            const Text('Retention Period:'),
+                            const SizedBox(width: 16),
+                            DropdownButton<int>(
+                              value: settings.retentionYears,
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 5,
+                                  child: Text('5 Years'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 7,
+                                  child: Text('7 Years'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 10,
+                                  child: Text('10 Years'),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v != null) settings.updateRetentionYears(v);
+                              },
+                            ),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.danger,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () => _showPurgeConfirmation(
+                                context,
+                                settings.retentionYears,
+                              ),
+                              icon: const Icon(
+                                Icons.delete_forever_rounded,
+                                size: 18,
+                              ),
+                              label: const Text('Delete Now'),
                             ),
                           ],
-                          onChanged: (v) {
-                            if (v != null) settings.updateRetentionYears(v);
-                          },
                         ),
-                        const Spacer(),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.danger,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () => _showPurgeConfirmation(
-                            context,
+                        const SizedBox(height: 12),
+                        FutureBuilder<int>(
+                          future: DatabaseHelper.instance.countOldRecords(
                             settings.retentionYears,
                           ),
-                          icon: const Icon(
-                            Icons.delete_forever_rounded,
-                            size: 18,
-                          ),
-                          label: const Text('Delete Now'),
+                          builder: (context, snapshot) {
+                            final count = snapshot.data ?? 0;
+                            final isLoading =
+                                snapshot.connectionState ==
+                                ConnectionState.waiting;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: count > 0
+                                    ? AppTheme.danger.withValues(alpha: 0.08)
+                                    : Colors.green.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: count > 0
+                                      ? AppTheme.danger.withValues(alpha: 0.2)
+                                      : Colors.green.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    count > 0
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.check_circle_outline,
+                                    size: 18,
+                                    color: count > 0
+                                        ? AppTheme.danger
+                                        : Colors.green,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    isLoading
+                                        ? 'Counting old records...'
+                                        : count > 0
+                                        ? '$count patient record${count == 1 ? '' : 's'} older than ${settings.retentionYears} years'
+                                        : 'No patient records older than ${settings.retentionYears} years',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: count > 0
+                                          ? AppTheme.danger
+                                          : Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ],
                     );
@@ -221,8 +297,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text('The ISKOLINIC Core Development Team'),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                Table(
+                  children: [
+                    TableRow(
+                      children: [
+                        _buildDevAvatar('assets/dev-rovic.png'),
+                        _buildDevAvatar('assets/dev-ac.png'),
+                        _buildDevAvatar('assets/dev-marvin.jpg'),
+                        _buildDevAvatar('assets/dev-aiza.jpg'),
+                      ],
+                    ),
+                    TableRow(
+                      children: [
+                        _buildDevName('Rovic Aliman'),
+                        _buildDevName('Amparito Orticio'),
+                        _buildDevName('Marvin Uneta'),
+                        _buildDevName('Aiza Caballero'),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
 
                 Text(
                   'License',
@@ -238,23 +334,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'MIT License\n\n'
-                    'Copyright (c) 2026 Rovic Xavier Aliman\n\n'
-                    'Permission is hereby granted, free of charge, to any person obtaining a copy '
-                    'of this software and associated documentation files (the "Software"), to deal '
-                    'in the Software without restriction, including without limitation the rights '
-                    'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell '
-                    'copies of the Software, and to permit persons to whom the Software is '
-                    'furnished to do so, subject to the following conditions:\n\n'
-                    'The above copyright notice and this permission notice shall be included in all '
-                    'copies or substantial portions of the Software.\n\n'
-                    'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR '
-                    'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, '
-                    'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE '
-                    'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER '
-                    'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, '
-                    'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE '
-                    'SOFTWARE.',
+                    'Copyright (c) 2026 IskoLinic Team\n'
+                    'All Rights Reserved\n\n'
+                    'This software and associated documentation files (the "Software") are proprietary. '
+                    'The Software may not be copied, modified, distributed, or used without the express '
+                    'written permission of the author.',
                     style: GoogleFonts.robotoMono(
                       fontSize: 12,
                       color: AppTheme.textSecondary,
@@ -270,7 +354,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       showLicensePage(
                         context: context,
                         applicationName: 'ISKOLINIC',
-                        applicationVersion: '1.0.0',
+                        applicationVersion: _appVersion,
                         applicationIcon: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Image.asset(
@@ -352,16 +436,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildRadioTile({
     required int value,
-    required int groupValue,
+    required bool isSelected,
     required String title,
     required String subtitle,
     required IconData icon,
     bool disabled = false,
-    ValueChanged<int>? onChanged,
+    VoidCallback? onTap,
   }) {
-    final isSelected = groupValue == value;
     return InkWell(
-      onTap: (disabled || onChanged == null) ? null : () => onChanged(value),
+      onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(12),
       child: Opacity(
         opacity: disabled ? 0.4 : 1.0,
@@ -402,14 +485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
-              Radio<int>(
-                value: value,
-                groupValue: groupValue,
-                onChanged: (disabled || onChanged == null)
-                    ? null
-                    : (v) => onChanged(v!),
-                activeColor: AppTheme.accent,
-              ),
+              Radio<int>(value: value, activeColor: AppTheme.accent),
             ],
           ),
         ),
@@ -540,5 +616,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
     }
+  }
+
+  Widget _buildDevAvatar(String assetPath) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: Center(
+        child: Container(
+          width: 110,
+          height: 110,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppTheme.accent.withValues(alpha: 0.2),
+              width: 2,
+            ),
+            image: DecorationImage(
+              image: AssetImage(assetPath),
+              fit: BoxFit.cover,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDevName(String name) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Text(
+        name,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      ),
+    );
   }
 }

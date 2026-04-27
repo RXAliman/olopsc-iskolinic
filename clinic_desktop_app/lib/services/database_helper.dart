@@ -188,7 +188,7 @@ class DatabaseHelper {
       // 2. Migrate existing inventory to stocks
       // We group by itemName + clinic to keep them separate per clinic as requested
       final List<Map<String, dynamic>> items = await db.query('inventory');
-      
+
       final Map<String, List<Map<String, dynamic>>> groups = {};
       for (final item in items) {
         final key = "${item['itemName']}_${item['clinic']}";
@@ -196,12 +196,12 @@ class DatabaseHelper {
       }
 
       final now = DateTime.now().toIso8601String();
-      
+
       for (final group in groups.values) {
         // The first item in the group is our survivor
         final survivor = group.first;
         final survivorId = survivor['id'] as String;
-        
+
         // 2a. Create a separate stock batch for EACH item in the group
         for (final item in group) {
           final qty = item['quantity'] as int? ?? 0;
@@ -221,14 +221,24 @@ class DatabaseHelper {
 
         // 2b. Delete all other items in the group from the inventory table
         for (int i = 1; i < group.length; i++) {
-          await db.delete('inventory', where: 'id = ?', whereArgs: [group[i]['id']]);
+          await db.delete(
+            'inventory',
+            where: 'id = ?',
+            whereArgs: [group[i]['id']],
+          );
         }
       }
 
       // 3. Add indices for the new table
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_stocks_itemId ON inventory_stocks (itemId)');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_stocks_expiry ON inventory_stocks (expiryDate)');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_inventory_stocks_hlc ON inventory_stocks (hlc)');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_itemId ON inventory_stocks (itemId)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_expiry ON inventory_stocks (expiryDate)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_hlc ON inventory_stocks (hlc)',
+      );
     }
   }
 
@@ -640,7 +650,7 @@ class DatabaseHelper {
       where: 'isDeleted = 0',
       orderBy: 'itemName ASC',
     );
-    
+
     final List<InventoryItem> items = [];
     for (final itemMap in itemMaps) {
       final itemId = itemMap['id'] as String;
@@ -680,7 +690,7 @@ class DatabaseHelper {
       limit: limit,
       offset: offset,
     );
-    
+
     final List<InventoryItem> items = [];
     for (final itemMap in itemMaps) {
       final itemId = itemMap['id'] as String;
@@ -702,7 +712,7 @@ class DatabaseHelper {
       where: 'isDeleted = 0',
       orderBy: 'itemName ASC',
     );
-    
+
     final List<InventoryItem> items = [];
     for (final itemMap in itemMaps) {
       final itemId = itemMap['id'] as String;
@@ -775,7 +785,11 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> deleteStockBatch(String id, {required String hlc, required String nodeId}) async {
+  Future<void> deleteStockBatch(
+    String id, {
+    required String hlc,
+    required String nodeId,
+  }) async {
     final db = await database;
     await db.update(
       'inventory_stocks',
@@ -811,11 +825,11 @@ class DatabaseHelper {
         final currentAmount = map['amount'] as int;
 
         if (currentAmount <= remainingToDeduct) {
-          // Consume whole batch
+          // Consume whole batch — soft-delete it
           remainingToDeduct -= currentAmount;
           await txn.update(
             'inventory_stocks',
-            {'amount': 0, 'isDeleted': 0, 'hlc': hlc, 'nodeId': nodeId},
+            {'amount': 0, 'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
             where: 'id = ?',
             whereArgs: [batchId],
           );
@@ -876,6 +890,18 @@ class DatabaseHelper {
         );
       }
     });
+  }
+
+  /// Count active patient records older than [years] years.
+  Future<int> countOldRecords(int years) async {
+    final db = await database;
+    final thresholdDate = DateTime.now().subtract(Duration(days: years * 365));
+    final thresholdIso = thresholdDate.toIso8601String();
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as cnt FROM patients WHERE createdAt < ? AND isDeleted = 0',
+      [thresholdIso],
+    );
+    return (result.first['cnt'] as int?) ?? 0;
   }
 
   Future<void> garbageCollectTombstones() async {
@@ -1039,7 +1065,9 @@ class DatabaseHelper {
 
   // ── Inventory Stocks CRDT ──────────────────────────────────────
 
-  Future<List<StockBatch>> getInventoryStockChangesSince(String sinceHlc) async {
+  Future<List<StockBatch>> getInventoryStockChangesSince(
+    String sinceHlc,
+  ) async {
     final db = await database;
     final maps = await db.query(
       'inventory_stocks',

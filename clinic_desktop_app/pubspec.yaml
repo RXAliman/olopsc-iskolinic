@@ -76,6 +76,10 @@ flutter:
     - assets/app-icon-white.png
     - assets/app-icon-colored.png
     - assets/OLOPSC.png
+    - assets/dev-rovic.png
+    - assets/dev-ac.png
+    - assets/dev-marvin.jpg
+    - assets/dev-aiza.jpg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

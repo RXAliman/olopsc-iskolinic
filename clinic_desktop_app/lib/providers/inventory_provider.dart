@@ -141,8 +141,7 @@ class InventoryProvider extends ChangeNotifier {
     required int lowStockAmount,
     required String clinic,
     required String itemType,
-    int? initialStockAmount,
-    DateTime? initialExpiry,
+    List<({int amount, DateTime? expiry})>? initialStocks,
   }) async {
     final nodeId = await NodeId.get();
     final hlc = HLC.now(nodeId).pack();
@@ -159,16 +158,19 @@ class InventoryProvider extends ChangeNotifier {
     );
     await _db.insertInventoryItem(item);
 
-    if (initialStockAmount != null && initialStockAmount > 0) {
-      final stock = StockBatch(
-        id: const Uuid().v4(),
-        itemId: itemId,
-        amount: initialStockAmount,
-        expiryDate: initialExpiry,
-        hlc: hlc,
-        nodeId: nodeId,
-      );
-      await _db.insertStockBatch(stock);
+    if (initialStocks != null) {
+      for (final entry in initialStocks) {
+        if (entry.amount <= 0) continue;
+        final stock = StockBatch(
+          id: const Uuid().v4(),
+          itemId: itemId,
+          amount: entry.amount,
+          expiryDate: entry.expiry,
+          hlc: hlc,
+          nodeId: nodeId,
+        );
+        await _db.insertStockBatch(stock);
+      }
     }
 
     await loadInventory();
@@ -209,11 +211,18 @@ class InventoryProvider extends ChangeNotifier {
 
   Future<void> updateStockBatch(StockBatch stock) async {
     final nodeId = await NodeId.get();
-    final updated = stock.copyWith(
-      hlc: HLC.now(nodeId).pack(),
-      nodeId: nodeId,
-    );
-    await _db.updateStockBatch(updated);
+    final hlc = HLC.now(nodeId).pack();
+
+    // If amount is 0 or less, auto-delete the batch
+    if (stock.amount <= 0) {
+      await _db.deleteStockBatch(stock.id, hlc: hlc, nodeId: nodeId);
+    } else {
+      final updated = stock.copyWith(
+        hlc: hlc,
+        nodeId: nodeId,
+      );
+      await _db.updateStockBatch(updated);
+    }
     await loadInventory();
     onLocalChange?.call();
   }
