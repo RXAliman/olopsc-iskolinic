@@ -29,7 +29,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -78,6 +78,7 @@ class DatabaseHelper {
         consumedSupplies TEXT NOT NULL DEFAULT '',
         treatment TEXT,
         remarks TEXT,
+        customChiefComplaint TEXT NOT NULL DEFAULT '',
         hlc TEXT NOT NULL DEFAULT '',
         nodeId TEXT NOT NULL DEFAULT '',
         isDeleted INTEGER NOT NULL DEFAULT 0,
@@ -238,6 +239,12 @@ class DatabaseHelper {
       );
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_hlc ON inventory_stocks (hlc)',
+      );
+    }
+    if (oldVersion < 4) {
+      // Add customChiefComplaint column to visitations
+      await db.execute(
+        "ALTER TABLE visitations ADD COLUMN customChiefComplaint TEXT NOT NULL DEFAULT ''",
       );
     }
   }

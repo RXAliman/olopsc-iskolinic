@@ -15,6 +15,7 @@ import '../theme/app_theme.dart';
 import '../services/database_helper.dart';
 import 'patient_list_screen.dart';
 import 'patient_detail_screen.dart';
+import 'patient_form_screen.dart';
 import 'visitation_form_screen.dart';
 import 'analytics_screen.dart';
 import 'inventory_screen.dart';
@@ -227,6 +228,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onPressed: () {
                       showDialog(
                         context: context,
+                        builder: (_) => const PatientFormScreen(),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                    ),
+                    icon: const Icon(Icons.person_add_rounded, size: 18),
+                    label: const Text('Add Patient'),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
                         builder: (_) => const VisitationFormScreen(),
                       );
                     },
@@ -234,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.all(16),
                     ),
                     icon: const Icon(Icons.medical_services_rounded, size: 18),
-                    label: const Text('Add Patient / Visitation'),
+                    label: const Text('Add Visit'),
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton.icon(
@@ -430,9 +445,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  if (visit.symptoms.isNotEmpty)
+                                  if (visit.symptoms.isNotEmpty || visit.customChiefComplaint.isNotEmpty)
                                     Text(
-                                      'Symptoms: ${visit.symptoms.join(', ')}',
+                                      'Symptoms: ${[...visit.symptoms, if (visit.customChiefComplaint.isNotEmpty) visit.customChiefComplaint].join(', ')}',
                                       style: const TextStyle(fontSize: 13),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,

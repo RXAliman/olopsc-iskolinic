@@ -280,6 +280,7 @@ class PatientProvider extends ChangeNotifier {
     List<String> consumedSupplies = const [],
     required String treatment,
     required String remarks,
+    String customChiefComplaint = '',
   }) async {
     final hlc = _tick();
     final visit = Visitation(
@@ -289,6 +290,7 @@ class PatientProvider extends ChangeNotifier {
       suppliesUsed: suppliesUsed,
       treatment: treatment,
       remarks: remarks,
+      customChiefComplaint: customChiefComplaint,
       hlc: hlc,
       nodeId: _nodeId,
     );

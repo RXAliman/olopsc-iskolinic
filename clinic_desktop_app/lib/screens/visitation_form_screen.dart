@@ -34,6 +34,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _treatmentCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
+  final _customChiefComplaintCtrl = TextEditingController();
   final Set<String> _selectedSymptoms = {};
   final Set<String> _selectedSupplies = {};
   final Set<String> _fullyConsumedSupplies = {};
@@ -62,6 +63,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       _selectedSymptoms.addAll(widget.visitation!.symptoms);
       _selectedSupplies.addAll(widget.visitation!.suppliesUsed);
       _fullyConsumedSupplies.addAll(widget.visitation!.consumedSupplies);
+      _customChiefComplaintCtrl.text = widget.visitation!.customChiefComplaint;
     }
 
     final pId = widget.visitation?.patientId ?? widget.patientId;
@@ -91,6 +93,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   void dispose() {
     _treatmentCtrl.dispose();
     _remarksCtrl.dispose();
+    _customChiefComplaintCtrl.dispose();
     super.dispose();
   }
 
@@ -105,10 +108,10 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       );
       return;
     }
-    if (_selectedSymptoms.isEmpty) {
+    if (_selectedSymptoms.isEmpty && _customChiefComplaintCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one symptom'),
+          content: Text('Please select at least one symptom or enter a custom chief complaint'),
           backgroundColor: AppTheme.danger,
         ),
       );
@@ -152,6 +155,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         consumedSupplies: consumedSupplies,
         treatment: _treatmentCtrl.text.trim(),
         remarks: _remarksCtrl.text.trim(),
+        customChiefComplaint: _customChiefComplaintCtrl.text.trim(),
       );
       await context.read<PatientProvider>().updateVisitation(updated);
     } else {
@@ -162,6 +166,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         consumedSupplies: consumedSupplies,
         treatment: _treatmentCtrl.text.trim(),
         remarks: _remarksCtrl.text.trim(),
+        customChiefComplaint: _customChiefComplaintCtrl.text.trim(),
       );
     }
 
@@ -519,6 +524,22 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                               ],
                             );
                           },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _customChiefComplaintCtrl,
+                          maxLength: 150,
+                          decoration: const InputDecoration(
+                            labelText: 'Other Chief Complaint',
+                            hintText: 'Enter any complaint not listed above',
+                            prefixIcon: Icon(Icons.edit_note_rounded),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(150),
+                          ],
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
                         ),
                         const SizedBox(height: 10),
                         const Divider(),

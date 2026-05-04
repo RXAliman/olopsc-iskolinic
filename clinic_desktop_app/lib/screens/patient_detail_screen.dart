@@ -696,6 +696,30 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                         )
                                                         .toList(),
                                                   ),
+                                                if (visit.customChiefComplaint.isNotEmpty) ...[
+                                                  const SizedBox(height: 6),
+                                                  Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      const Text(
+                                                        'Other: ',
+                                                        style: TextStyle(
+                                                          color: AppTheme.textMuted,
+                                                          fontSize: 13,
+                                                        ),
+                                                      ),
+                                                      Expanded(
+                                                        child: Text(
+                                                          visit.customChiefComplaint,
+                                                          style: const TextStyle(
+                                                            color: AppTheme.textPrimary,
+                                                            fontSize: 13,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                                 if (visit
                                                         .treatment
                                                         .isNotEmpty ||
