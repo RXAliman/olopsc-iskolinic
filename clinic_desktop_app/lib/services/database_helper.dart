@@ -1037,6 +1037,26 @@ class DatabaseHelper {
   // addStock is no longer needed in this form because we use insertStockBatch
   // to add new specific batches with expiries.
 
+  Future<int> removeDetachedVisitations() async {
+    final db = await database;
+
+    // Get node ID to mark soft delete
+    final nodeIdStr = await getMeta('nodeId') ?? 'unknown';
+    final hlcStr = HLC.now(nodeIdStr).pack();
+
+    return await db.transaction((txn) async {
+      // Mark visitations deleted if their patient is deleted or missing
+      final count = await txn.rawUpdate('''
+        UPDATE visitations 
+        SET isDeleted = 1, hlc = ?, nodeId = ?
+        WHERE isDeleted = 0 
+          AND patientId NOT IN (SELECT id FROM patients WHERE isDeleted = 0)
+      ''', [hlcStr, nodeIdStr]);
+
+      return count;
+    });
+  }
+
   Future<void> purgeOldRecords(int years) async {
     final db = await database;
     final thresholdDate = DateTime.now().subtract(Duration(days: years * 365));

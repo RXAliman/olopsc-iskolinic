@@ -138,10 +138,11 @@ class _SplashScreenState extends State<SplashScreen>
       await settingsProvider.loadSettings();
 
       // Step 3: Data Retention Purge
-      _setStatus('Checking data retention policy...');
+      _setStatus('Cleaning database...');
       await DatabaseHelper.instance.purgeOldRecords(
         settingsProvider.retentionYears,
       );
+      await DatabaseHelper.instance.removeDetachedVisitations();
 
       final patientProvider = PatientProvider();
       await patientProvider.initCrdt();
