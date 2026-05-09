@@ -53,7 +53,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         if (!context.mounted) return;
 
         final route = PersistentFormService.instance.isEmpty
-            ? '/barcode'
+            ? '/id-method'
             : '/form';
         await Navigator.pushNamed(context, route);
 

@@ -41,6 +41,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
   final _guardian2NameCtrl = TextEditingController();
   final _guardian2ContactCtrl = TextEditingController();
   final _allergicToCtrl = TextEditingController();
+  final _customChiefComplaintCtrl = TextEditingController();
 
   // ── Visitation fields ────────────────────────────────────────────
   final Set<String> _selectedSymptoms = {};
@@ -66,6 +67,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _guardian2ContactCtrl.text = p.guardian2Contact;
     _customExtensionCtrl.text = p.customExtension;
     _allergicToCtrl.text = p.allergicTo;
+    _customChiefComplaintCtrl.text = p.customChiefComplaint;
 
     _selectedExtension = p.extension;
     _selectedBirthdate = p.birthdate;
@@ -97,6 +99,9 @@ class _InputFormScreenState extends State<InputFormScreen> {
       () => p.guardian2Contact = _guardian2ContactCtrl.text,
     );
     _allergicToCtrl.addListener(() => p.allergicTo = _allergicToCtrl.text);
+    _customChiefComplaintCtrl.addListener(
+      () => p.customChiefComplaint = _customChiefComplaintCtrl.text,
+    );
   }
 
   Future<void> _searchPatient(String id) async {
@@ -125,6 +130,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
         _guardian2ContactCtrl.text = p.guardian2Contact;
         _customExtensionCtrl.text = p.customExtension;
         _allergicToCtrl.text = p.allergicTo;
+        _customChiefComplaintCtrl.text = p.customChiefComplaint;
 
         setState(() {
           _selectedExtension = p.extension;
@@ -161,6 +167,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _guardian2NameCtrl.dispose();
     _guardian2ContactCtrl.dispose();
     _allergicToCtrl.dispose();
+    _customChiefComplaintCtrl.dispose();
     super.dispose();
   }
 
@@ -178,6 +185,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _guardian2NameCtrl.clear();
     _guardian2ContactCtrl.clear();
     _allergicToCtrl.clear();
+    _customChiefComplaintCtrl.clear();
     PersistentFormService.instance.clear();
     setState(() {
       _selectedExtension = 'None';
@@ -200,7 +208,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
 
     if (!isValid) return;
 
-    if (_selectedSymptoms.isEmpty) {
+    if (_selectedSymptoms.isEmpty && _customChiefComplaintCtrl.text.trim().isEmpty) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -226,7 +234,9 @@ class _InputFormScreenState extends State<InputFormScreen> {
               const Text('Warning'),
             ],
           ),
-          content: const Text('Please select at least one symptom.'),
+          content: const Text(
+            'Please select at least one symptom or describe your complaint in the "Other Chief Complaints" field.',
+          ),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
@@ -327,6 +337,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
         guardian2Contact: _guardian2ContactCtrl.text.trim(),
         allergicTo: _allergicToCtrl.text.trim(),
         symptoms: _selectedSymptoms.toList(),
+        customChiefComplaint: _customChiefComplaintCtrl.text.trim(),
         role: _selectedRole ?? '',
         department: _selectedDepartment ?? '',
         existingPatientId: PersistentFormService.instance.existingPatientId,
@@ -1071,6 +1082,22 @@ class _InputFormScreenState extends State<InputFormScreen> {
                 onToggle: () =>
                     setState(() => _showAllBehavioral = !_showAllBehavioral),
               ),
+
+              const SizedBox(height: 16),
+
+              // Custom Chief Complaint Field
+              TextFormField(
+                controller: _customChiefComplaintCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Other Chief Complaints',
+                  hintText: 'Enter other symptoms or complaints here...',
+                  prefixIcon: Icon(Icons.edit_note_rounded),
+                ),
+                inputFormatters: [UpperCaseTextFormatter()],
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+              ),
+
               const SizedBox(height: 32),
 
               // ── Submit button ─────────────────────────────────

@@ -5,6 +5,7 @@ import 'screens/input_form_screen.dart';
 import 'screens/barcode_scanner_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/connection_help_screen.dart';
+import 'screens/id_method_screen.dart';
 import 'screens/confirmation_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -28,6 +29,7 @@ class ClinicInputApp extends StatelessWidget {
         '/help': (_) => const ConnectionHelpScreen(),
         '/scan': (_) => const QrScanScreen(),
         '/welcome': (_) => const WelcomeScreen(),
+        '/id-method': (_) => const IdentificationMethodScreen(),
         '/barcode': (_) => const BarcodeScannerScreen(),
         '/form': (_) => const InputFormScreen(),
         '/confirmation': (_) => const ConfirmationScreen(),

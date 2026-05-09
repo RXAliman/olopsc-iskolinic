@@ -28,7 +28,6 @@ const List<String> kMedicalSymptoms = [
   'Allergy',
   'Rashes',
   'Acidic',
-  'Due Meds Given',
 ];
 
 const List<String> kBehavioralSymptoms = [

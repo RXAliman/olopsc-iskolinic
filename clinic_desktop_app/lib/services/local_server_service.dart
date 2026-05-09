@@ -194,13 +194,17 @@ class LocalServerService {
           await DatabaseHelper.instance.insertPatient(patient);
         }
 
-        // If symptoms are included, create a visitation record too
+        // If symptoms or custom chief complaints are included, create a visitation record too
         final symptoms = data['symptoms'] as List<dynamic>?;
-        if (symptoms != null && symptoms.isNotEmpty) {
+        final customChiefComplaint = data['customChiefComplaint'] as String? ?? '';
+
+        if ((symptoms != null && symptoms.isNotEmpty) ||
+            customChiefComplaint.isNotEmpty) {
           final visitation = Visitation(
             id: const Uuid().v4(),
             patientId: patientId,
-            symptoms: symptoms.cast<String>(),
+            symptoms: symptoms?.cast<String>() ?? [],
+            customChiefComplaint: customChiefComplaint,
             hlc: HLC.now(nodeId).send().pack(),
             nodeId: nodeId,
           );

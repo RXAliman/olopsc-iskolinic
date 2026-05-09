@@ -103,6 +103,7 @@ class PersistentFormService {
   String guardian2Name = '';
   String guardian2Contact = '';
   String allergicTo = '';
+  String customChiefComplaint = '';
 
   // ── Visitation Info ──────────────────────────────────────────────
   final Set<String> _selectedSymptoms = {};
@@ -134,6 +135,7 @@ class PersistentFormService {
     guardian2Name = '';
     guardian2Contact = '';
     allergicTo = '';
+    customChiefComplaint = '';
     _selectedSymptoms.clear();
   }
 }
