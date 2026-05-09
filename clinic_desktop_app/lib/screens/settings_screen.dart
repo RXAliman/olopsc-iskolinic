@@ -291,30 +291,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Developers',
+                  'The ISKOLINIC Team',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const SizedBox(height: 16),
-                Table(
+                Row(
                   children: [
-                    TableRow(
-                      children: [
-                        _buildDevAvatar('assets/dev-rovic.png'),
-                        _buildDevAvatar('assets/dev-ac.png'),
-                        _buildDevAvatar('assets/dev-marvin.jpg'),
-                        _buildDevAvatar('assets/dev-aiza.jpg'),
-                      ],
+                    _buildTeamMember(
+                      'assets/dev-rovic.png',
+                      'Rovic Aliman',
+                      'Developer',
                     ),
-                    TableRow(
-                      children: [
-                        _buildDevName('Rovic Aliman'),
-                        _buildDevName('Amparito Orticio'),
-                        _buildDevName('Marvin Uneta'),
-                        _buildDevName('Aiza Caballero'),
-                      ],
+                    _buildTeamMember(
+                      'assets/dev-ac.png',
+                      'Amparito Orticio',
+                      'Researcher',
+                    ),
+                    _buildTeamMember(
+                      'assets/dev-marvin.jpg',
+                      'Marvin Uneta',
+                      'Researcher',
+                    ),
+                    _buildTeamMember(
+                      'assets/dev-aiza.jpg',
+                      'Aiza Caballero',
+                      'Researcher',
                     ),
                   ],
                 ),
@@ -618,43 +622,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Widget _buildDevAvatar(String assetPath) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-      child: Center(
-        child: Container(
-          width: 110,
-          height: 110,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppTheme.accent.withValues(alpha: 0.2),
-              width: 2,
+  Widget _buildTeamMember(String assetPath, String name, String role) {
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            height: 180,
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            image: DecorationImage(
-              image: AssetImage(assetPath),
-              fit: BoxFit.cover,
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              assetPath,
+              fit: BoxFit.fitHeight,
+              alignment: Alignment.topCenter,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDevName(String name) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
-      child: Text(
-        name,
-        textAlign: TextAlign.center,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          const SizedBox(height: 16),
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            role,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
+          ),
+        ],
       ),
     );
   }
