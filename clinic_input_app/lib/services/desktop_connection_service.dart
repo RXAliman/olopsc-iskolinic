@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'device_service.dart';
 
 /// Manages the tablet's connection to the desktop app's local HTTP server.
 ///
@@ -173,7 +174,10 @@ class DesktopConnectionService {
   }
 
   /// Standard auth headers for every request.
-  Map<String, String> get _authHeaders => {
-        'Authorization': 'Bearer $_token',
-      };
+  Map<String, String> get _authHeaders {
+    return {
+      'Authorization': 'Bearer $_token',
+      'X-Device-Model': DeviceService.instance.cachedModel ?? 'Unknown Device',
+    };
+  }
 }

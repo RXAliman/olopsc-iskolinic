@@ -23,7 +23,7 @@ class LocalServerService {
   String _authToken = '';
   String _localIp = '';
   int _port = 8080;
-  final Map<String, DateTime> _connectedDevices = {};
+  final Map<String, ({DateTime lastSeen, String model})> _connectedDevices = {};
   static const _deviceTimeout = Duration(seconds: 60);
 
   bool get isRunning => _server != null;
@@ -32,12 +32,12 @@ class LocalServerService {
   int get port => _port;
 
   /// Returns only devices that have made a request within the last 60 seconds.
-  Set<String> get connectedDevices {
+  List<String> get connectedDeviceModels {
     final now = DateTime.now();
     _connectedDevices.removeWhere(
-      (_, lastSeen) => now.difference(lastSeen) > _deviceTimeout,
+      (_, data) => now.difference(data.lastSeen) > _deviceTimeout,
     );
-    return _connectedDevices.keys.toSet();
+    return _connectedDevices.values.map((d) => d.model).toList();
   }
 
   /// JSON payload to encode in the QR code.
@@ -233,9 +233,14 @@ class LocalServerService {
                       as HttpConnectionInfo?)
                   ?.remoteAddress
                   .address;
+          final deviceModel = request.headers['x-device-model'] ?? 'Tablet';
+
           if (remoteIp != null) {
             final isNew = !_connectedDevices.containsKey(remoteIp);
-            _connectedDevices[remoteIp] = DateTime.now();
+            _connectedDevices[remoteIp] = (
+              lastSeen: DateTime.now(),
+              model: deviceModel,
+            );
             if (isNew) {
               onDevicesChanged?.call();
             }

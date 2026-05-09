@@ -4,6 +4,7 @@ import 'screens/qr_scan_screen.dart';
 import 'screens/input_form_screen.dart';
 import 'screens/barcode_scanner_screen.dart';
 import 'screens/welcome_screen.dart';
+import 'screens/connection_help_screen.dart';
 import 'screens/confirmation_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -22,8 +23,9 @@ class ClinicInputApp extends StatelessWidget {
       title: 'OLOPSC IskoLinic Form App',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const QrScanScreen(),
+      home: const ConnectionHelpScreen(),
       routes: {
+        '/help': (_) => const ConnectionHelpScreen(),
         '/scan': (_) => const QrScanScreen(),
         '/welcome': (_) => const WelcomeScreen(),
         '/barcode': (_) => const BarcodeScannerScreen(),

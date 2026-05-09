@@ -14,7 +14,7 @@ class LocalServerProvider extends ChangeNotifier {
   int get port => _service.port;
   String get authToken => _service.authToken;
   String get qrPayload => _service.qrPayload;
-  Set<String> get connectedDevices => _service.connectedDevices;
+  List<String> get connectedDeviceModels => _service.connectedDeviceModels;
 
   /// Start the server and notify listeners.
   Future<void> startServer({int port = 8080}) async {

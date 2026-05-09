@@ -44,7 +44,7 @@ class ConnectionScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildConnectionInfoCard(context, server),
-                        if (server.connectedDevices.isNotEmpty) ...[
+                        if (server.connectedDeviceModels.isNotEmpty) ...[
                           const SizedBox(height: 20),
                           _buildDevicesCard(context, server),
                         ] else ...[
@@ -205,9 +205,19 @@ class ConnectionScreen extends StatelessWidget {
           _InfoRow(
             icon: Icons.vpn_key_rounded,
             label: 'Connection Token',
-            value: server.isRunning
-                ? '${server.authToken.substring(0, 8)}…'
-                : '—',
+            value: server.isRunning ? '${server.authToken.substring(0, 8)}…' : '—',
+          ),
+          const SizedBox(height: 10),
+          _InfoRow(
+            icon: Icons.wifi_rounded,
+            label: 'Host IP Address',
+            value: server.isRunning ? server.localIp : '—',
+          ),
+          const SizedBox(height: 10),
+          _InfoRow(
+            icon: Icons.settings_input_component_rounded,
+            label: 'Server Port',
+            value: server.isRunning ? server.port.toString() : '—',
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
@@ -252,8 +262,8 @@ class ConnectionScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          ...server.connectedDevices.map(
-            (ip) => Padding(
+          ...server.connectedDeviceModels.map(
+            (model) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -273,8 +283,8 @@ class ConnectionScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      ip,
-                      style: GoogleFonts.chivoMono(
+                      model,
+                      style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimary,

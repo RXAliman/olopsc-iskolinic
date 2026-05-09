@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/desktop_connection_service.dart';
 import '../theme/app_theme.dart';
+import '../services/device_service.dart';
 
 class QrScanScreen extends StatefulWidget {
   const QrScanScreen({super.key});
@@ -15,11 +16,20 @@ class _QrScanScreenState extends State<QrScanScreen> {
   MobileScannerController? _cameraController;
   bool _isProcessing = false;
   bool _cameraAvailable = true;
+  String _deviceModel = 'Detecting...';
 
   @override
   void initState() {
     super.initState();
     _initCamera();
+    _loadDeviceModel();
+  }
+
+  Future<void> _loadDeviceModel() async {
+    final model = await DeviceService.instance.getDeviceModel();
+    if (mounted) {
+      setState(() => _deviceModel = model);
+    }
   }
 
   Future<void> _initCamera() async {
@@ -127,7 +137,21 @@ class _QrScanScreenState extends State<QrScanScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 40),
+            // ── Back Button ─────────────────────────────────────
+            Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textMuted),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.cardLight,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
 
             // ── Header ──────────────────────────────────────────
             Container(
@@ -232,6 +256,14 @@ class _QrScanScreenState extends State<QrScanScreen> {
                         ),
                 ),
               ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Device: $_deviceModel',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textMuted,
+                    letterSpacing: 0.5,
+                  ),
             ),
             const SizedBox(height: 32),
           ],

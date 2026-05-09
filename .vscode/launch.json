@@ -28,26 +28,6 @@
     //   "flutterMode": "release"
     // },
     {
-      "name": "student_mobile_app",
-      "cwd": "student_mobile_app",
-      "request": "launch",
-      "type": "dart"
-    },
-    // {
-    //   "name": "student_mobile_app (profile mode)",
-    //   "cwd": "student_mobile_app",
-    //   "request": "launch",
-    //   "type": "dart",
-    //   "flutterMode": "profile"
-    // },
-    // {
-    //   "name": "student_mobile_app (release mode)",
-    //   "cwd": "student_mobile_app",
-    //   "request": "launch",
-    //   "type": "dart",
-    //   "flutterMode": "release"
-    // },
-    {
       "name": "clinic_input_app",
       "cwd": "clinic_input_app",
       "request": "launch",
