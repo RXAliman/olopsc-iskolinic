@@ -17,6 +17,7 @@ import 'patient_list_screen.dart';
 import 'patient_detail_screen.dart';
 import 'patient_form_screen.dart';
 import 'visitation_form_screen.dart';
+import 'visits_screen.dart';
 import 'analytics_screen.dart';
 import 'inventory_screen.dart';
 import 'connection_screen.dart';
@@ -45,6 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
     _NavItem(Icons.people_rounded, 'Patients'),
+    _NavItem(Icons.medical_services_rounded, 'Visits'),
     _NavItem(Icons.inventory_2_rounded, 'Inventory'),
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
     _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
@@ -143,12 +145,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return PatientListScreen(autoFocusSearch: _focusSearchOnNextTab);
       case 2:
-        return const InventoryScreen();
+        return const VisitsScreen();
       case 3:
-        return const AnalyticsScreen();
+        return const InventoryScreen();
       case 4:
-        return const ConnectionScreen();
+        return const AnalyticsScreen();
       case 5:
+        return const ConnectionScreen();
+      case 6:
         return const SettingsScreen();
       default:
         return _buildDashboardHome();
@@ -182,6 +186,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              _buildDashboardFilters(patients),
               const SizedBox(height: 24),
 
               // Summary Cards
@@ -191,7 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: _SummaryCard(
                       icon: Icons.people_rounded,
                       label: 'Total Patients Recorded',
-                      value: '${patients.allPatientsCount}',
+                      value: '${patients.dashboardTotalPatients}',
                       gradient: const LinearGradient(
                         colors: [
                           Color(0xFFF59E0B),
@@ -329,8 +335,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No visitations recorded today yet.',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        'No visitations recorded today',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Try adjusting your filters',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textMuted,
+                        ),
                       ),
                     ],
                   ),
@@ -445,7 +458,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  if (visit.symptoms.isNotEmpty || visit.customChiefComplaint.isNotEmpty)
+                                  if (visit.symptoms.isNotEmpty ||
+                                      visit.customChiefComplaint.isNotEmpty)
                                     Text(
                                       'Symptoms: ${[...visit.symptoms, if (visit.customChiefComplaint.isNotEmpty) visit.customChiefComplaint].join(', ')}',
                                       style: const TextStyle(fontSize: 13),
@@ -583,6 +597,152 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDashboardFilters(PatientProvider provider) {
+    final List<String> grades = [
+      'Pre-school',
+      'Grade School',
+      'Junior High School',
+      'Senior High School',
+      'College',
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Text(
+          'Filters:',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textMuted,
+          ),
+        ),
+        const SizedBox(width: 8),
+        MenuBar(
+          style: MenuStyle(
+            backgroundColor: WidgetStateProperty.all(Colors.transparent),
+            elevation: WidgetStateProperty.all(0),
+          ),
+          children: [
+            SubmenuButton(
+              style: ButtonStyle(
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: AppTheme.accent),
+                  ),
+                ),
+                foregroundColor: WidgetStateProperty.all(AppTheme.accent),
+                textStyle: WidgetStateProperty.all(
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                padding: WidgetStateProperty.all(const EdgeInsets.all(16)),
+              ),
+              leadingIcon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: AppTheme.accent,
+              ),
+              menuChildren: [
+                ...grades.map((grade) {
+                  final isSelected = provider.dashboardSelectedDepartments
+                      .contains(grade);
+                  return CheckboxMenuButton(
+                    closeOnActivate: false,
+                    value: isSelected,
+                    onChanged: (val) {
+                      if (val != null) {
+                        provider.toggleDashboardFilter(grade, val);
+                      }
+                    },
+                    child: Text(grade),
+                  );
+                }),
+                if (provider.dashboardIncludeEmployee)
+                  CheckboxMenuButton(
+                    closeOnActivate: false,
+                    value: provider.dashboardSelectedDepartments.contains(
+                      'General',
+                    ),
+                    onChanged: (val) {
+                      if (val != null) {
+                        provider.toggleDashboardFilter('General', val);
+                      }
+                    },
+                    child: const Text('General'),
+                  ),
+              ],
+              child: const Text('Department'),
+            ),
+            const SizedBox(width: 8),
+            SubmenuButton(
+              style: ButtonStyle(
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: AppTheme.accent),
+                  ),
+                ),
+                foregroundColor: WidgetStateProperty.all(AppTheme.accent),
+                textStyle: WidgetStateProperty.all(
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                padding: WidgetStateProperty.all(const EdgeInsets.all(16)),
+              ),
+              leadingIcon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: AppTheme.accent,
+              ),
+              menuChildren: [
+                CheckboxMenuButton(
+                  closeOnActivate: false,
+                  value: provider.dashboardIncludeStudent,
+                  onChanged: (val) {
+                    if (val != null) {
+                      provider.toggleDashboardFilter('Student', val);
+                    }
+                  },
+                  child: const Text('Student'),
+                ),
+                CheckboxMenuButton(
+                  closeOnActivate: false,
+                  value: provider.dashboardIncludeEmployee,
+                  onChanged: (val) {
+                    if (val != null) {
+                      provider.toggleDashboardFilter('Employee', val);
+                    }
+                  },
+                  child: const Text('Employee'),
+                ),
+              ],
+              child: const Text('Role'),
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+        TextButton.icon(
+          onPressed: () {
+            provider.clearDashboardFilters();
+          },
+          icon: const Icon(Icons.restart_alt_rounded, size: 16),
+          label: const Text('Reset'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.accent,
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            padding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            side: const BorderSide(color: AppTheme.accent),
+          ),
+        ),
+      ],
     );
   }
 

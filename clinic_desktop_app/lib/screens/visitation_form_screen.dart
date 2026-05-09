@@ -299,9 +299,9 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                           final query = textEditingValue.text;
                           return await DatabaseHelper.instance
                               .searchPatientsPaginated(
-                                query,
-                                10, // top 10 matches
-                                0, // offset 0
+                                query: query,
+                                limit: 10, // top 10 matches
+                                offset: 0, // offset 0
                               );
                         },
                         onSelected: (selection) {

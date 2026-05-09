@@ -266,6 +266,37 @@ class DatabaseHelper {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  // ── Helpers ─────────────────────────────────────────────────────
+
+  String _buildPatientFilterClause(
+    List<String>? selectedDepartments,
+    bool includeStudent,
+    bool includeEmployee, {
+    String tablePrefix = '',
+  }) {
+    final prefix = tablePrefix.isNotEmpty ? '$tablePrefix.' : '';
+    List<String> roleConditions = [];
+    if (includeStudent) roleConditions.add("${prefix}role = 'Student'");
+    if (includeEmployee) roleConditions.add("${prefix}role = 'Employee'");
+
+    if (roleConditions.isEmpty) {
+      return "1=0"; // No roles selected, match nothing
+    }
+
+    String roleClause = "(${roleConditions.join(' OR ')})";
+
+    if (selectedDepartments == null) {
+      return roleClause;
+    }
+
+    if (selectedDepartments.isEmpty) {
+      return "1=0"; // Departments list provided but empty, match nothing
+    }
+
+    final deptList = selectedDepartments.map((d) => "'$d'").join(',');
+    return "($roleClause AND ${prefix}department IN ($deptList))";
+  }
+
   // ── Patient CRUD (with soft-delete) ─────────────────────────────
 
   Future<void> insertPatient(Patient patient) async {
@@ -287,11 +318,18 @@ class DatabaseHelper {
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
 
-  Future<List<Patient>> getPatientsPaginated(int limit, int offset) async {
+  Future<List<Patient>> getPatientsPaginated({
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
     final maps = await db.query(
       'patients',
-      where: 'isDeleted = 0',
+      where: 'isDeleted = 0 AND $filterClause',
       orderBy: 'patientName ASC',
       limit: limit,
       offset: offset,
@@ -299,24 +337,33 @@ class DatabaseHelper {
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
 
-  Future<int> getPatientCount() async {
+  Future<int> getPatientCount({
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0',
+      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND $filterClause',
     );
     return result.first['count'] as int? ?? 0;
   }
 
-  Future<List<Patient>> searchPatientsPaginated(
-    String query,
-    int limit,
-    int offset,
-  ) async {
+  Future<List<Patient>> searchPatientsPaginated({
+    required String query,
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
     final maps = await db.query(
       'patients',
       where:
-          'isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
+          'isDeleted = 0 AND $filterClause AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
       whereArgs: ['%$query%', '%$query%', '%$query%', '%$query%'],
       orderBy: 'patientName ASC',
       limit: limit,
@@ -325,10 +372,16 @@ class DatabaseHelper {
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
 
-  Future<int> searchPatientCount(String query) async {
+  Future<int> searchPatientCount({
+    required String query,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
+      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND $filterClause AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
       ['%$query%', '%$query%', '%$query%', '%$query%'],
     );
     return result.first['count'] as int? ?? 0;
@@ -476,40 +529,131 @@ class DatabaseHelper {
     return maps.map((m) => Visitation.fromMap(m)).toList();
   }
 
-  Future<int> getTodayVisitCount() async {
+  Future<int> getTodayVisitCount({
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).toIso8601String();
     final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
+
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM visitations WHERE isDeleted = 0 AND dateTime >= ? AND dateTime < ?',
+      '''
+      SELECT COUNT(v.id) as count 
+      FROM visitations v
+      JOIN patients p ON v.patientId = p.id
+      WHERE v.isDeleted = 0 
+        AND v.dateTime >= ? 
+        AND v.dateTime < ?
+        AND $filterClause
+      ''',
       [start, end],
     );
     return result.first['count'] as int? ?? 0;
   }
 
   /// Gets today's visitations along with the patient's name, paginated.
-  Future<List<Map<String, dynamic>>> getTodayVisitationsPaginated(
-    int limit,
-    int offset,
-  ) async {
+  Future<List<Map<String, dynamic>>> getTodayVisitationsPaginated({
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).toIso8601String();
     final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
 
     final maps = await db.rawQuery(
       '''
-      SELECT v.*, p.patientName, p.firstName 
+      SELECT v.*, p.patientName, p.firstName, p.department, p.role 
       FROM visitations v 
       JOIN patients p ON v.patientId = p.id 
       WHERE v.isDeleted = 0 
         AND v.dateTime >= ? 
         AND v.dateTime < ?
+        AND $filterClause
       ORDER BY v.dateTime DESC
       LIMIT ? OFFSET ?
       ''',
       [start, end, limit, offset],
+    );
+
+    return maps;
+  }
+
+  /// Global visit count with filters.
+  Future<int> getGlobalVisitCount({
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+    DateTime? date,
+  }) async {
+    final db = await database;
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
+    
+    String dateClause = '';
+    List<dynamic> args = [];
+    if (date != null) {
+      final dateStr = "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      dateClause = ' AND v.dateTime LIKE ?';
+      args.add('$dateStr%');
+    }
+
+    final result = await db.rawQuery(
+      '''
+      SELECT COUNT(v.id) as count 
+      FROM visitations v
+      JOIN patients p ON v.patientId = p.id
+      WHERE v.isDeleted = 0 
+        AND $filterClause
+        $dateClause
+      ''',
+      args,
+    );
+    return result.first['count'] as int? ?? 0;
+  }
+
+  /// Global paginated visitations with filters.
+  Future<List<Map<String, dynamic>>> getGlobalVisitationsPaginated({
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+    DateTime? date,
+  }) async {
+    final db = await database;
+    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
+
+    String dateClause = '';
+    List<dynamic> args = [];
+    if (date != null) {
+      final dateStr = "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      dateClause = ' AND v.dateTime LIKE ?';
+      args.add('$dateStr%');
+    }
+    
+    args.add(limit);
+    args.add(offset);
+
+    final maps = await db.rawQuery(
+      '''
+      SELECT v.*, p.patientName, p.firstName, p.department, p.role 
+      FROM visitations v 
+      JOIN patients p ON v.patientId = p.id 
+      WHERE v.isDeleted = 0 
+        AND $filterClause
+        $dateClause
+      ORDER BY v.dateTime DESC
+      LIMIT ? OFFSET ?
+      ''',
+      args,
     );
 
     return maps;

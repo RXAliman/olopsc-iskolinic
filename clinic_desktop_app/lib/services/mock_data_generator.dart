@@ -1,4 +1,6 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:uuid/uuid.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
@@ -402,6 +404,13 @@ class MockDataGenerator {
           address: _generateAddress(),
           guardianName: _generateNameComponents()['patientName'] ?? '',
           guardianContact: _generatePhone(),
+          guardian2Name: _random.nextBool() ? (_generateNameComponents()['patientName'] ?? '') : '',
+          guardian2Contact: _random.nextBool() ? _generatePhone() : '',
+          pastMedicalHistory: const [],
+          vaccinationHistory: const [],
+          allergicTo: _random.nextBool() ? 'Dust, Pollen' : '',
+          patientRemarks: 'Generated mock data.',
+          permissions: const {},
           role: _pick(_roles),
           department: _pick(_departments),
           createdAt: createdAt,
@@ -459,68 +468,62 @@ class MockDataGenerator {
     final existing = await db.getPatients();
     if (existing.isNotEmpty) return; // Don't seed if data already exists
 
-    // Seed inventory first so visitations can reference items
-    final inventoryItems = _generateInventory();
-    for (final item in inventoryItems) {
-      await db.insertInventoryItem(item);
-      for (final stock in item.stocks) {
-        await db.insertStockBatch(stock);
+    // We use a transaction and batch for massive performance speedup
+    final sqliteDb = await db.database;
+    await sqliteDb.transaction((txn) async {
+      debugPrint('Seeding inventory...');
+      final inventoryItems = _generateInventory();
+      for (final item in inventoryItems) {
+        await txn.insert('inventory', item.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        for (final stock in item.stocks) {
+          await txn.insert('inventory_stocks', stock.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
       }
-    }
 
-    final patients = generate(count: count);
-    for (final patient in patients) {
-      final patientHlc = HLC.now('mock-node').toString();
-      final pWithCrdt = patient.copyWith(hlc: patientHlc, nodeId: 'mock-node');
-      await db.insertPatient(pWithCrdt);
+      debugPrint('Generating $count patients with $visitationsPerPatient visits each...');
+      final patients = generate(count: count);
+      for (final patient in patients) {
+        final patientHlc = HLC.now('mock-node').toString();
+        final pWithCrdt = patient.copyWith(hlc: patientHlc, nodeId: 'mock-node');
+        await txn.insert('patients', pWithCrdt.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
 
-      // Generate Visitations
-      for (int j = 0; j < visitationsPerPatient; j++) {
-        final visitDate = DateTime.now().subtract(
-          Duration(days: _random.nextInt(365)),
-        );
+        for (int j = 0; j < visitationsPerPatient; j++) {
+          final visitDate = DateTime.now().subtract(Duration(days: _random.nextInt(365)));
+          final symptomCount = 1 + _random.nextInt(3);
+          final shuffledSymptoms = List.of(kSymptomsList)..shuffle(_random);
+          final symptoms = shuffledSymptoms.take(symptomCount).toList();
 
-        // Pick 1–3 random symptoms
-        final symptomCount = 1 + _random.nextInt(3);
-        final shuffledSymptoms = List.of(kSymptomsList)..shuffle(_random);
-        final symptoms = shuffledSymptoms.take(symptomCount).toList();
+          final supplyCount = _random.nextInt(4);
+          final shuffledItems = List.of(inventoryItems)..shuffle(_random);
+          final selectedItems = shuffledItems.take(supplyCount).toList();
+          final suppliesUsed = selectedItems.map((i) => '${i.id}:${i.itemName}').toList();
 
-        // Pick 0–3 random supplies from inventory (in ID:Name format)
-        final supplyCount = _random.nextInt(4); // 0–3
-        final shuffledItems = List.of(inventoryItems)..shuffle(_random);
-        final selectedItems = shuffledItems.take(supplyCount).toList();
-        final suppliesUsed = selectedItems
-            .map((i) => '${i.id}:${i.itemName}')
-            .toList();
+          final consumedSupplies = selectedItems
+              .where((i) => i.itemType == 'piece' || _random.nextDouble() < 0.2)
+              .map((i) => '${i.id}:${i.itemName}')
+              .toList();
 
-        // Determine consumed supplies (pieces are always consumed, others might be)
-        final consumedSupplies = selectedItems
-            .where((i) {
-              if (i.itemType == 'piece') return true;
-              return _random.nextDouble() < 0.2; // 20% chance of fully consumed
-            })
-            .map((i) => '${i.id}:${i.itemName}')
-            .toList();
+          final treatmentCount = 1 + _random.nextInt(2);
+          final shuffledTreatments = List.of(_treatments)..shuffle(_random);
+          final treatment = shuffledTreatments.take(treatmentCount).join(', ');
 
-        // Pick 1–2 treatment strings
-        final treatmentCount = 1 + _random.nextInt(2);
-        final shuffledTreatments = List.of(_treatments)..shuffle(_random);
-        final treatment = shuffledTreatments.take(treatmentCount).join(', ');
-
-        final visit = Visitation(
-          id: _uuid.v4(),
-          patientId: patient.id,
-          dateTime: visitDate,
-          symptoms: symptoms,
-          suppliesUsed: suppliesUsed,
-          consumedSupplies: consumedSupplies,
-          treatment: treatment,
-          remarks: 'Mock data $j',
-          hlc: HLC.now('mock-node').toString(),
-          nodeId: 'mock-node',
-        );
-        await db.insertVisitation(visit);
+          final visit = Visitation(
+            id: _uuid.v4(),
+            patientId: patient.id,
+            dateTime: visitDate,
+            symptoms: symptoms,
+            suppliesUsed: suppliesUsed,
+            consumedSupplies: consumedSupplies,
+            treatment: treatment,
+            remarks: 'Mock data $j',
+            customChiefComplaint: _random.nextDouble() > 0.8 ? 'Headache and minor cough' : '',
+            hlc: HLC.now('mock-node').toString(),
+            nodeId: 'mock-node',
+          );
+          await txn.insert('visitations', visit.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
       }
-    }
+    });
+    debugPrint('Database seeding complete!');
   }
 }

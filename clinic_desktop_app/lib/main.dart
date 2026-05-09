@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+// import 'services/mock_data_generator.dart';
 import 'providers/patient_provider.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/sync_provider.dart';
@@ -19,6 +20,8 @@ void main() async {
   // Initialize sqflite FFI for Windows desktop
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
+
+  // await MockDataGenerator.seedDatabase();
 
   runApp(const AppRoot());
 }

@@ -138,7 +138,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
                       final isOffline = syncProvider.currentMode == 0;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(isOffline ? 'Refreshing local data...' : 'Reloading and syncing...'),
+                          content: Text(
+                            isOffline
+                                ? 'Refreshing local data...'
+                                : 'Reloading and syncing...',
+                          ),
                           duration: const Duration(seconds: 1),
                         ),
                       );
@@ -152,6 +156,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              _buildRecordsFilters(provider),
               const SizedBox(height: 24),
 
               // Patient Table
@@ -241,6 +247,152 @@ class _PatientListScreenState extends State<PatientListScreen> {
     );
   }
 
+  Widget _buildRecordsFilters(PatientProvider provider) {
+    final List<String> grades = [
+      'Pre-school',
+      'Grade School',
+      'Junior High School',
+      'Senior High School',
+      'College',
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Text(
+          'Show only:',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textMuted,
+          ),
+        ),
+        const SizedBox(width: 8),
+        MenuBar(
+          style: MenuStyle(
+            backgroundColor: WidgetStateProperty.all(Colors.transparent),
+            elevation: WidgetStateProperty.all(0),
+          ),
+          children: [
+            SubmenuButton(
+              style: ButtonStyle(
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: AppTheme.accent),
+                  ),
+                ),
+                foregroundColor: WidgetStateProperty.all(AppTheme.accent),
+                textStyle: WidgetStateProperty.all(
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.all(16),
+                ),
+              ),
+              leadingIcon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: AppTheme.accent,
+              ),
+              menuChildren: [
+                ...grades.map((grade) {
+                  final isSelected = provider.recordsSelectedDepartments
+                      .contains(grade);
+                  return CheckboxMenuButton(
+                    closeOnActivate: false,
+                    value: isSelected,
+                    onChanged: (val) {
+                      if (val != null) provider.toggleRecordsFilter(grade, val);
+                    },
+                    child: Text(grade),
+                  );
+                }),
+                if (provider.recordsIncludeEmployee)
+                  CheckboxMenuButton(
+                    closeOnActivate: false,
+                    value: provider.recordsSelectedDepartments.contains(
+                      'General',
+                    ),
+                    onChanged: (val) {
+                      if (val != null) {
+                        provider.toggleRecordsFilter('General', val);
+                      }
+                    },
+                    child: const Text('General'),
+                  ),
+              ],
+              child: const Text('Department'),
+            ),
+            const SizedBox(width: 8),
+            SubmenuButton(
+              style: ButtonStyle(
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: AppTheme.accent),
+                  ),
+                ),
+                foregroundColor: WidgetStateProperty.all(AppTheme.accent),
+                textStyle: WidgetStateProperty.all(
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.all(16),
+                ),
+              ),
+              leadingIcon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: AppTheme.accent,
+              ),
+              menuChildren: [
+                CheckboxMenuButton(
+                  closeOnActivate: false,
+                  value: provider.recordsIncludeStudent,
+                  onChanged: (val) {
+                    if (val != null) {
+                      provider.toggleRecordsFilter('Student', val);
+                    }
+                  },
+                  child: const Text('Student'),
+                ),
+                CheckboxMenuButton(
+                  closeOnActivate: false,
+                  value: provider.recordsIncludeEmployee,
+                  onChanged: (val) {
+                    if (val != null) {
+                      provider.toggleRecordsFilter('Employee', val);
+                    }
+                  },
+                  child: const Text('Employee'),
+                ),
+              ],
+              child: const Text('Role'),
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+        TextButton.icon(
+          onPressed: () {
+            _searchController.clear();
+            provider.clearFilters();
+          },
+          icon: const Icon(Icons.restart_alt_rounded, size: 16),
+          label: const Text('Reset Search & Filters'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.accent,
+            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            padding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            side: const BorderSide(color: AppTheme.accent),
+          ),
+        ),
+      ],
+    );
+  }
+
   List<Widget> _buildPageNumbers(PatientProvider provider, int totalPages) {
     final current = provider.currentPage;
 
@@ -283,8 +435,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Add a new record to get started',
-            style: Theme.of(context).textTheme.bodyMedium,
+            'Try adjusting your search or filters',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.textMuted,
+            ),
           ),
         ],
       ),
@@ -405,21 +559,6 @@ class _PatientTileState extends State<_PatientTile> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-
-                // Guardian
-                SizedBox(
-                  width: 180,
-                  child: Text(
-                    widget.patient.guardianName.isNotEmpty
-                        ? widget.patient.guardianName
-                        : '—',
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                    ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

@@ -170,6 +170,21 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
       ),
+      menuBarTheme: MenuBarThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStateProperty.all(surfaceLight),
+          elevation: WidgetStateProperty.all(0),
+        ),
+      ),
+      menuButtonTheme: MenuButtonThemeData(
+        style: MenuItemButton.styleFrom(
+          textStyle: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: textPrimary,
+          ),
+        ),
+      ),
     );
   }
 
