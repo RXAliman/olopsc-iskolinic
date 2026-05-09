@@ -108,10 +108,13 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       );
       return;
     }
-    if (_selectedSymptoms.isEmpty && _customChiefComplaintCtrl.text.trim().isEmpty) {
+    if (_selectedSymptoms.isEmpty &&
+        _customChiefComplaintCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one symptom or enter a custom chief complaint'),
+          content: Text(
+            'Please select at least one symptom or enter a custom chief complaint',
+          ),
           backgroundColor: AppTheme.danger,
         ),
       );
@@ -564,30 +567,6 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                               ),
                             );
                           },
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.info_outline_rounded,
-                                size: 14,
-                                color: AppTheme.textMuted,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Note: Please manually verify the supply\'s physical expiration date before use.',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppTheme.textMuted,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                         const SizedBox(height: 20),
 

@@ -22,6 +22,8 @@ import 'analytics_screen.dart';
 import 'inventory_screen.dart';
 import 'connection_screen.dart';
 import 'settings_screen.dart';
+import 'mock_data_screen.dart';
+import '../constants/app_config.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -51,6 +53,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.bar_chart_rounded, 'Analytics'),
     _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
     _NavItem(Icons.settings_rounded, 'Settings'),
+    if (!AppConfig.isProduction)
+      _NavItem(Icons.bug_report_rounded, 'Mock Data', isDev: true),
   ];
 
   @override
@@ -154,6 +158,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const ConnectionScreen();
       case 6:
         return const SettingsScreen();
+      case 7:
+        return const DevToolsScreen();
       default:
         return _buildDashboardHome();
     }
@@ -554,7 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               items: inventory.lowStockItems,
                               icon: Icons.warning_amber_rounded,
                               accentColor: AppTheme.danger,
-                              onTap: () => setState(() => _selectedIndex = 2),
+                              onTap: () => setState(() => _selectedIndex = 3),
                               subtitleBuilder: (item) =>
                                   'Current: ${item.quantity} (Low at: ${item.lowStockAmount})',
                             ),
@@ -567,7 +573,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               items: inventory.expiringItems,
                               icon: Icons.timer_outlined,
                               accentColor: Colors.orange,
-                              onTap: () => setState(() => _selectedIndex = 2),
+                              onTap: () => setState(() => _selectedIndex = 3),
                               subtitleBuilder: (item) {
                                 final nearest =
                                     item.stocks
@@ -1134,6 +1140,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               ),
                                             ),
                                           ),
+                                          if (item.isDev) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 1,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.warning
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: AppTheme.warning
+                                                      .withValues(alpha: 0.4),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                'DEV',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppTheme.warning,
+                                                  letterSpacing: 1,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                               ),
@@ -1228,7 +1263,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class _NavItem {
   final IconData icon;
   final String label;
-  _NavItem(this.icon, this.label);
+  final bool isDev;
+  _NavItem(this.icon, this.label, {this.isDev = false});
 }
 
 class _DashboardAlertSection extends StatefulWidget {

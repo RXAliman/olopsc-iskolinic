@@ -11,6 +11,7 @@ import '../providers/custom_symptom_provider.dart';
 import '../providers/local_server_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/update_service.dart';
+import '../services/database_helper.dart';
 import '../theme/app_theme.dart';
 
 /// Callback signature for when the splash screen finishes initialization.
@@ -135,6 +136,12 @@ class _SplashScreenState extends State<SplashScreen>
       // Step 2: Settings & Persistence
       final settingsProvider = SettingsProvider();
       await settingsProvider.loadSettings();
+
+      // Step 3: Data Retention Purge
+      _setStatus('Checking data retention policy...');
+      await DatabaseHelper.instance.purgeOldRecords(
+        settingsProvider.retentionYears,
+      );
 
       final patientProvider = PatientProvider();
       await patientProvider.initCrdt();

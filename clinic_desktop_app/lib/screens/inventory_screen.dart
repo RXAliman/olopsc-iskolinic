@@ -1130,40 +1130,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Expiration Warning Note
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.amber.shade800,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Note: Please manually verify the supply\'s physical expiration date before use.',
-                        style: TextStyle(
-                          color: Colors.amber.shade900,
-                          fontSize: 13,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
               // Inventory table
               Expanded(
                 child: Card(

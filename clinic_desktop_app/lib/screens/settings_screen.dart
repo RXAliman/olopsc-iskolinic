@@ -18,6 +18,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '';
+  int _dropdownKeyCounter = 0;
 
   @override
   void initState() {
@@ -150,129 +151,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             decoration: AppTheme.glassCard(),
             padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  'Data Retention Policy',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Automatically delete patient records securely after a specified number of years. This helps keep the database performant and secures unneeded historical data.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                Consumer<SettingsProvider>(
-                  builder: (context, settings, _) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Data Retention Policy',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Automatically delete patient records securely after a specified number of years. This helps keep the database performant and secures unneeded historical data.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 16),
+                    Consumer<SettingsProvider>(
+                      builder: (context, settings, _) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Retention Period:'),
-                            const SizedBox(width: 16),
-                            DropdownButton<int>(
-                              value: settings.retentionYears,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 5,
-                                  child: Text('5 Years'),
+                            SizedBox(
+                              width: 200,
+                              child: DropdownButtonFormField<int>(
+                                key: ValueKey(
+                                  'retention_dropdown_${settings.retentionYears}_$_dropdownKeyCounter',
                                 ),
-                                DropdownMenuItem(
-                                  value: 7,
-                                  child: Text('7 Years'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 10,
-                                  child: Text('10 Years'),
-                                ),
-                              ],
-                              onChanged: (v) {
-                                if (v != null) settings.updateRetentionYears(v);
-                              },
-                            ),
-                            const Spacer(),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.danger,
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () => _showPurgeConfirmation(
-                                context,
-                                settings.retentionYears,
-                              ),
-                              icon: const Icon(
-                                Icons.delete_forever_rounded,
-                                size: 18,
-                              ),
-                              label: const Text('Delete Now'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        FutureBuilder<int>(
-                          future: DatabaseHelper.instance.countOldRecords(
-                            settings.retentionYears,
-                          ),
-                          builder: (context, snapshot) {
-                            final count = snapshot.data ?? 0;
-                            final isLoading =
-                                snapshot.connectionState ==
-                                ConnectionState.waiting;
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: count > 0
-                                    ? AppTheme.danger.withValues(alpha: 0.08)
-                                    : Colors.green.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: count > 0
-                                      ? AppTheme.danger.withValues(alpha: 0.2)
-                                      : Colors.green.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    count > 0
-                                        ? Icons.warning_amber_rounded
-                                        : Icons.check_circle_outline,
-                                    size: 18,
-                                    color: count > 0
-                                        ? AppTheme.danger
-                                        : Colors.green,
+                                initialValue: settings.retentionYears,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    isLoading
-                                        ? 'Counting old records...'
-                                        : count > 0
-                                        ? '$count patient record${count == 1 ? '' : 's'} older than ${settings.retentionYears} years'
-                                        : 'No patient records older than ${settings.retentionYears} years',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: count > 0
-                                          ? AppTheme.danger
-                                          : Colors.green,
-                                    ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 5,
+                                    child: Text('5 Years'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 7,
+                                    child: Text('7 Years'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 10,
+                                    child: Text('10 Years'),
                                   ),
                                 ],
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    _handleRetentionChange(
+                                      context,
+                                      settings,
+                                      v,
+                                    );
+                                  }
+                                },
                               ),
-                            );
-                          },
-                        ),
-                      ],
-                    );
-                  },
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -357,7 +304,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () {
                       showLicensePage(
                         context: context,
-                        applicationName: 'ISKOLINIC',
+                        applicationName: 'OLOPSC ISKOLINIC',
                         applicationVersion: _appVersion,
                         applicationIcon: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -580,45 +527,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _showPurgeConfirmation(BuildContext context, int years) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Data Deletion'),
-        content: Text(
-          'Are you sure you want to delete patient records and visitations older than $years years?\n\n'
-          'This action will mark the records as deleted across all synced devices. They will be permanently removed locally after 30 days.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _handleRetentionChange(
+    BuildContext context,
+    SettingsProvider settings,
+    int newYears,
+  ) async {
+    final count = await DatabaseHelper.instance.countOldRecords(newYears);
 
-    if (confirmed == true) {
+    if (count > 0) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Deleting old records...')));
-
-      await DatabaseHelper.instance.purgeOldRecords(years);
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm Retention Change'),
           content: Text(
-            'Successfully deleted records older than $years years.',
+            'Changing the retention period to $newYears years will mark $count patient record${count == 1 ? '' : 's'} for deletion.\n\n'
+            'Are you sure you want to proceed with this policy change?',
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirm Change'),
+            ),
+          ],
         ),
       );
+
+      if (confirmed == true) {
+        settings.updateRetentionYears(newYears);
+        await DatabaseHelper.instance.purgeOldRecords(newYears);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Retention policy updated. $count records marked for deletion.',
+              ),
+            ),
+          );
+        }
+      } else {
+        // Revert the dropdown selection in the UI if cancelled or dismissed
+        // We increment the counter to force the DropdownButtonFormField (using initialValue) to rebuild
+        if (mounted) {
+          setState(() {
+            _dropdownKeyCounter++;
+          });
+        }
+      }
+    } else {
+      settings.updateRetentionYears(newYears);
     }
   }
 

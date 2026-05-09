@@ -303,9 +303,9 @@ class PatientProvider extends ChangeNotifier {
   void firstPage() => goToPage(0);
   void lastPage() => goToPage(totalPages - 1);
 
-  Future<void> addPatient(Patient patient) async {
+  Future<void> addPatient(Patient patient, {String? nodeId}) async {
     final hlc = _tick();
-    final withCrdt = patient.copyWith(hlc: hlc, nodeId: _nodeId);
+    final withCrdt = patient.copyWith(hlc: hlc, nodeId: nodeId ?? _nodeId);
     await _db.insertPatient(withCrdt);
     await loadPatients();
     _autoPush();
@@ -428,18 +428,21 @@ class PatientProvider extends ChangeNotifier {
     required String treatment,
     required String remarks,
     String customChiefComplaint = '',
+    DateTime? dateTime,
+    String? nodeId,
   }) async {
     final hlc = _tick();
     final visit = Visitation(
       id: const Uuid().v4(),
       patientId: patientId,
+      dateTime: dateTime,
       symptoms: symptoms,
       suppliesUsed: suppliesUsed,
       treatment: treatment,
       remarks: remarks,
       customChiefComplaint: customChiefComplaint,
       hlc: hlc,
-      nodeId: _nodeId,
+      nodeId: nodeId ?? _nodeId,
     );
     await _db.insertVisitation(visit);
 
@@ -605,15 +608,22 @@ class PatientProvider extends ChangeNotifier {
 
   void clearVisitsFilters() async {
     _visitsSelectedDepartments = [
-      'Pre-school', 'Grade School', 'Junior High School', 'Senior High School', 'College', 'General'
+      'Pre-school',
+      'Grade School',
+      'Junior High School',
+      'Senior High School',
+      'College',
+      'General',
     ];
     _visitsIncludeStudent = true;
     _visitsIncludeEmployee = true;
-    _visitsSelectedDate = null;
     _globalVisitPage = 0;
-    _saveFilters('visits', _visitsSelectedDepartments, _visitsIncludeStudent, _visitsIncludeEmployee);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('visits_date');
+    _saveFilters(
+      'visits',
+      _visitsSelectedDepartments,
+      _visitsIncludeStudent,
+      _visitsIncludeEmployee,
+    );
     loadGlobalVisits();
   }
 

@@ -326,7 +326,11 @@ class DatabaseHelper {
     bool includeEmployee = true,
   }) async {
     final db = await database;
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
     final maps = await db.query(
       'patients',
       where: 'isDeleted = 0 AND $filterClause',
@@ -343,7 +347,11 @@ class DatabaseHelper {
     bool includeEmployee = true,
   }) async {
     final db = await database;
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
     final result = await db.rawQuery(
       'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND $filterClause',
     );
@@ -359,7 +367,11 @@ class DatabaseHelper {
     bool includeEmployee = true,
   }) async {
     final db = await database;
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
     final maps = await db.query(
       'patients',
       where:
@@ -379,7 +391,11 @@ class DatabaseHelper {
     bool includeEmployee = true,
   }) async {
     final db = await database;
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee);
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
     final result = await db.rawQuery(
       'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND $filterClause AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
       ['%$query%', '%$query%', '%$query%', '%$query%'],
@@ -538,7 +554,12 @@ class DatabaseHelper {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).toIso8601String();
     final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
 
     final result = await db.rawQuery(
       '''
@@ -567,7 +588,12 @@ class DatabaseHelper {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).toIso8601String();
     final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
 
     final maps = await db.rawQuery(
       '''
@@ -595,27 +621,30 @@ class DatabaseHelper {
     DateTime? date,
   }) async {
     final db = await database;
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
-    
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
+
     String dateClause = '';
     List<dynamic> args = [];
     if (date != null) {
-      final dateStr = "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      final dateStr =
+          "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
       dateClause = ' AND v.dateTime LIKE ?';
       args.add('$dateStr%');
     }
 
-    final result = await db.rawQuery(
-      '''
+    final result = await db.rawQuery('''
       SELECT COUNT(v.id) as count 
       FROM visitations v
       JOIN patients p ON v.patientId = p.id
       WHERE v.isDeleted = 0 
         AND $filterClause
         $dateClause
-      ''',
-      args,
-    );
+      ''', args);
     return result.first['count'] as int? ?? 0;
   }
 
@@ -629,21 +658,26 @@ class DatabaseHelper {
     DateTime? date,
   }) async {
     final db = await database;
-    final filterClause = _buildPatientFilterClause(selectedDepartments, includeStudent, includeEmployee, tablePrefix: 'p');
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
 
     String dateClause = '';
     List<dynamic> args = [];
     if (date != null) {
-      final dateStr = "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      final dateStr =
+          "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
       dateClause = ' AND v.dateTime LIKE ?';
       args.add('$dateStr%');
     }
-    
+
     args.add(limit);
     args.add(offset);
 
-    final maps = await db.rawQuery(
-      '''
+    final maps = await db.rawQuery('''
       SELECT v.*, p.patientName, p.firstName, p.department, p.role 
       FROM visitations v 
       JOIN patients p ON v.patientId = p.id 
@@ -652,9 +686,7 @@ class DatabaseHelper {
         $dateClause
       ORDER BY v.dateTime DESC
       LIMIT ? OFFSET ?
-      ''',
-      args,
-    );
+      ''', args);
 
     return maps;
   }
@@ -1092,18 +1124,6 @@ class DatabaseHelper {
     });
   }
 
-  // TODO: Delete this after testing
-  /// Clears all tables in the database.
-  Future<void> clearAllData() async {
-    final db = await database;
-    await db.transaction((txn) async {
-      await txn.delete('visitations');
-      await txn.delete('patients');
-      await txn.delete('inventory');
-      await txn.delete('meta');
-    });
-  }
-
   // ── Custom Symptoms ───────────────────────────────────────────────
 
   Future<int> insertCustomSymptom(CustomSymptom symptom) async {
@@ -1255,6 +1275,43 @@ class DatabaseHelper {
       return true;
     }
     return false;
+  }
+
+  // ── Mock Data Management (Dev Only) ──────────────────────────
+  
+  Future<Map<String, int>> getMockDataStats() async {
+    final db = await database;
+    final Map<String, int> stats = {};
+
+    final patients = await db.rawQuery("SELECT COUNT(*) as count FROM patients WHERE nodeId = 'MOCK_NODE'");
+    stats['patients'] = patients.first['count'] as int? ?? 0;
+
+    final visits = await db.rawQuery("SELECT COUNT(*) as count FROM visitations WHERE nodeId = 'MOCK_NODE'");
+    stats['visitations'] = visits.first['count'] as int? ?? 0;
+
+    final inventory = await db.rawQuery("SELECT COUNT(*) as count FROM inventory WHERE nodeId = 'MOCK_NODE'");
+    stats['inventory'] = inventory.first['count'] as int? ?? 0;
+
+    final stocks = await db.rawQuery("SELECT COUNT(*) as count FROM inventory_stocks WHERE nodeId = 'MOCK_NODE'");
+    stats['stocks'] = stocks.first['count'] as int? ?? 0;
+
+    final totalPatients = await db.rawQuery("SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0");
+    stats['totalActivePatients'] = totalPatients.first['count'] as int? ?? 0;
+
+    final totalVisits = await db.rawQuery("SELECT COUNT(*) as count FROM visitations WHERE isDeleted = 0");
+    stats['totalActiveVisitations'] = totalVisits.first['count'] as int? ?? 0;
+
+    return stats;
+  }
+
+  Future<void> nukeMockData() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('inventory_stocks', where: "nodeId = 'MOCK_NODE'");
+      await txn.delete('inventory', where: "nodeId = 'MOCK_NODE'");
+      await txn.delete('visitations', where: "nodeId = 'MOCK_NODE'");
+      await txn.delete('patients', where: "nodeId = 'MOCK_NODE'");
+    });
   }
 
   /// Close the database connection gracefully.

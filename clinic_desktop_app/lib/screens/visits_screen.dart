@@ -112,30 +112,34 @@ class _VisitsScreenState extends State<VisitsScreen> {
                 tooltip: 'Previous Day',
               ),
               const SizedBox(width: 8),
-              InkWell(
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: provider.visitsSelectedDate ?? DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime.now(),
-                  );
-                  if (date != null) {
-                    provider.setVisitsDate(date);
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 160,
-                  child: Text(
-                    DateFormat(
-                      'MMMM dd, yyyy',
-                    ).format(provider.visitsSelectedDate ?? DateTime.now()),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+              Tooltip(
+                message: 'Pick a Date',
+                child: InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate:
+                          provider.visitsSelectedDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      provider.setVisitsDate(date);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 160,
+                    child: Text(
+                      DateFormat(
+                        'MMMM dd, yyyy',
+                      ).format(provider.visitsSelectedDate ?? DateTime.now()),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),

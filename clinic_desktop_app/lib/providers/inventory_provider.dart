@@ -142,9 +142,10 @@ class InventoryProvider extends ChangeNotifier {
     required String clinic,
     required String itemType,
     List<({int amount, DateTime? expiry})>? initialStocks,
+    String? nodeId,
   }) async {
-    final nodeId = await NodeId.get();
-    final hlc = HLC.now(nodeId).pack();
+    final effectiveNodeId = nodeId ?? await NodeId.get();
+    final hlc = HLC.now(effectiveNodeId).pack();
     final itemId = const Uuid().v4();
 
     final item = InventoryItem(
@@ -154,7 +155,7 @@ class InventoryProvider extends ChangeNotifier {
       clinic: clinic,
       itemType: itemType,
       hlc: hlc,
-      nodeId: nodeId,
+      nodeId: effectiveNodeId,
     );
     await _db.insertInventoryItem(item);
 
@@ -167,7 +168,7 @@ class InventoryProvider extends ChangeNotifier {
           amount: entry.amount,
           expiryDate: entry.expiry,
           hlc: hlc,
-          nodeId: nodeId,
+          nodeId: effectiveNodeId,
         );
         await _db.insertStockBatch(stock);
       }
@@ -192,9 +193,10 @@ class InventoryProvider extends ChangeNotifier {
     required String itemId,
     required int amount,
     DateTime? expiryDate,
+    String? nodeId,
   }) async {
-    final nodeId = await NodeId.get();
-    final hlc = HLC.now(nodeId).pack();
+    final effectiveNodeId = nodeId ?? await NodeId.get();
+    final hlc = HLC.now(effectiveNodeId).pack();
 
     final stock = StockBatch(
       id: const Uuid().v4(),
@@ -202,7 +204,7 @@ class InventoryProvider extends ChangeNotifier {
       amount: amount,
       expiryDate: expiryDate,
       hlc: hlc,
-      nodeId: nodeId,
+      nodeId: effectiveNodeId,
     );
     await _db.insertStockBatch(stock);
     await loadInventory();
@@ -235,14 +237,14 @@ class InventoryProvider extends ChangeNotifier {
     onLocalChange?.call();
   }
 
-  Future<void> deductStock(String itemId, int qty) async {
+  Future<void> deductStock(String itemId, int qty, {String? nodeId}) async {
     if (_pendingDeductions.contains(itemId)) return;
     _pendingDeductions.add(itemId);
     try {
-      final nodeId = await NodeId.get();
-      final hlc = HLC.now(nodeId).pack();
+      final effectiveNodeId = nodeId ?? await NodeId.get();
+      final hlc = HLC.now(effectiveNodeId).pack();
       // FIFO deduction logic is implemented inside DatabaseHelper.deductStock
-      await _db.deductStock(itemId, qty, hlc: hlc, nodeId: nodeId);
+      await _db.deductStock(itemId, qty, hlc: hlc, nodeId: effectiveNodeId);
       await loadInventory();
       onLocalChange?.call();
     } finally {
