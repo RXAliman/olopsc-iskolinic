@@ -128,10 +128,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(color: AppTheme.accent),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
+                      padding: const EdgeInsets.all(16),
                     ),
                     onPressed: () async {
                       final syncProvider = context.read<SyncProvider>();
@@ -285,9 +282,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                 textStyle: WidgetStateProperty.all(
                   const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.all(16),
-                ),
+                padding: WidgetStateProperty.all(const EdgeInsets.all(16)),
               ),
               leadingIcon: const Icon(
                 Icons.keyboard_arrow_down_rounded,
@@ -336,9 +331,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                 textStyle: WidgetStateProperty.all(
                   const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
-                padding: WidgetStateProperty.all(
-                  const EdgeInsets.all(16),
-                ),
+                padding: WidgetStateProperty.all(const EdgeInsets.all(16)),
               ),
               leadingIcon: const Icon(
                 Icons.keyboard_arrow_down_rounded,
@@ -381,7 +374,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
           label: const Text('Reset Search & Filters'),
           style: TextButton.styleFrom(
             foregroundColor: AppTheme.accent,
-            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
             padding: const EdgeInsets.all(16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -436,9 +432,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
           const SizedBox(height: 8),
           Text(
             'Try adjusting your search or filters',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textMuted,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textMuted),
           ),
         ],
       ),

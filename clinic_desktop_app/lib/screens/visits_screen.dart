@@ -5,6 +5,7 @@ import '../providers/patient_provider.dart';
 import '../models/visitation.dart';
 import '../theme/app_theme.dart';
 import 'patient_detail_screen.dart';
+import 'visitation_form_screen.dart';
 
 class VisitsScreen extends StatefulWidget {
   const VisitsScreen({super.key});
@@ -98,62 +99,112 @@ class _VisitsScreenState extends State<VisitsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Date Navigation
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          decoration: AppTheme.glassCard(),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: () => provider.previousVisitsDay(),
-                icon: const Icon(Icons.chevron_left_rounded, size: 24),
-                color: AppTheme.textPrimary,
-                splashRadius: 20,
-                tooltip: 'Previous Day',
-              ),
-              const SizedBox(width: 8),
-              Tooltip(
-                message: 'Pick a Date',
-                child: InkWell(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate:
-                          provider.visitsSelectedDate ?? DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now(),
-                    );
-                    if (date != null) {
-                      provider.setVisitsDate(date);
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 160,
-                    child: Text(
-                      DateFormat(
-                        'MMMM dd, yyyy',
-                      ).format(provider.visitsSelectedDate ?? DateTime.now()),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: AppTheme.glassCard(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: () => provider.previousVisitsDay(),
+                    icon: const Icon(Icons.chevron_left_rounded, size: 24),
+                    color: AppTheme.textPrimary,
+                    splashRadius: 20,
+                    tooltip: 'Previous Day',
+                  ),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: 'Pick a Date',
+                    child: InkWell(
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              provider.visitsSelectedDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (date != null) {
+                          provider.setVisitsDate(date);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 160,
+                        child: Text(
+                          DateFormat('MMMM dd, yyyy').format(
+                            provider.visitsSelectedDate ?? DateTime.now(),
+                          ),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: isToday ? null : () => provider.nextVisitsDay(),
+                    icon: const Icon(Icons.chevron_right_rounded, size: 24),
+                    color: isToday ? AppTheme.textMuted : AppTheme.textPrimary,
+                    splashRadius: 20,
+                    tooltip: 'Next Day',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            TextButton.icon(
+              onPressed: () => provider.setVisitsDate(DateTime.now()),
+              icon: const Icon(Icons.today_rounded, size: 18),
+              label: const Text('Today'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.accent,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppTheme.dividerColor),
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: isToday ? null : () => provider.nextVisitsDay(),
-                icon: const Icon(Icons.chevron_right_rounded, size: 24),
-                color: isToday ? AppTheme.textMuted : AppTheme.textPrimary,
-                splashRadius: 20,
-                tooltip: 'Next Day',
+            ),
+            const Spacer(),
+            ElevatedButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const VisitationFormScreen(),
+                );
+              },
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text('Add Visit'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryLight,
+                foregroundColor: AppTheme.accent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppTheme.accent),
+                ),
+                padding: const EdgeInsets.all(16),
+              ),
+              onPressed: () => provider.loadGlobalVisits(),
+              icon: const Icon(Icons.sync_rounded),
+              label: const Text('Reload'),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Row(
