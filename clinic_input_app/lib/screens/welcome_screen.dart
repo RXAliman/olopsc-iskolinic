@@ -17,14 +17,42 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   VideoPlayerController? _videoController;
   bool _videoInitialized = false;
+  Timer? _resetTimer;
+  Timer? _sleepTimer;
+  bool _isSleeping = false;
 
   @override
   void initState() {
     super.initState();
     _initVideo();
+    _startTimers();
+  }
+
+  void _startTimers() {
+    _stopTimers();
+    // 10-minute reset timer
+    _resetTimer = Timer(const Duration(minutes: 10), () {
+      if (mounted) {
+        PersistentFormService.instance.clear();
+      }
+    });
+
+    // 1-hour sleep timer
+    _sleepTimer = Timer(const Duration(hours: 1), () {
+      if (mounted) {
+        setState(() => _isSleeping = true);
+        _videoController?.pause();
+      }
+    });
+  }
+
+  void _stopTimers() {
+    _resetTimer?.cancel();
+    _sleepTimer?.cancel();
   }
 
   void _initVideo() {
+    if (_isSleeping) return;
     _videoController =
         VideoPlayerController.asset('assets/olopsc-hs-clinic-avp.mp4')
           ..initialize().then((_) {
@@ -36,36 +64,96 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           });
   }
 
+  Future<void> _handleTap() async {
+    if (_isSleeping) {
+      setState(() => _isSleeping = false);
+      _initVideo();
+      _startTimers();
+      return;
+    }
+
+    if (PersistentFormService.instance.hasData) {
+      final choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.history_rounded, color: Color(0xFF1B4697)),
+              SizedBox(width: 12),
+              Text('Resume Progress?'),
+            ],
+          ),
+          content: const Text(
+            'We found an unsaved form. Would you like to continue where you left off or start a new form?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'reset'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Start New'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, 'resume'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B4697),
+              ),
+              child: const Text('Resume'),
+            ),
+          ],
+        ),
+      );
+
+      if (choice == 'reset') {
+        PersistentFormService.instance.clear();
+      } else if (choice == null) {
+        return; // Dialog cancelled or dismissed
+      }
+    }
+
+    // Fully dispose video to release hardware codec buffers for the camera
+    await _videoController?.dispose();
+    _videoController = null;
+    _videoInitialized = false;
+
+    if (!mounted) return;
+
+    final route = PersistentFormService.instance.isEmpty
+        ? '/id-method'
+        : '/form';
+    await Navigator.pushNamed(context, route);
+
+    // Re-initialize video when coming back
+    if (mounted) {
+      _initVideo();
+      _startTimers(); // Restart timers when returning to welcome screen
+    }
+  }
+
   @override
   void dispose() {
+    _stopTimers();
     _videoController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isSleeping) {
+      return GestureDetector(
+        onTap: _handleTap,
+        child: const Scaffold(backgroundColor: Colors.black),
+      );
+    }
+
     final isMobile = ResponsiveLayout.isMobile(context);
     final screenWidth = MediaQuery.of(context).size.width;
 
     return GestureDetector(
-      onTap: () async {
-        // Fully dispose video to release hardware codec buffers for the camera
-        await _videoController?.dispose();
-        _videoController = null;
-        _videoInitialized = false;
-
-        if (!context.mounted) return;
-
-        final route = PersistentFormService.instance.isEmpty
-            ? '/id-method'
-            : '/form';
-        await Navigator.pushNamed(context, route);
-
-        // Re-initialize video when coming back
-        if (mounted) {
-          _initVideo();
-        }
-      },
+      onTap: _handleTap,
       child: Scaffold(
         extendBody: false,
         body: Container(

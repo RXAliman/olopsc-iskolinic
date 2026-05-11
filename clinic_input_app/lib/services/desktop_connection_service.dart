@@ -120,13 +120,16 @@ class DesktopConnectionService {
   /// Fetch a single patient by their ID number.
   ///
   /// Returns a map of patient details or null if not found.
-  Future<Map<String, dynamic>?> fetchPatientByIdNumber(String idNumber) async {
+  Future<Map<String, dynamic>?> fetchPatientByIdNumber(
+    String idNumber, {
+    String? requestId,
+  }) async {
     try {
+      var url = '$baseUrl/api/patients/search?idNumber=$idNumber';
+      if (requestId != null) url += '&requestId=$requestId';
+
       final response = await http
-          .get(
-            Uri.parse('$baseUrl/api/patients/search?idNumber=$idNumber'),
-            headers: _authHeaders,
-          )
+          .get(Uri.parse(url), headers: _authHeaders)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -135,6 +138,48 @@ class DesktopConnectionService {
       return null;
     } catch (_) {
       _connected = false;
+      return null;
+    }
+  }
+
+  /// Request permission to edit/view full details of a patient.
+  Future<Map<String, dynamic>?> requestEdit(String idNumber) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/edit-requests'),
+            headers: {
+              ..._authHeaders,
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'idNumber': idNumber}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Check the status of a pending edit request.
+  Future<Map<String, dynamic>?> checkEditRequestStatus(String requestId) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/api/edit-requests/$requestId'),
+            headers: _authHeaders,
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
       return null;
     }
   }

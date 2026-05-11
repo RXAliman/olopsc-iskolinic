@@ -24,6 +24,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
   bool _isSubmitting = false;
   bool _isAutofilling = false;
   bool _hasAttemptedSubmit = false;
+  bool _isPartialResult = false;
+  bool _isRequestingEdit = false;
 
   // ── Patient fields ───────────────────────────────────────────────
   final _firstNameCtrl = TextEditingController();
@@ -77,6 +79,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _selectedRole = p.role;
     _selectedDepartment = p.department;
     _selectedSymptoms.addAll(p.selectedSymptoms);
+    _isPartialResult = p.isPartial;
 
     // Add listeners to sync UI -> Persistent Service
     _firstNameCtrl.addListener(() => p.firstName = _firstNameCtrl.text);
@@ -113,18 +116,19 @@ class _InputFormScreenState extends State<InputFormScreen> {
     });
   }
 
-  Future<void> _searchPatient(String id) async {
+  Future<void> _searchPatient(String id, {String? requestId}) async {
     if (id.isEmpty || _isAutofilling) return;
 
     setState(() => _isAutofilling = true);
 
     try {
       final data = await DesktopConnectionService.instance
-          .fetchPatientByIdNumber(id);
+          .fetchPatientByIdNumber(id, requestId: requestId);
       if (data != null && mounted) {
-        // Only autofill if the form is nearly empty to avoid overwriting current work unexpectedly
-        // or just apply it immediately if coming from scanner (which sets studentNumber before navigation)
         PersistentFormService.instance.updateFromMap(data);
+        setState(() {
+          _isPartialResult = PersistentFormService.instance.isPartial;
+        });
 
         // Refresh UI from persistence
         final p = PersistentFormService.instance;
@@ -151,14 +155,146 @@ class _InputFormScreenState extends State<InputFormScreen> {
           _selectedSymptoms.addAll(p.selectedSymptoms);
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Patient details autofilled!')),
-        );
+        if (requestId != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Access approved! Full details loaded.'),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Patient details loaded.')),
+          );
+        }
       }
     } catch (_) {
       // Ignore errors
     } finally {
       if (mounted) setState(() => _isAutofilling = false);
+    }
+  }
+
+  Future<void> _requestEditAccess() async {
+    final idNumber = _numberCtrl.text;
+    if (idNumber.isEmpty) return;
+
+    setState(() => _isRequestingEdit = true);
+
+    try {
+      final request = await DesktopConnectionService.instance.requestEdit(
+        idNumber,
+      );
+      if (request == null) {
+        setState(() => _isRequestingEdit = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to send edit request.')),
+          );
+        }
+        return;
+      }
+
+      final requestId = request['id'] as String;
+      bool approved = false;
+      bool denied = false;
+      bool cancelled = false;
+
+      // Show persistent dialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.security_rounded, color: AppTheme.accent),
+                SizedBox(width: 12),
+                Text('Request Pending'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 24),
+                const Text(
+                  'Your request to edit your full details is pending. Please wait for the clinic staff to approve your request.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'ID Number: $idNumber',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  cancelled = true;
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Cancel Request'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Polling loop
+      while (!approved && !denied && !cancelled && mounted) {
+        await Future.delayed(const Duration(seconds: 2));
+        if (cancelled) break;
+
+        final status = await DesktopConnectionService.instance
+            .checkEditRequestStatus(requestId);
+        if (status != null && mounted) {
+          if (status['isApproved'] == true) {
+            approved = true;
+          } else if (status['isDenied'] == true) {
+            denied = true;
+          }
+        }
+      }
+
+      if (mounted) {
+        if (approved) {
+          if (Navigator.canPop(context)) Navigator.pop(context); // Close dialog
+          await _searchPatient(
+            idNumber,
+            requestId: requestId,
+          ); // Refetch full data
+        } else if (denied) {
+          if (Navigator.canPop(context)) Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Request denied by administrator.')),
+          );
+        }
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      if (mounted) setState(() => _isRequestingEdit = false);
     }
   }
 
@@ -205,13 +341,16 @@ class _InputFormScreenState extends State<InputFormScreen> {
       _selectedDepartment = null;
       _selectedSymptoms.clear();
       _hasAttemptedSubmit = false;
+      _isPartialResult = false;
     });
   }
 
   Future<void> _submit() async {
     setState(() => _hasAttemptedSubmit = true);
     bool isValid = _formKey.currentState!.validate();
-    if (_selectedBirthdate == null) {
+
+    // Only manually validate birthdate if it's visible (not in partial/restricted view)
+    if (!_isPartialResult && _selectedBirthdate == null) {
       setState(() {}); // trigger rebuild to show error text
       isValid = false;
     }
@@ -555,6 +694,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Required' : null,
               ),
+
               const SizedBox(height: 14),
 
               // First Name & Last Name
@@ -567,6 +707,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   Expanded(
                     flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
+                      readOnly: _isPartialResult,
                       controller: _firstNameCtrl,
                       maxLength: 30,
                       decoration: InputDecoration(
@@ -606,6 +747,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   Expanded(
                     flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
+                      readOnly: _isPartialResult,
                       controller: _lastNameCtrl,
                       maxLength: 30,
                       decoration: InputDecoration(
@@ -652,6 +794,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   Expanded(
                     flex: ResponsiveLayout.isMobile(context) ? 0 : 2,
                     child: TextFormField(
+                      readOnly: _isPartialResult,
                       controller: _middleNameCtrl,
                       maxLength: 30,
                       decoration: const InputDecoration(
@@ -698,189 +841,191 @@ class _InputFormScreenState extends State<InputFormScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Role & Department
-              Flex(
-                direction: ResponsiveLayout.isMobile(context)
-                    ? Axis.vertical
-                    : Axis.horizontal,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: _buildRoleDropdown(),
-                  ),
-                  SizedBox(
-                    width: ResponsiveLayout.isMobile(context) ? 0 : 16,
-                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
-                  ),
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: _buildDepartmentDropdown(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Birthdate & Sex
-              Flex(
-                direction: ResponsiveLayout.isMobile(context)
-                    ? Axis.vertical
-                    : Axis.horizontal,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: _buildBirthdateField(),
-                  ),
-                  SizedBox(
-                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
-                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
-                  ),
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: _buildSexDropdown(),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 14),
-
-              // Contact Number
-              TextFormField(
-                controller: _contactCtrl,
-                maxLength: 20,
-                decoration: const InputDecoration(
-                  labelText: 'Contact Number',
-                  prefixIcon: Icon(Icons.phone_outlined),
-                  counterText: '',
+              if (!_isPartialResult) ...[
+                // Role & Department
+                Flex(
+                  direction: ResponsiveLayout.isMobile(context)
+                      ? Axis.vertical
+                      : Axis.horizontal,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: _buildRoleDropdown(),
+                    ),
+                    SizedBox(
+                      width: ResponsiveLayout.isMobile(context) ? 0 : 16,
+                      height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                    ),
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: _buildDepartmentDropdown(),
+                    ),
+                  ],
                 ),
-                inputFormatters: [LengthLimitingTextInputFormatter(20)],
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-              // Address
-              TextFormField(
-                controller: _addressCtrl,
-                maxLength: 150,
-                decoration: const InputDecoration(
-                  labelText: 'Address',
-                  prefixIcon: Icon(Icons.home_outlined),
-                  counterText: '',
+                // Birthdate & Sex
+                Flex(
+                  direction: ResponsiveLayout.isMobile(context)
+                      ? Axis.vertical
+                      : Axis.horizontal,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: _buildBirthdateField(),
+                    ),
+                    SizedBox(
+                      width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                      height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                    ),
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: _buildSexDropdown(),
+                    ),
+                  ],
                 ),
-                inputFormatters: [
-                  UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(150),
-                ],
-                minLines: 1,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-              ),
-              const SizedBox(height: 14),
 
-              // Guardian 1: Name & Contact
-              Flex(
-                direction: ResponsiveLayout.isMobile(context)
-                    ? Axis.vertical
-                    : Axis.horizontal,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: TextFormField(
-                      controller: _guardianNameCtrl,
-                      maxLength: 65,
-                      decoration: const InputDecoration(
-                        labelText: 'Parent / Guardian Name',
-                        prefixIcon: Icon(Icons.family_restroom_outlined),
-                        counterText: '',
-                      ),
-                      inputFormatters: [
-                        UpperCaseTextFormatter(),
-                        LengthLimitingTextInputFormatter(65),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
-                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
-                  ),
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: TextFormField(
-                      controller: _guardianContactCtrl,
-                      maxLength: 20,
-                      decoration: const InputDecoration(
-                        labelText: 'Parent / Guardian Contact',
-                        prefixIcon: Icon(Icons.phone_outlined),
-                        counterText: '',
-                      ),
-                      inputFormatters: [LengthLimitingTextInputFormatter(20)],
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-              // Guardian 2: Name & Contact
-              Flex(
-                direction: ResponsiveLayout.isMobile(context)
-                    ? Axis.vertical
-                    : Axis.horizontal,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: TextFormField(
-                      controller: _guardian2NameCtrl,
-                      maxLength: 65,
-                      decoration: const InputDecoration(
-                        labelText: 'Second Guardian Name',
-                        prefixIcon: Icon(Icons.family_restroom_outlined),
-                        counterText: '',
-                      ),
-                      inputFormatters: [
-                        UpperCaseTextFormatter(),
-                        LengthLimitingTextInputFormatter(65),
-                      ],
-                    ),
+                // Contact Number
+                TextFormField(
+                  controller: _contactCtrl,
+                  maxLength: 20,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact Number',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                    counterText: '',
                   ),
-                  SizedBox(
-                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
-                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
-                  ),
-                  Expanded(
-                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
-                    child: TextFormField(
-                      controller: _guardian2ContactCtrl,
-                      maxLength: 20,
-                      decoration: const InputDecoration(
-                        labelText: 'Second Guardian Contact',
-                        prefixIcon: Icon(Icons.phone_outlined),
-                        counterText: '',
-                      ),
-                      inputFormatters: [LengthLimitingTextInputFormatter(20)],
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Allergic To
-              TextFormField(
-                controller: _allergicToCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Allergies',
-                  hintText: 'The patient is allergic to...',
-                  prefixIcon: Icon(Icons.coronavirus_outlined),
+                  inputFormatters: [LengthLimitingTextInputFormatter(20)],
+                  keyboardType: TextInputType.phone,
                 ),
-                inputFormatters: [UpperCaseTextFormatter()],
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 14),
+
+                // Address
+                TextFormField(
+                  controller: _addressCtrl,
+                  maxLength: 150,
+                  decoration: const InputDecoration(
+                    labelText: 'Address',
+                    prefixIcon: Icon(Icons.home_outlined),
+                    counterText: '',
+                  ),
+                  inputFormatters: [
+                    UpperCaseTextFormatter(),
+                    LengthLimitingTextInputFormatter(150),
+                  ],
+                  minLines: 1,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                ),
+                const SizedBox(height: 14),
+
+                // Guardian 1: Name & Contact
+                Flex(
+                  direction: ResponsiveLayout.isMobile(context)
+                      ? Axis.vertical
+                      : Axis.horizontal,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: TextFormField(
+                        controller: _guardianNameCtrl,
+                        maxLength: 65,
+                        decoration: const InputDecoration(
+                          labelText: 'Parent / Guardian Name',
+                          prefixIcon: Icon(Icons.family_restroom_outlined),
+                          counterText: '',
+                        ),
+                        inputFormatters: [
+                          UpperCaseTextFormatter(),
+                          LengthLimitingTextInputFormatter(65),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                      height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                    ),
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: TextFormField(
+                        controller: _guardianContactCtrl,
+                        maxLength: 20,
+                        decoration: const InputDecoration(
+                          labelText: 'Parent / Guardian Contact',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                          counterText: '',
+                        ),
+                        inputFormatters: [LengthLimitingTextInputFormatter(20)],
+                        keyboardType: TextInputType.phone,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Guardian 2: Name & Contact
+                Flex(
+                  direction: ResponsiveLayout.isMobile(context)
+                      ? Axis.vertical
+                      : Axis.horizontal,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: TextFormField(
+                        controller: _guardian2NameCtrl,
+                        maxLength: 65,
+                        decoration: const InputDecoration(
+                          labelText: 'Second Guardian Name',
+                          prefixIcon: Icon(Icons.family_restroom_outlined),
+                          counterText: '',
+                        ),
+                        inputFormatters: [
+                          UpperCaseTextFormatter(),
+                          LengthLimitingTextInputFormatter(65),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                      height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                    ),
+                    Expanded(
+                      flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                      child: TextFormField(
+                        controller: _guardian2ContactCtrl,
+                        maxLength: 20,
+                        decoration: const InputDecoration(
+                          labelText: 'Second Guardian Contact',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                          counterText: '',
+                        ),
+                        inputFormatters: [LengthLimitingTextInputFormatter(20)],
+                        keyboardType: TextInputType.phone,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Allergic To
+                TextFormField(
+                  controller: _allergicToCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Allergies',
+                    hintText: 'The patient is allergic to...',
+                    prefixIcon: Icon(Icons.coronavirus_outlined),
+                  ),
+                  inputFormatters: [UpperCaseTextFormatter()],
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                ),
+                const SizedBox(height: 32),
+              ],
 
               // ═══════════════════════════════════════════════════
               //  SECTION 2 — Chief Complaints / Symptoms
@@ -931,11 +1076,72 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   prefixIcon: Icon(Icons.edit_note_rounded),
                 ),
                 inputFormatters: [UpperCaseTextFormatter()],
+                minLines: 1,
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
               ),
 
               const SizedBox(height: 32),
+
+              if (_isPartialResult) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppTheme.accent.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.privacy_tip_outlined,
+                        color: AppTheme.accent,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Restricted View',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.accent,
+                                fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'In order to view your full details, you need to request access from the clinic staff.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _isRequestingEdit
+                            ? null
+                            : _requestEditAccess,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          elevation: 0,
+                        ),
+                        child: const Text('Request Access'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // ── Submit button ─────────────────────────────────
               SizedBox(
@@ -957,7 +1163,6 @@ class _InputFormScreenState extends State<InputFormScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-
               // ── Clear form button ──────────────────────────────
               SizedBox(
                 width: double.infinity,
@@ -1036,17 +1241,20 @@ class _InputFormScreenState extends State<InputFormScreen> {
           child: Text(e, style: GoogleFonts.inter(fontWeight: FontWeight.w400)),
         );
       }).toList(),
-      onChanged: (val) {
-        if (val != null) {
-          setState(() => _selectedExtension = val);
-          PersistentFormService.instance.extension = val;
-        }
-      },
+      onChanged: _isPartialResult
+          ? null
+          : (val) {
+              if (val != null) {
+                setState(() => _selectedExtension = val);
+                PersistentFormService.instance.extension = val;
+              }
+            },
     );
   }
 
   Widget _buildCustomExtensionField() {
     return TextFormField(
+      readOnly: _isPartialResult,
       controller: _customExtensionCtrl,
       maxLength: 5,
       decoration: const InputDecoration(labelText: 'Specify', counterText: ''),

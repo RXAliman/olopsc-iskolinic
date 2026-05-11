@@ -44,6 +44,10 @@ class ConnectionScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildConnectionInfoCard(context, server),
+                        if (server.pendingRequests.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          _buildRequestsCard(context, server),
+                        ],
                         if (server.connectedDeviceModels.isNotEmpty) ...[
                           const SizedBox(height: 20),
                           _buildDevicesCard(context, server),
@@ -205,7 +209,9 @@ class ConnectionScreen extends StatelessWidget {
           _InfoRow(
             icon: Icons.vpn_key_rounded,
             label: 'Connection Token',
-            value: server.isRunning ? '${server.authToken.substring(0, 8)}…' : '—',
+            value: server.isRunning
+                ? '${server.authToken.substring(0, 8)}…'
+                : '—',
           ),
           const SizedBox(height: 10),
           _InfoRow(
@@ -259,6 +265,13 @@ class ConnectionScreen extends StatelessWidget {
                 'Connected Devices',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+              const Spacer(),
+              IconButton(
+                onPressed: () => server.refreshDevices(),
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: 'Refresh list',
+                color: AppTheme.accent,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -294,6 +307,108 @@ class ConnectionScreen extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// List of pending edit requests from tablets.
+  Widget _buildRequestsCard(BuildContext context, LocalServerProvider server) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.accent.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.security_rounded,
+                color: AppTheme.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Pending Edit Requests',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.accentDim,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => server.clearRequests(),
+                child: const Text('Clear All'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: server.pendingRequests.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final req = server.pendingRequests[index];
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.dividerColor),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ID: ${req.idNumber}',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            'From: ${req.deviceModel}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => server.denyRequest(req.id),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.danger,
+                          ),
+                          child: const Text('Deny'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => server.approveRequest(req.id),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.accent,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Approve'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
