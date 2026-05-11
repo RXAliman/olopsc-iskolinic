@@ -29,7 +29,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -65,7 +65,8 @@ class DatabaseHelper {
         patientRemarks TEXT NOT NULL DEFAULT '',
         permissions TEXT NOT NULL DEFAULT '{}',
         role TEXT NOT NULL DEFAULT '',
-        department TEXT NOT NULL DEFAULT ''
+        department TEXT NOT NULL DEFAULT '',
+        level TEXT NOT NULL DEFAULT ''
       )
     ''');
     await db.execute('''
@@ -245,6 +246,12 @@ class DatabaseHelper {
       // Add customChiefComplaint column to visitations
       await db.execute(
         "ALTER TABLE visitations ADD COLUMN customChiefComplaint TEXT NOT NULL DEFAULT ''",
+      );
+    }
+    if (oldVersion < 5) {
+      // Add level column to patients
+      await db.execute(
+        "ALTER TABLE patients ADD COLUMN level TEXT NOT NULL DEFAULT ''",
       );
     }
   }

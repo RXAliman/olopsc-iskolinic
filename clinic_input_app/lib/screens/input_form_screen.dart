@@ -38,6 +38,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
   String? _selectedSex;
   String? _selectedRole;
   String? _selectedDepartment;
+  String? _selectedLevel;
   final _contactCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _guardianNameCtrl = TextEditingController();
@@ -78,6 +79,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _selectedSex = p.sex;
     _selectedRole = p.role;
     _selectedDepartment = p.department;
+    _selectedLevel = p.level.isEmpty ? null : p.level;
     _selectedSymptoms.addAll(p.selectedSymptoms);
     _isPartialResult = p.isPartial;
 
@@ -151,6 +153,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
           _selectedSex = p.sex;
           _selectedRole = p.role;
           _selectedDepartment = p.department;
+          _selectedLevel = p.level.isEmpty ? null : p.level;
           _selectedSymptoms.clear();
           _selectedSymptoms.addAll(p.selectedSymptoms);
         });
@@ -339,6 +342,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
       _selectedSex = null;
       _selectedRole = null;
       _selectedDepartment = null;
+      _selectedLevel = null;
       _selectedSymptoms.clear();
       _hasAttemptedSubmit = false;
       _isPartialResult = false;
@@ -492,6 +496,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
         customChiefComplaint: _customChiefComplaintCtrl.text.trim(),
         role: _selectedRole ?? '',
         department: _selectedDepartment ?? '',
+        level: _selectedLevel ?? '',
         existingPatientId: PersistentFormService.instance.existingPatientId,
       );
 
@@ -863,6 +868,13 @@ class _InputFormScreenState extends State<InputFormScreen> {
                     ),
                   ],
                 ),
+
+                if (_selectedRole == 'Student' &&
+                    _selectedDepartment != null &&
+                    _selectedDepartment != 'General') ...[
+                  const SizedBox(height: 14),
+                  _buildLevelDropdown(),
+                ],
                 const SizedBox(height: 14),
 
                 // Birthdate & Sex
@@ -1115,7 +1127,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'In order to view your full details, you need to request access from the clinic staff.',
+                              'In order to view and edit your personal information, you need to request access from the clinic staff.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondary,
@@ -1307,12 +1319,93 @@ class _InputFormScreenState extends State<InputFormScreen> {
       onChanged: (val) {
         setState(() {
           _selectedRole = val;
-          PersistentFormService.instance.role = val;
+          PersistentFormService.instance.role = val ?? '';
           if (val == 'Student' && _selectedDepartment == 'General') {
             _selectedDepartment = null;
             PersistentFormService.instance.department = null;
           }
+          if (val != 'Student') {
+            _selectedLevel = null;
+            PersistentFormService.instance.level = '';
+          }
         });
+      },
+    );
+  }
+
+  Widget _buildLevelDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedLevel,
+      hint: Text(
+        'Select level',
+        style: GoogleFonts.inter(
+          color: AppTheme.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+      decoration: InputDecoration(
+        label: RichText(
+          text: TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Level ',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+              const TextSpan(
+                text: "*",
+                style: TextStyle(color: AppTheme.danger),
+              ),
+            ],
+          ),
+        ),
+        prefixIcon: const Icon(Icons.layers_outlined),
+      ),
+      items: () {
+        List<String> levels = [];
+        switch (_selectedDepartment) {
+          case 'Pre-school':
+            levels = ['Nursery', 'Pre-Kinder', 'Kinder'];
+            break;
+          case 'Grade School':
+            levels = [
+              'Grade 1',
+              'Grade 2',
+              'Grade 3',
+              'Grade 4',
+              'Grade 5',
+              'Grade 6',
+            ];
+            break;
+          case 'Junior High School':
+            levels = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
+            break;
+          case 'Senior High School':
+            levels = ['Grade 11', 'Grade 12'];
+            break;
+          case 'College':
+            levels = ['First Year', 'Second Year', 'Third Year', 'Fourth Year'];
+            break;
+        }
+        return levels.map((l) {
+          return DropdownMenuItem(
+            value: l,
+            child: Text(
+              l,
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+              ),
+            ),
+          );
+        }).toList();
+      }(),
+      validator: (v) => v == null ? 'Required' : null,
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedLevel = val);
+          PersistentFormService.instance.level = val;
+        }
       },
     );
   }
@@ -1367,8 +1460,12 @@ class _InputFormScreenState extends State<InputFormScreen> {
           }).toList(),
       validator: (v) => v == null ? 'Required' : null,
       onChanged: (val) {
-        setState(() => _selectedDepartment = val);
-        PersistentFormService.instance.department = val;
+        setState(() {
+          _selectedDepartment = val;
+          _selectedLevel = null;
+          PersistentFormService.instance.department = val;
+          PersistentFormService.instance.level = '';
+        });
       },
     );
   }

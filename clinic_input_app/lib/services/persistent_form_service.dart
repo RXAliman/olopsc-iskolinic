@@ -90,6 +90,7 @@ class PersistentFormService {
     guardian2Name = data['guardian2Name'] as String? ?? '';
     guardian2Contact = data['guardian2Contact'] as String? ?? '';
     allergicTo = data['allergicTo'] as String? ?? '';
+    level = data['level'] as String? ?? '';
   }
 
   // ── Patient Info ─────────────────────────────────────────────────
@@ -104,6 +105,7 @@ class PersistentFormService {
   String? sex;
   String? role;
   String? department;
+  String level = '';
   String contactNumber = '';
   String address = '';
   String guardianName = '';
@@ -144,6 +146,7 @@ class PersistentFormService {
     guardian2Name = '';
     guardian2Contact = '';
     allergicTo = '';
+    level = '';
     customChiefComplaint = '';
     isPartial = false;
     _selectedSymptoms.clear();

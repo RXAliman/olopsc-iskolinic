@@ -145,7 +145,34 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (_isSleeping) {
       return GestureDetector(
         onTap: _handleTap,
-        child: const Scaffold(backgroundColor: Colors.black),
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'TAP ANYWHERE TO WAKE',
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 2.0,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Opacity(
+                  opacity: 0.3,
+                  child: Image.asset(
+                    'assets/app-logo-white.png',
+                    height: 30,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

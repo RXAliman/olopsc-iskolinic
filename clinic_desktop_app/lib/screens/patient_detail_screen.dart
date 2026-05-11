@@ -284,7 +284,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                   : '—',
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(width: 16),
                                           Expanded(
                                             child: _InfoCell(
                                               icon: Icons.groups,
@@ -298,6 +298,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                           ),
                                         ],
                                       ),
+                                      if (patient.level.isNotEmpty) ...[
+                                        const SizedBox(height: 20),
+                                        _InfoCell(
+                                          icon: Icons.layers_outlined,
+                                          label: 'Level',
+                                          value: patient.level,
+                                        ),
+                                      ],
                                       const SizedBox(height: 20),
                                       Row(
                                         children: [

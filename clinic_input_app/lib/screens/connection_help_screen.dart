@@ -28,7 +28,7 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
     final packageInfo = await PackageInfo.fromPlatform();
     if (mounted) {
       setState(() {
-        _appVersion = 'v${packageInfo.version}';
+        _appVersion = packageInfo.version;
       });
     }
   }
@@ -110,14 +110,13 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                   Text(
                     'Form App Version $_appVersion',
                     style: GoogleFonts.inter(
-                      fontSize: isMobile ? 12 : 16,
+                      fontSize: isMobile ? 14 : 16,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textMuted,
                     ),
                   ),
                 ],
                 SizedBox(height: isMobile ? 32 : 48),
-
                 // Title
                 Text(
                   'Network Setup',

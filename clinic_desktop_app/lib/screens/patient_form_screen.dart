@@ -36,6 +36,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   String? _selectedSex;
   String? _selectedRole;
   String? _selectedDepartment;
+  String? _selectedLevel;
   late TextEditingController _contactCtrl;
   late TextEditingController _guardian2NameCtrl;
   late TextEditingController _guardian2ContactCtrl;
@@ -131,6 +132,8 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _selectedRole = role.isEmpty ? null : role;
     final department = widget.patient?.department ?? '';
     _selectedDepartment = department.isEmpty ? null : department;
+    final level = widget.patient?.level ?? '';
+    _selectedLevel = level.isEmpty ? null : level;
     _guardian2NameCtrl = TextEditingController(
       text: widget.patient?.guardian2Name ?? '',
     );
@@ -237,6 +240,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     String finalSex = _selectedSex ?? '';
     String finalRole = _selectedRole ?? '';
     String finalDepartment = _selectedDepartment ?? '';
+    String finalLevel = _selectedLevel ?? '';
 
     final permissionsMap = {
       'suddenIllness': _suddenIllness,
@@ -276,6 +280,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         permissions: permissionsMap,
         role: finalRole,
         department: finalDepartment,
+        level: finalLevel,
       );
       await provider.updatePatient(updated);
       if (mounted) Navigator.pop(context);
@@ -307,6 +312,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
         permissions: permissionsMap,
         role: finalRole,
         department: finalDepartment,
+        level: finalLevel,
       );
       await provider.addPatient(patient);
       if (mounted) Navigator.pop(context, patient);
@@ -674,6 +680,9 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                             _selectedDepartment == 'General') {
                           _selectedDepartment = null;
                         }
+                        if (val != 'Student') {
+                          _selectedLevel = null;
+                        }
                       });
                     },
                   ),
@@ -731,13 +740,98 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                         }).toList(),
                     validator: (v) => v == null ? 'Required' : null,
                     onChanged: (val) {
-                      setState(() => _selectedDepartment = val);
+                      setState(() {
+                        _selectedDepartment = val;
+                        _selectedLevel = null;
+                      });
                     },
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
+
+            if (_selectedRole == 'Student' && _selectedDepartment != null) ...[
+              DropdownButtonFormField<String>(
+                initialValue: _selectedLevel,
+                hint: Text(
+                  'Select level',
+                  style: GoogleFonts.inter(
+                    color: AppTheme.textMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                decoration: InputDecoration(
+                  label: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Level ',
+                          style: GoogleFonts.inter(
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        TextSpan(
+                          text: "*",
+                          style: TextStyle(color: AppTheme.danger),
+                        ),
+                      ],
+                    ),
+                  ),
+                  prefixIcon: Icon(Icons.layers_outlined),
+                ),
+                items: () {
+                  List<String> levels = [];
+                  switch (_selectedDepartment) {
+                    case 'Pre-school':
+                      levels = ['Nursery', 'Pre-Kinder', 'Kinder'];
+                      break;
+                    case 'Grade School':
+                      levels = [
+                        'Grade 1',
+                        'Grade 2',
+                        'Grade 3',
+                        'Grade 4',
+                        'Grade 5',
+                        'Grade 6',
+                      ];
+                      break;
+                    case 'Junior High School':
+                      levels = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
+                      break;
+                    case 'Senior High School':
+                      levels = ['Grade 11', 'Grade 12'];
+                      break;
+                    case 'College':
+                      levels = [
+                        'First Year',
+                        'Second Year',
+                        'Third Year',
+                        'Fourth Year',
+                      ];
+                      break;
+                  }
+                  return levels.map((l) {
+                    return DropdownMenuItem(
+                      value: l,
+                      child: Text(
+                        l,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+                  }).toList();
+                }(),
+                validator: (v) => v == null ? 'Required' : null,
+                onChanged: (val) {
+                  setState(() => _selectedLevel = val);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Birthdate & Sex
             Row(

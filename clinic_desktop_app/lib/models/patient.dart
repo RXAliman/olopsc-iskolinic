@@ -25,6 +25,7 @@ class Patient {
   final Map<String, dynamic> permissions;
   final String role;
   final String department;
+  final String level;
 
   // CRDT fields
   final String hlc;
@@ -59,6 +60,7 @@ class Patient {
     this.permissions = const {},
     this.role = '',
     this.department = '',
+    this.level = '',
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -91,6 +93,7 @@ class Patient {
       'permissions': jsonEncode(permissions),
       'role': role,
       'department': department,
+      'level': level,
     };
   }
 
@@ -129,6 +132,7 @@ class Patient {
           : const {},
       role: map['role'] as String? ?? '',
       department: map['department'] as String? ?? '',
+      level: map['level'] as String? ?? '',
     );
   }
 
@@ -157,6 +161,7 @@ class Patient {
     Map<String, dynamic>? permissions,
     String? role,
     String? department,
+    String? level,
   }) {
     return Patient(
       id: id,
@@ -186,6 +191,7 @@ class Patient {
       permissions: permissions ?? this.permissions,
       role: role ?? this.role,
       department: department ?? this.department,
+      level: level ?? this.level,
     );
   }
 

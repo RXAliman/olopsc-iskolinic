@@ -26,6 +26,7 @@ class QueueService {
     required String customChiefComplaint,
     required String role,
     required String department,
+    required String level,
     String? existingPatientId,
   }) async {
     if (!_connection.isConnected) {
@@ -62,6 +63,7 @@ class QueueService {
       'customChiefComplaint': customChiefComplaint,
       'role': role,
       'department': department,
+      'level': level,
       if (existingPatientId != null) 'existingPatientId': existingPatientId,
     };
 
