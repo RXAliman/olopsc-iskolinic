@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
@@ -8,6 +9,10 @@ import '../crdt/node_id.dart';
 import '../providers/inventory_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:csv/csv.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
+import 'dart:io';
 
 class PatientProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -56,19 +61,31 @@ class PatientProvider extends ChangeNotifier {
 
   // ── FILTER STATES ──────────────────────────────────────────────────
   List<String> _dashboardSelectedDepartments = [
-    'Pre-school', 'Grade School', 'Junior High School', 'Senior High School', 'College'
+    'Pre-school',
+    'Grade School',
+    'Junior High School',
+    'Senior High School',
+    'College',
   ];
   bool _dashboardIncludeStudent = true;
   bool _dashboardIncludeEmployee = true;
 
   List<String> _recordsSelectedDepartments = [
-    'Pre-school', 'Grade School', 'Junior High School', 'Senior High School', 'College'
+    'Pre-school',
+    'Grade School',
+    'Junior High School',
+    'Senior High School',
+    'College',
   ];
   bool _recordsIncludeStudent = true;
   bool _recordsIncludeEmployee = true;
 
   List<String> _visitsSelectedDepartments = [
-    'Pre-school', 'Grade School', 'Junior High School', 'Senior High School', 'College'
+    'Pre-school',
+    'Grade School',
+    'Junior High School',
+    'Senior High School',
+    'College',
   ];
   bool _visitsIncludeStudent = true;
   bool _visitsIncludeEmployee = true;
@@ -76,7 +93,7 @@ class PatientProvider extends ChangeNotifier {
 
   Future<void> loadFilters() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     final dDepts = prefs.getStringList('dashboard_depts');
     if (dDepts != null) _dashboardSelectedDepartments = dDepts;
     _dashboardIncludeStudent = prefs.getBool('dashboard_student') ?? true;
@@ -91,18 +108,23 @@ class PatientProvider extends ChangeNotifier {
     if (vDepts != null) _visitsSelectedDepartments = vDepts;
     _visitsIncludeStudent = prefs.getBool('visits_student') ?? true;
     _visitsIncludeEmployee = prefs.getBool('visits_employee') ?? true;
-    
+
     final vDateStr = prefs.getString('visits_date');
     if (vDateStr != null) {
       _visitsSelectedDate = DateTime.tryParse(vDateStr);
     } else {
       _visitsSelectedDate = DateTime.now();
     }
-    
+
     notifyListeners();
   }
 
-  Future<void> _saveFilters(String prefix, List<String> depts, bool student, bool employee) async {
+  Future<void> _saveFilters(
+    String prefix,
+    List<String> depts,
+    bool student,
+    bool employee,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('${prefix}_depts', depts);
     await prefs.setBool('${prefix}_student', student);
@@ -111,12 +133,22 @@ class PatientProvider extends ChangeNotifier {
 
   void clearDashboardFilters() {
     _dashboardSelectedDepartments = [
-      'Pre-school', 'Grade School', 'Junior High School', 'Senior High School', 'College', 'General'
+      'Pre-school',
+      'Grade School',
+      'Junior High School',
+      'Senior High School',
+      'College',
+      'General',
     ];
     _dashboardIncludeStudent = true;
     _dashboardIncludeEmployee = true;
     _dashboardVisitPage = 0;
-    _saveFilters('dashboard', _dashboardSelectedDepartments, _dashboardIncludeStudent, _dashboardIncludeEmployee);
+    _saveFilters(
+      'dashboard',
+      _dashboardSelectedDepartments,
+      _dashboardIncludeStudent,
+      _dashboardIncludeEmployee,
+    );
     loadPatients(); // This refreshes today's counts and lists
   }
 
@@ -154,7 +186,8 @@ class PatientProvider extends ChangeNotifier {
   Set<String> get lastSyncChangedIds => _lastSyncChangedIds;
 
   // Filter getters
-  List<String> get dashboardSelectedDepartments => _dashboardSelectedDepartments;
+  List<String> get dashboardSelectedDepartments =>
+      _dashboardSelectedDepartments;
   bool get dashboardIncludeStudent => _dashboardIncludeStudent;
   bool get dashboardIncludeEmployee => _dashboardIncludeEmployee;
   int get dashboardTotalPatients => _dashboardTotalPatients;
@@ -171,7 +204,8 @@ class PatientProvider extends ChangeNotifier {
   int get globalVisitPageSize => _globalVisitPageSize;
   DateTime? get visitsSelectedDate => _visitsSelectedDate;
   int get totalGlobalVisits => _totalGlobalVisits;
-  int get totalGlobalVisitPages => (_totalGlobalVisits / _globalVisitPageSize).ceil();
+  int get totalGlobalVisitPages =>
+      (_totalGlobalVisits / _globalVisitPageSize).ceil();
 
   // ── STATE MUTATORS ─────────────────────────────────────────────────
 
@@ -221,7 +255,7 @@ class PatientProvider extends ChangeNotifier {
         includeEmployee: _recordsIncludeEmployee,
       );
       _patients = await _db.getPatientsPaginated(
-        limit: _pageSize, 
+        limit: _pageSize,
         offset: offset,
         selectedDepartments: _recordsSelectedDepartments,
         includeStudent: _recordsIncludeStudent,
@@ -261,25 +295,42 @@ class PatientProvider extends ChangeNotifier {
       _recordsIncludeEmployee = value;
     } else {
       if (value) {
-        if (!_recordsSelectedDepartments.contains(filter)) _recordsSelectedDepartments.add(filter);
+        if (!_recordsSelectedDepartments.contains(filter)) {
+          _recordsSelectedDepartments.add(filter);
+        }
       } else {
         _recordsSelectedDepartments.remove(filter);
       }
     }
     _currentPage = 0;
-    _saveFilters('records', _recordsSelectedDepartments, _recordsIncludeStudent, _recordsIncludeEmployee);
+    _saveFilters(
+      'records',
+      _recordsSelectedDepartments,
+      _recordsIncludeStudent,
+      _recordsIncludeEmployee,
+    );
     loadPatients();
   }
 
   void clearFilters() {
     _searchQuery = '';
     _recordsSelectedDepartments = [
-      'Pre-school', 'Grade School', 'Junior High School', 'Senior High School', 'College', 'General'
+      'Pre-school',
+      'Grade School',
+      'Junior High School',
+      'Senior High School',
+      'College',
+      'General',
     ];
     _recordsIncludeStudent = true;
     _recordsIncludeEmployee = true;
     _currentPage = 0;
-    _saveFilters('records', _recordsSelectedDepartments, _recordsIncludeStudent, _recordsIncludeEmployee);
+    _saveFilters(
+      'records',
+      _recordsSelectedDepartments,
+      _recordsIncludeStudent,
+      _recordsIncludeEmployee,
+    );
     loadPatients();
   }
 
@@ -384,7 +435,7 @@ class PatientProvider extends ChangeNotifier {
   Future<void> updateVisitation(Visitation visit) async {
     // Before updating, get original to see if new supplies were added
     final original = await _db.getVisitation(visit.id);
-    
+
     final updatedVisit = visit.copyWith(hlc: _tick());
     await _db.updateVisitation(updatedVisit);
 
@@ -393,12 +444,14 @@ class PatientProvider extends ChangeNotifier {
       final originalSet = original.consumedSupplies.toSet();
       for (final supplyStr in visit.consumedSupplies) {
         if (!originalSet.contains(supplyStr)) {
-          final id = supplyStr.contains(':') ? supplyStr.split(':')[0] : supplyStr;
+          final id = supplyStr.contains(':')
+              ? supplyStr.split(':')[0]
+              : supplyStr;
           await _inventoryProvider?.deductStock(id, 1);
         }
       }
     }
-    
+
     await loadTodayVisits();
     if (_selectedPatient?.id == visit.patientId) {
       await loadVisitations();
@@ -411,9 +464,9 @@ class PatientProvider extends ChangeNotifier {
   Future<void> deleteVisitation(Visitation visit) async {
     final deletedVisit = visit.copyWith(isDeleted: true, hlc: _tick());
     await _db.updateVisitation(deletedVisit);
-    
+
     // Inventory restocking is complex due to FEFO, omitted for now.
-    
+
     await loadTodayVisits();
     if (_selectedPatient?.id == visit.patientId) {
       if (_visitations.length == 1 && _currentVisitPage > 0) {
@@ -472,11 +525,11 @@ class PatientProvider extends ChangeNotifier {
 
   Future<void> addVisitationsBatch(List<Visitation> visits) async {
     await _db.insertVisitationsBatch(visits);
-    
+
     await loadTodayVisits();
-    
+
     // If any of the visits are for the selected patient, refresh.
-    if (_selectedPatient != null && 
+    if (_selectedPatient != null &&
         visits.any((v) => v.patientId == _selectedPatient!.id)) {
       _currentVisitPage = 0;
       await loadVisitations();
@@ -519,13 +572,20 @@ class PatientProvider extends ChangeNotifier {
       _dashboardIncludeEmployee = value;
     } else {
       if (value) {
-        if (!_dashboardSelectedDepartments.contains(filter)) _dashboardSelectedDepartments.add(filter);
+        if (!_dashboardSelectedDepartments.contains(filter)) {
+          _dashboardSelectedDepartments.add(filter);
+        }
       } else {
         _dashboardSelectedDepartments.remove(filter);
       }
     }
     _dashboardVisitPage = 0;
-    _saveFilters('dashboard', _dashboardSelectedDepartments, _dashboardIncludeStudent, _dashboardIncludeEmployee);
+    _saveFilters(
+      'dashboard',
+      _dashboardSelectedDepartments,
+      _dashboardIncludeStudent,
+      _dashboardIncludeEmployee,
+    );
     loadTodayVisits();
   }
 
@@ -556,7 +616,7 @@ class PatientProvider extends ChangeNotifier {
       includeEmployee: _visitsIncludeEmployee,
       date: _visitsSelectedDate,
     );
-    
+
     final offset = _globalVisitPage * _globalVisitPageSize;
     _globalVisitations = await _db.getGlobalVisitationsPaginated(
       limit: _globalVisitPageSize,
@@ -570,7 +630,10 @@ class PatientProvider extends ChangeNotifier {
   }
 
   void goToGlobalVisitPage(int page) {
-    if (page < 0 || (totalGlobalVisitPages > 0 && page >= totalGlobalVisitPages)) return;
+    if (page < 0 ||
+        (totalGlobalVisitPages > 0 && page >= totalGlobalVisitPages)) {
+      return;
+    }
     _globalVisitPage = page;
     loadGlobalVisits();
   }
@@ -578,7 +641,9 @@ class PatientProvider extends ChangeNotifier {
   void nextGlobalVisitPage() => goToGlobalVisitPage(_globalVisitPage + 1);
   void prevGlobalVisitPage() => goToGlobalVisitPage(_globalVisitPage - 1);
   void firstGlobalVisitPage() => goToGlobalVisitPage(0);
-  void lastGlobalVisitPage() => goToGlobalVisitPage((totalGlobalVisitPages > 0 ? totalGlobalVisitPages : 1) - 1);
+  void lastGlobalVisitPage() => goToGlobalVisitPage(
+    (totalGlobalVisitPages > 0 ? totalGlobalVisitPages : 1) - 1,
+  );
 
   void toggleVisitsFilter(String filter, bool value) {
     if (filter == 'Student') {
@@ -587,13 +652,20 @@ class PatientProvider extends ChangeNotifier {
       _visitsIncludeEmployee = value;
     } else {
       if (value) {
-        if (!_visitsSelectedDepartments.contains(filter)) _visitsSelectedDepartments.add(filter);
+        if (!_visitsSelectedDepartments.contains(filter)) {
+          _visitsSelectedDepartments.add(filter);
+        }
       } else {
         _visitsSelectedDepartments.remove(filter);
       }
     }
     _globalVisitPage = 0;
-    _saveFilters('visits', _visitsSelectedDepartments, _visitsIncludeStudent, _visitsIncludeEmployee);
+    _saveFilters(
+      'visits',
+      _visitsSelectedDepartments,
+      _visitsIncludeStudent,
+      _visitsIncludeEmployee,
+    );
     loadGlobalVisits();
   }
 
@@ -674,6 +746,93 @@ class PatientProvider extends ChangeNotifier {
         _visitations = await _db.getVisitationsForPatient(_selectedPatient!.id);
       }
       notifyListeners();
+    }
+  }
+
+  // ── Data Export ──────────────────────────────────────────────────
+
+  Future<String?> exportPatientsToCsv() async {
+    try {
+      final allPatients = await _db.getPatients();
+
+      List<List<dynamic>> rows = [];
+
+      // Header
+      rows.add([
+        'ID Number',
+        'Last Name',
+        'First Name',
+        'Middle Name',
+        'Extension',
+        'Sex',
+        'Birthdate',
+        'Department',
+        'Role',
+        'Contact Number',
+        'Address',
+        'Guardian 1 Name',
+        'Guardian 1 Contact',
+        'Guardian 2 Name',
+        'Guardian 2 Contact',
+        'Allergic To',
+        'Medical History',
+        'Vaccination History',
+        'Permissions',
+        'Patient Remarks',
+        'Created At',
+      ]);
+
+      for (var p in allPatients) {
+        rows.add([
+          p.idNumber,
+          p.lastName,
+          p.firstName,
+          p.middleName,
+          p.extension,
+          p.sex,
+          p.birthdate != null
+              ? DateFormat('yyyy-MM-dd').format(p.birthdate!)
+              : '',
+          p.department,
+          p.role,
+          p.contactNumber,
+          p.address,
+          p.guardianName,
+          p.guardianContact,
+          p.guardian2Name,
+          p.guardian2Contact,
+          p.allergicTo,
+          jsonEncode(p.pastMedicalHistory),
+          jsonEncode(p.vaccinationHistory),
+          jsonEncode(p.permissions),
+          p.patientRemarks,
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(p.createdAt),
+        ]);
+      }
+
+      String csvData = const ListToCsvConverter().convert(rows);
+
+      String? outputFile = await FilePicker.saveFile(
+        dialogTitle: 'Export Patients List',
+        fileName:
+            'patients_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv',
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (outputFile == null) return null;
+
+      // Ensure filename ends with .csv on Windows if not provided
+      if (!outputFile.toLowerCase().endsWith('.csv')) {
+        outputFile += '.csv';
+      }
+
+      final file = File(outputFile);
+      await file.writeAsString(csvData);
+      return outputFile;
+    } catch (e) {
+      debugPrint('Export error: $e');
+      rethrow;
     }
   }
 }

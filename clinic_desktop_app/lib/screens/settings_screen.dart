@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../providers/sync_provider.dart';
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
+import '../providers/patient_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -151,73 +152,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             decoration: AppTheme.glassCard(),
             padding: const EdgeInsets.all(20),
-            child: Row(
+            child: Column(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
-                    Text(
-                      'Data Retention Policy',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Automatically delete patient records securely after a specified number of years. This helps keep the database performant and secures unneeded historical data.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 16),
-                    Consumer<SettingsProvider>(
-                      builder: (context, settings, _) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 200,
-                              child: DropdownButtonFormField<int>(
-                                key: ValueKey(
-                                  'retention_dropdown_${settings.retentionYears}_$_dropdownKeyCounter',
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Data Retention Policy',
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
                                 ),
-                                initialValue: settings.retentionYears,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 5,
-                                    child: Text('5 Years'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 7,
-                                    child: Text('7 Years'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 10,
-                                    child: Text('10 Years'),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Automatically delete patient records securely after a specified number of years. This helps keep the database performant and secures unneeded historical data.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
+                          Consumer<SettingsProvider>(
+                            builder: (context, settings, _) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    width: 200,
+                                    child: DropdownButtonFormField<int>(
+                                      key: ValueKey(
+                                        'retention_dropdown_${settings.retentionYears}_$_dropdownKeyCounter',
+                                      ),
+                                      initialValue: settings.retentionYears,
+                                      decoration: InputDecoration(
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 5,
+                                          child: Text('5 Years'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 7,
+                                          child: Text('7 Years'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 10,
+                                          child: Text('10 Years'),
+                                        ),
+                                      ],
+                                      onChanged: (v) {
+                                        if (v != null) {
+                                          _handleRetentionChange(
+                                            context,
+                                            settings,
+                                            v,
+                                          );
+                                        }
+                                      },
+                                    ),
                                   ),
                                 ],
-                                onChanged: (v) {
-                                  if (v != null) {
-                                    _handleRetentionChange(
-                                      context,
-                                      settings,
-                                      v,
-                                    );
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Divider(),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Export Patients List',
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Generate a Comma-separated values Excel (CSV) file containing all registered patient records for external use or reporting. Note that this doesn\'t include patient visitation data.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.file_download_rounded, size: 18),
+                      label: const Text('Export to Excel/CSV'),
+                      onPressed: () => _handleExportPatients(context),
                     ),
                   ],
                 ),
@@ -581,6 +626,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } else {
       settings.updateRetentionYears(newYears);
+    }
+  }
+
+  Future<bool> _verifyPinBeforeExport() async {
+    final pinController = TextEditingController();
+    String? error;
+
+    final isVerified = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Authentication Required'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'For security reasons, please enter your 6-digit access PIN to authorize the data export.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: 6,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Enter PIN',
+                  counterText: '',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  errorText: error,
+                ),
+                onChanged: (_) {
+                  if (error != null) setDialogState(() => error = null);
+                },
+                onSubmitted: (value) async {
+                  final isValid = await AuthService.instance.verifyPin(value);
+                  if (isValid) {
+                    if (context.mounted) Navigator.pop(context, true);
+                  } else {
+                    setDialogState(() => error = 'Incorrect PIN');
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final isValid = await AuthService.instance.verifyPin(
+                  pinController.text,
+                );
+                if (isValid) {
+                  if (context.mounted) Navigator.pop(context, true);
+                } else {
+                  setDialogState(() => error = 'Incorrect PIN');
+                }
+              },
+              child: const Text('VERIFY & EXPORT'),
+            ),
+          ],
+        ),
+      ),
+    );
+    return isVerified ?? false;
+  }
+
+  Future<void> _handleExportPatients(BuildContext context) async {
+    // Verify PIN first
+    final isAuthorized = await _verifyPinBeforeExport();
+    if (!isAuthorized || !context.mounted) return;
+
+    final patientProvider = Provider.of<PatientProvider>(
+      context,
+      listen: false,
+    );
+
+    try {
+      final path = await patientProvider.exportPatientsToCsv();
+
+      if (path != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Patients list exported successfully to $path'),
+            backgroundColor: AppTheme.accent,
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export patients: $e'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      }
     }
   }
 
