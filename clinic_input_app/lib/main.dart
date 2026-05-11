@@ -9,8 +9,14 @@ import 'screens/id_method_screen.dart';
 import 'screens/confirmation_screen.dart';
 import 'theme/app_theme.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Disable runtime fetching to ensure local bundled fonts are used
+  GoogleFonts.config.allowRuntimeFetching = false;
+
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const ClinicInputApp());
 }

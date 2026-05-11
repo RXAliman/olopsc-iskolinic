@@ -8,6 +8,7 @@ import '../services/desktop_connection_service.dart';
 import '../services/queue_service.dart';
 import '../services/persistent_form_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/responsive_layout.dart';
 
 class InputFormScreen extends StatefulWidget {
   const InputFormScreen({super.key});
@@ -19,6 +20,7 @@ class InputFormScreen extends StatefulWidget {
 class _InputFormScreenState extends State<InputFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _queueService = QueueService();
+  final _idFocusNode = FocusNode();
   bool _isSubmitting = false;
   bool _isAutofilling = false;
   bool _hasAttemptedSubmit = false;
@@ -102,6 +104,13 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _customChiefComplaintCtrl.addListener(
       () => p.customChiefComplaint = _customChiefComplaintCtrl.text,
     );
+
+    // Trigger lookup when ID field loses focus
+    _idFocusNode.addListener(() {
+      if (!_idFocusNode.hasFocus && _numberCtrl.text.isNotEmpty) {
+        _searchPatient(_numberCtrl.text);
+      }
+    });
   }
 
   Future<void> _searchPatient(String id) async {
@@ -168,6 +177,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _guardian2ContactCtrl.dispose();
     _allergicToCtrl.dispose();
     _customChiefComplaintCtrl.dispose();
+    _idFocusNode.dispose();
     super.dispose();
   }
 
@@ -208,7 +218,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
 
     if (!isValid) return;
 
-    if (_selectedSymptoms.isEmpty && _customChiefComplaintCtrl.text.trim().isEmpty) {
+    if (_selectedSymptoms.isEmpty &&
+        _customChiefComplaintCtrl.text.trim().isEmpty) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -274,6 +285,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
       _showConnectionLostDialog();
       return;
     }
+
+    if (!mounted) return;
 
     // Show confirmation dialog AFTER connection check
     final confirmed = await showDialog<bool>(
@@ -422,49 +435,65 @@ class _InputFormScreenState extends State<InputFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: isMobile ? 70 : 90,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leadingWidth: isMobile ? 50 : 70,
+        leading: Center(
+          child: IconButton(
+            onPressed: () =>
+                Navigator.popUntil(context, ModalRoute.withName('/welcome')),
+            icon: const Icon(Icons.chevron_left_rounded),
+            iconSize: 28,
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.cardLight,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: isMobile ? 32 : 40,
+              height: isMobile ? 32 : 40,
+              decoration: BoxDecoration(
+                gradient: AppTheme.accentGradient,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.medical_information_rounded,
+                size: isMobile ? 16 : 20,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                'Patient & Visit Form',
+                style: isMobile
+                    ? Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      )
+                    : Theme.of(context).textTheme.headlineMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             children: [
-              // ── App bar area ──────────────────────────────────
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.popUntil(
-                      context,
-                      ModalRoute.withName('/welcome'),
-                    ),
-                    icon: const Icon(Icons.chevron_left_rounded),
-                    iconSize: 28,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.accentGradient,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.medical_information_rounded,
-                      size: 20,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(
-                    'Patient & Visit Form',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-
               // ═══════════════════════════════════════════════════
               //  SECTION 1 — Patient Information
               // ═══════════════════════════════════════════════════
@@ -487,6 +516,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
               // ID Number (At the top now)
               TextFormField(
                 controller: _numberCtrl,
+                focusNode: _idFocusNode,
                 maxLength: 16,
                 decoration: InputDecoration(
                   label: RichText(
@@ -528,10 +558,14 @@ class _InputFormScreenState extends State<InputFormScreen> {
               const SizedBox(height: 14),
 
               // First Name & Last Name
-              Row(
+              Flex(
+                direction: ResponsiveLayout.isMobile(context)
+                    ? Axis.vertical
+                    : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
                       controller: _firstNameCtrl,
                       maxLength: 30,
@@ -542,11 +576,11 @@ class _InputFormScreenState extends State<InputFormScreen> {
                               fontWeight: FontWeight.w400,
                             ),
                             children: [
-                              TextSpan(
+                              const TextSpan(
                                 text: 'First Name ',
                                 style: TextStyle(color: AppTheme.textSecondary),
                               ),
-                              TextSpan(
+                              const TextSpan(
                                 text: '*',
                                 style: TextStyle(color: AppTheme.danger),
                               ),
@@ -565,8 +599,12 @@ class _InputFormScreenState extends State<InputFormScreen> {
                           v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                  ),
                   Expanded(
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
                       controller: _lastNameCtrl,
                       maxLength: 30,
@@ -577,11 +615,11 @@ class _InputFormScreenState extends State<InputFormScreen> {
                               fontWeight: FontWeight.w400,
                             ),
                             children: [
-                              TextSpan(
+                              const TextSpan(
                                 text: 'Last Name ',
                                 style: TextStyle(color: AppTheme.textSecondary),
                               ),
-                              TextSpan(
+                              const TextSpan(
                                 text: '*',
                                 style: TextStyle(color: AppTheme.danger),
                               ),
@@ -605,11 +643,14 @@ class _InputFormScreenState extends State<InputFormScreen> {
               const SizedBox(height: 14),
 
               // Middle Name & Extension
-              Row(
+              Flex(
+                direction: ResponsiveLayout.isMobile(context)
+                    ? Axis.vertical
+                    : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    flex: 2,
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 2,
                     child: TextFormField(
                       controller: _middleNameCtrl,
                       maxLength: 30,
@@ -625,299 +666,79 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       textCapitalization: TextCapitalization.words,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: _selectedExtension == 'Others' ? 1 : 2,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selectedExtension,
-                      decoration: const InputDecoration(
-                        labelText: 'Extension',
-                        prefixIcon: Icon(Icons.badge_outlined),
-                      ),
-                      items: ['None', 'JR.', 'SR.', 'I', 'II', 'III', 'Others']
-                          .map((e) {
-                            return DropdownMenuItem(
-                              value: e,
-                              child: Text(
-                                e,
-                                style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                            );
-                          })
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedExtension = val);
-                          PersistentFormService.instance.extension = val;
-                        }
-                      },
-                    ),
+                  SizedBox(
+                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
                   ),
-                  if (_selectedExtension == 'Others') ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 1,
-                      child: TextFormField(
-                        controller: _customExtensionCtrl,
-                        maxLength: 5,
-                        decoration: const InputDecoration(
-                          labelText: 'Specify',
-                          counterText: '',
-                        ),
-                        inputFormatters: [
-                          UpperCaseTextFormatter(),
-                          LengthLimitingTextInputFormatter(5),
+                  if (ResponsiveLayout.isMobile(context))
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 2, child: _buildExtensionDropdown()),
+                        if (_selectedExtension == 'Others') ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 1,
+                            child: _buildCustomExtensionField(),
+                          ),
                         ],
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Required' : null,
-                      ),
+                      ],
+                    )
+                  else ...[
+                    Expanded(
+                      flex: _selectedExtension == 'Others' ? 1 : 2,
+                      child: _buildExtensionDropdown(),
                     ),
+                    if (_selectedExtension == 'Others') ...[
+                      const SizedBox(width: 12),
+                      Expanded(flex: 1, child: _buildCustomExtensionField()),
+                    ],
                   ],
                 ],
               ),
               const SizedBox(height: 14),
 
               // Role & Department
-              Row(
+              Flex(
+                direction: ResponsiveLayout.isMobile(context)
+                    ? Axis.vertical
+                    : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selectedRole,
-                      hint: Text(
-                        'Select role',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textMuted,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      decoration: InputDecoration(
-                        label: RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'Role ',
-                                style: GoogleFonts.inter(
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                              TextSpan(
-                                text: "*",
-                                style: TextStyle(color: AppTheme.danger),
-                              ),
-                            ],
-                          ),
-                        ),
-                        prefixIcon: Icon(Icons.work_outline),
-                      ),
-                      items: ['Student', 'Employee'].map((r) {
-                        return DropdownMenuItem(
-                          value: r,
-                          child: Text(
-                            r,
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      validator: (v) => v == null ? 'Required' : null,
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedRole = val;
-                          PersistentFormService.instance.role = val;
-                          // Reset department if switching to a role
-                          // where current selection is invalid
-                          if (val == 'Student' &&
-                              _selectedDepartment == 'General') {
-                            _selectedDepartment = null;
-                            PersistentFormService.instance.department = null;
-                          }
-                        });
-                      },
-                    ),
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                    child: _buildRoleDropdown(),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(
+                    width: ResponsiveLayout.isMobile(context) ? 0 : 16,
+                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                  ),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selectedDepartment,
-                      hint: Text(
-                        'Select department',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textMuted,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      decoration: InputDecoration(
-                        label: RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'Department ',
-                                style: GoogleFonts.inter(
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                              TextSpan(
-                                text: "*",
-                                style: TextStyle(color: AppTheme.danger),
-                              ),
-                            ],
-                          ),
-                        ),
-                        prefixIcon: Icon(Icons.school_outlined),
-                      ),
-                      items:
-                          [
-                            if (_selectedRole == 'Employee') 'General',
-                            'Pre-school',
-                            'Grade School',
-                            'Junior High School',
-                            'Senior High School',
-                            'College',
-                          ].map((d) {
-                            return DropdownMenuItem(
-                              value: d,
-                              child: Text(
-                                d,
-                                style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w400,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                      validator: (v) => v == null ? 'Required' : null,
-                      onChanged: (val) {
-                        setState(() => _selectedDepartment = val);
-                        PersistentFormService.instance.department = val;
-                      },
-                    ),
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                    child: _buildDepartmentDropdown(),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
 
               // Birthdate & Sex
-              Row(
+              Flex(
+                direction: ResponsiveLayout.isMobile(context)
+                    ? Axis.vertical
+                    : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedBirthdate ?? DateTime.now(),
-                          firstDate: DateTime(1900),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          setState(() => _selectedBirthdate = picked);
-                          PersistentFormService.instance.birthdate = picked;
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          label: RichText(
-                            text: TextSpan(
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w400,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: 'Birthdate ',
-                                  style: TextStyle(
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: '*',
-                                  style: TextStyle(color: AppTheme.danger),
-                                ),
-                              ],
-                            ),
-                          ),
-                          prefixIcon: const Icon(Icons.cake_outlined),
-                          errorText:
-                              (_hasAttemptedSubmit &&
-                                  _selectedBirthdate == null)
-                              ? 'Required'
-                              : null,
-                        ),
-                        child: Text(
-                          _selectedBirthdate != null
-                              ? DateFormat(
-                                  'MMM dd, yyyy',
-                                ).format(_selectedBirthdate!)
-                              : 'Select Date',
-                          style: TextStyle(
-                            color: _selectedBirthdate != null
-                                ? AppTheme.textPrimary
-                                : AppTheme.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                    child: _buildBirthdateField(),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                  ),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selectedSex,
-                      hint: Text(
-                        'Select Biological Sex',
-                        style: GoogleFonts.inter(
-                          color: AppTheme.textMuted,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      decoration: InputDecoration(
-                        label: RichText(
-                          text: TextSpan(
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w400,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: 'Sex ',
-                                style: TextStyle(color: AppTheme.textSecondary),
-                              ),
-                              TextSpan(
-                                text: '*',
-                                style: TextStyle(color: AppTheme.danger),
-                              ),
-                            ],
-                          ),
-                        ),
-                        prefixIcon: const Icon(Icons.wc_outlined),
-                        errorText: (_hasAttemptedSubmit && _selectedSex == null)
-                            ? 'Required'
-                            : null,
-                      ),
-                      items: ['Male', 'Female', 'Intersex'].map((s) {
-                        return DropdownMenuItem(
-                          value: s,
-                          child: Text(
-                            s,
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      validator: (v) => v == null ? 'Required' : null,
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedSex = val);
-                          PersistentFormService.instance.sex = val;
-                        }
-                      },
-                    ),
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
+                    child: _buildSexDropdown(),
                   ),
                 ],
               ),
@@ -958,10 +779,14 @@ class _InputFormScreenState extends State<InputFormScreen> {
               const SizedBox(height: 14),
 
               // Guardian 1: Name & Contact
-              Row(
+              Flex(
+                direction: ResponsiveLayout.isMobile(context)
+                    ? Axis.vertical
+                    : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
                       controller: _guardianNameCtrl,
                       maxLength: 65,
@@ -976,8 +801,12 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                  ),
                   Expanded(
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
                       controller: _guardianContactCtrl,
                       maxLength: 20,
@@ -995,10 +824,14 @@ class _InputFormScreenState extends State<InputFormScreen> {
               const SizedBox(height: 14),
 
               // Guardian 2: Name & Contact
-              Row(
+              Flex(
+                direction: ResponsiveLayout.isMobile(context)
+                    ? Axis.vertical
+                    : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
                       controller: _guardian2NameCtrl,
                       maxLength: 65,
@@ -1013,8 +846,12 @@ class _InputFormScreenState extends State<InputFormScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: ResponsiveLayout.isMobile(context) ? 0 : 12,
+                    height: ResponsiveLayout.isMobile(context) ? 14 : 0,
+                  ),
                   Expanded(
+                    flex: ResponsiveLayout.isMobile(context) ? 0 : 1,
                     child: TextFormField(
                       controller: _guardian2ContactCtrl,
                       maxLength: 20,
@@ -1181,6 +1018,250 @@ class _InputFormScreenState extends State<InputFormScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // ── Form Field Builders ───────────────────────────────────────────
+
+  Widget _buildExtensionDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedExtension,
+      decoration: const InputDecoration(
+        labelText: 'Extension',
+        prefixIcon: Icon(Icons.badge_outlined),
+      ),
+      items: ['None', 'JR.', 'SR.', 'I', 'II', 'III', 'Others'].map((e) {
+        return DropdownMenuItem(
+          value: e,
+          child: Text(e, style: GoogleFonts.inter(fontWeight: FontWeight.w400)),
+        );
+      }).toList(),
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedExtension = val);
+          PersistentFormService.instance.extension = val;
+        }
+      },
+    );
+  }
+
+  Widget _buildCustomExtensionField() {
+    return TextFormField(
+      controller: _customExtensionCtrl,
+      maxLength: 5,
+      decoration: const InputDecoration(labelText: 'Specify', counterText: ''),
+      inputFormatters: [
+        UpperCaseTextFormatter(),
+        LengthLimitingTextInputFormatter(5),
+      ],
+      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+    );
+  }
+
+  Widget _buildRoleDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedRole,
+      hint: Text(
+        'Select role',
+        style: GoogleFonts.inter(
+          color: AppTheme.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+      decoration: InputDecoration(
+        label: RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Role ',
+                style: GoogleFonts.inter(color: AppTheme.textSecondary),
+              ),
+              const TextSpan(
+                text: "*",
+                style: TextStyle(color: AppTheme.danger),
+              ),
+            ],
+          ),
+        ),
+        prefixIcon: const Icon(Icons.work_outline),
+      ),
+      items: ['Student', 'Employee'].map((r) {
+        return DropdownMenuItem(
+          value: r,
+          child: Text(
+            r,
+            style: GoogleFonts.inter(fontWeight: FontWeight.w400, fontSize: 14),
+          ),
+        );
+      }).toList(),
+      validator: (v) => v == null ? 'Required' : null,
+      onChanged: (val) {
+        setState(() {
+          _selectedRole = val;
+          PersistentFormService.instance.role = val;
+          if (val == 'Student' && _selectedDepartment == 'General') {
+            _selectedDepartment = null;
+            PersistentFormService.instance.department = null;
+          }
+        });
+      },
+    );
+  }
+
+  Widget _buildDepartmentDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedDepartment,
+      hint: Text(
+        'Select department',
+        style: GoogleFonts.inter(
+          color: AppTheme.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+      decoration: InputDecoration(
+        label: RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Department ',
+                style: GoogleFonts.inter(color: AppTheme.textSecondary),
+              ),
+              const TextSpan(
+                text: "*",
+                style: TextStyle(color: AppTheme.danger),
+              ),
+            ],
+          ),
+        ),
+        prefixIcon: const Icon(Icons.school_outlined),
+      ),
+      items:
+          [
+            if (_selectedRole == 'Employee') 'General',
+            'Pre-school',
+            'Grade School',
+            'Junior High School',
+            'Senior High School',
+            'College',
+          ].map((d) {
+            return DropdownMenuItem(
+              value: d,
+              child: Text(
+                d,
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
+                ),
+              ),
+            );
+          }).toList(),
+      validator: (v) => v == null ? 'Required' : null,
+      onChanged: (val) {
+        setState(() => _selectedDepartment = val);
+        PersistentFormService.instance.department = val;
+      },
+    );
+  }
+
+  Widget _buildBirthdateField() {
+    return InkWell(
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate:
+              _selectedBirthdate ?? DateTime(now.year - 18, now.month, now.day),
+          firstDate: DateTime(1920),
+          lastDate: now,
+        );
+        if (picked != null) {
+          setState(() => _selectedBirthdate = picked);
+          PersistentFormService.instance.birthdate = picked;
+        }
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          label: RichText(
+            text: TextSpan(
+              style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+              children: [
+                const TextSpan(
+                  text: 'Birthdate ',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+                const TextSpan(
+                  text: '*',
+                  style: TextStyle(color: AppTheme.danger),
+                ),
+              ],
+            ),
+          ),
+          prefixIcon: const Icon(Icons.cake_outlined),
+          errorText: (_hasAttemptedSubmit && _selectedBirthdate == null)
+              ? 'Required'
+              : null,
+        ),
+        child: Text(
+          _selectedBirthdate != null
+              ? DateFormat('MMM dd, yyyy').format(_selectedBirthdate!)
+              : 'Select Date',
+          style: TextStyle(
+            color: _selectedBirthdate != null
+                ? AppTheme.textPrimary
+                : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSexDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedSex,
+      hint: Text(
+        'Select Biological Sex',
+        style: GoogleFonts.inter(
+          color: AppTheme.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+      decoration: InputDecoration(
+        label: RichText(
+          text: TextSpan(
+            style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+            children: [
+              const TextSpan(
+                text: 'Sex ',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+              const TextSpan(
+                text: '*',
+                style: TextStyle(color: AppTheme.danger),
+              ),
+            ],
+          ),
+        ),
+        prefixIcon: const Icon(Icons.wc_outlined),
+        errorText: (_hasAttemptedSubmit && _selectedSex == null)
+            ? 'Required'
+            : null,
+      ),
+      items: ['Male', 'Female', 'Intersex'].map((s) {
+        return DropdownMenuItem(
+          value: s,
+          child: Text(s, style: GoogleFonts.inter(fontWeight: FontWeight.w400)),
+        );
+      }).toList(),
+      validator: (v) => v == null ? 'Required' : null,
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedSex = val);
+          PersistentFormService.instance.sex = val;
+        }
+      },
     );
   }
 

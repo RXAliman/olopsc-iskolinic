@@ -1,31 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/responsive_layout.dart';
 
 class IdentificationMethodScreen extends StatelessWidget {
   const IdentificationMethodScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return Scaffold(
       backgroundColor: AppTheme.primaryLight,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 24 : 40,
+              vertical: isMobile ? 40 : 60,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Icon Header
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(isMobile ? 20 : 24),
                   decoration: BoxDecoration(
                     color: AppTheme.accent.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.person_search_rounded,
-                    size: 80,
+                    size: isMobile ? 60 : 80,
                     color: AppTheme.accent,
                   ),
                 ),
@@ -34,7 +40,11 @@ class IdentificationMethodScreen extends StatelessWidget {
                 // Title & Subtitle
                 Text(
                   'Identify Yourself',
-                  style: Theme.of(context).textTheme.headlineLarge,
+                  style: isMobile
+                      ? Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        )
+                      : Theme.of(context).textTheme.headlineLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -43,7 +53,7 @@ class IdentificationMethodScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 60),
+                const SizedBox(height: 48),
 
                 // Selection Buttons
                 _buildMethodButton(
@@ -54,7 +64,7 @@ class IdentificationMethodScreen extends StatelessWidget {
                   onTap: () => Navigator.pushNamed(context, '/barcode'),
                   isPrimary: true,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildMethodButton(
                   context: context,
                   icon: Icons.edit_note_rounded,
@@ -64,7 +74,7 @@ class IdentificationMethodScreen extends StatelessWidget {
                   isPrimary: false,
                 ),
 
-                const SizedBox(height: 60),
+                const SizedBox(height: 48),
 
                 // Back to Welcome
                 ElevatedButton.icon(
@@ -74,7 +84,10 @@ class IdentificationMethodScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.cardLight,
                     foregroundColor: AppTheme.textSecondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: const BorderSide(color: AppTheme.dividerColor),
@@ -98,6 +111,8 @@ class IdentificationMethodScreen extends StatelessWidget {
     required VoidCallback onTap,
     required bool isPrimary,
   }) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -127,11 +142,11 @@ class IdentificationMethodScreen extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(28),
+            padding: EdgeInsets.all(isMobile ? 20 : 28),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(isMobile ? 12 : 16),
                   decoration: BoxDecoration(
                     color: (isPrimary ? AppTheme.accent : AppTheme.textMuted)
                         .withValues(alpha: 0.1),
@@ -139,11 +154,11 @@ class IdentificationMethodScreen extends StatelessWidget {
                   ),
                   child: Icon(
                     icon,
-                    size: 32,
+                    size: isMobile ? 28 : 32,
                     color: isPrimary ? AppTheme.accent : AppTheme.textSecondary,
                   ),
                 ),
-                const SizedBox(width: 24),
+                const SizedBox(width: 20),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +166,7 @@ class IdentificationMethodScreen extends StatelessWidget {
                       Text(
                         title,
                         style: GoogleFonts.inter(
-                          fontSize: 20,
+                          fontSize: isMobile ? 18 : 20,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.textPrimary,
                         ),
@@ -160,7 +175,7 @@ class IdentificationMethodScreen extends StatelessWidget {
                       Text(
                         subtitle,
                         style: GoogleFonts.inter(
-                          fontSize: 14,
+                          fontSize: isMobile ? 13 : 14,
                           color: AppTheme.textSecondary,
                           height: 1.3,
                         ),

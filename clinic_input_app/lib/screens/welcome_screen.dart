@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 import '../services/persistent_form_service.dart';
+import '../widgets/responsive_layout.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -43,6 +44,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return GestureDetector(
       onTap: () async {
         // Fully dispose video to release hardware codec buffers for the camera
@@ -77,9 +81,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             children: [
               // Upper portion: Logo (left) and Date/Time (right)
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 40,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 20 : 32,
+                  vertical: isMobile ? 30 : 40,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -88,7 +92,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     // Upper left: OLOPCS Marikina City Logo
                     Image.asset(
                       'assets/olopsc-marikina-city.png',
-                      height: 80,
+                      height: isMobile ? 40 : 80,
                       fit: BoxFit.contain,
                     ),
                     // Upper right: Date and Time
@@ -102,7 +106,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             Text(
                               DateFormat('EEEE, MMMM d, yyyy').format(now),
                               style: GoogleFonts.inter(
-                                fontSize: 20,
+                                fontSize: isMobile ? 14 : 20,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
@@ -111,7 +115,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             Text(
                               DateFormat('hh:mm a').format(now),
                               style: GoogleFonts.inter(
-                                fontSize: 18,
+                                fontSize: isMobile ? 14 : 18,
                                 fontWeight: FontWeight.w500,
                                 color: Colors.white.withValues(alpha: 0.9),
                               ),
@@ -127,29 +131,39 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               const Spacer(flex: 2),
 
               // Center texts
-              Text(
-                'OUR LADY OF PERPETUAL SUCCOR COLLEGE',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.normal,
-                  color: Colors.white,
-                  letterSpacing: 3.0,
-                ),
-              ),
-              Text(
-                'SCHOOL CLINIC SYSTEM',
-                style: GoogleFonts.inter(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 2.0,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    Text(
+                      'OUR LADY OF PERPETUAL SUCCOR COLLEGE',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: isMobile ? 12 : 18,
+                        fontWeight: FontWeight.normal,
+                        color: Colors.white,
+                        letterSpacing: isMobile ? 1.5 : 3.0,
+                      ),
+                    ),
+                    Text(
+                      'SCHOOL CLINIC SYSTEM',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: isMobile ? 28 : 48,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: isMobile ? 1.0 : 2.0,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
 
               // Video player area
-              SizedBox(
-                width: 640,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                width: isMobile ? screenWidth : 640,
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Container(
@@ -183,7 +197,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   Text(
                     'POWERED BY: ',
                     style: GoogleFonts.inter(
-                      fontSize: 16,
+                      fontSize: isMobile ? 10 : 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white.withValues(alpha: 0.8),
                       letterSpacing: 1.5,
@@ -192,7 +206,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   const SizedBox(width: 8),
                   Image.asset(
                     'assets/app-logo-white.png',
-                    height: 40,
+                    height: isMobile ? 25 : 40,
                     fit: BoxFit.contain,
                   ),
                 ],
@@ -204,14 +218,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               Container(
                 width: double.infinity,
                 color: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 32),
+                padding: EdgeInsets.symmetric(vertical: isMobile ? 20 : 32),
                 child: Center(
                   child: AnimatedTextKit(
                     animatedTexts: [
                       TyperAnimatedText(
                         'TAP ANYWHERE TO CONTINUE',
                         textStyle: GoogleFonts.inter(
-                          fontSize: 30,
+                          fontSize: isMobile ? 18 : 30,
                           fontWeight: FontWeight.w500,
                           color: const Color(0xFF1B4697),
                           letterSpacing: 1.2,

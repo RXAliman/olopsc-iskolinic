@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'qr_scan_screen.dart';
 import '../theme/app_theme.dart';
+import '../widgets/responsive_layout.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class ConnectionHelpScreen extends StatefulWidget {
   const ConnectionHelpScreen({super.key});
@@ -13,11 +15,22 @@ class ConnectionHelpScreen extends StatefulWidget {
 
 class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
   String _localIp = 'Detecting...';
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _getHostIp();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = 'v${packageInfo.version}';
+      });
+    }
   }
 
   Future<void> _getHostIp() async {
@@ -26,9 +39,9 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
         type: InternetAddressType.IPv4,
         includeLoopback: false,
       );
-      
+
       String? foundIp;
-      
+
       // Try to find 192.168.x.x first
       for (final iface in interfaces) {
         for (final addr in iface.addresses) {
@@ -39,9 +52,11 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
         }
         if (foundIp != null) break;
       }
-      
+
       // Fallback to any address if 192.168.x.x not found
-      if (foundIp == null && interfaces.isNotEmpty && interfaces.first.addresses.isNotEmpty) {
+      if (foundIp == null &&
+          interfaces.isNotEmpty &&
+          interfaces.first.addresses.isNotEmpty) {
         foundIp = interfaces.first.addresses.first.address;
       }
 
@@ -71,34 +86,44 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return Scaffold(
       backgroundColor: AppTheme.primaryLight,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 24 : 40,
+              vertical: isMobile ? 40 : 60,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Icon Header
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.settings_ethernet_rounded,
-                    size: 80,
-                    color: AppTheme.accent,
-                  ),
+                // App Logo and Version
+                Image.asset(
+                  'assets/app-logo-colored.png',
+                  height: isMobile ? 80 : 120,
                 ),
-                const SizedBox(height: 40),
-                
+                if (_appVersion.isNotEmpty) ...[
+                  SizedBox(height: isMobile ? 8 : 12),
+                  Text(
+                    'Form App Version $_appVersion',
+                    style: GoogleFonts.inter(
+                      fontSize: isMobile ? 12 : 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+                SizedBox(height: isMobile ? 32 : 48),
+
                 // Title
                 Text(
                   'Network Setup',
-                  style: Theme.of(context).textTheme.headlineLarge,
+                  style: isMobile
+                      ? Theme.of(context).textTheme.headlineMedium
+                      : Theme.of(context).textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -106,12 +131,13 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 24),
 
                 // Instructions Card
                 Container(
-                  width: 500,
-                  padding: const EdgeInsets.all(32),
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  width: double.infinity,
+                  padding: EdgeInsets.all(isMobile ? 24 : 32),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
@@ -129,13 +155,15 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                       _buildStep(
                         icon: Icons.wifi_rounded,
                         title: 'Turn on Wi-Fi',
-                        description: 'Ensure the tablet\'s Wi-Fi is enabled and connected.',
+                        description:
+                            'Ensure the tablet\'s Wi-Fi is enabled and connected.',
                       ),
                       const Divider(height: 40),
                       _buildStep(
                         icon: Icons.router_rounded,
                         title: 'Join Clinic Network',
-                        description: 'Connect to the same Wi-Fi network as the clinic desktop app.',
+                        description:
+                            'Connect to the same Wi-Fi network as the clinic desktop app.',
                       ),
                       const Divider(height: 40),
                       _buildStep(
@@ -153,11 +181,16 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: AppTheme.cardLight,
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: AppTheme.dividerColor),
+                                      border: Border.all(
+                                        color: AppTheme.dividerColor,
+                                      ),
                                     ),
                                     child: Text(
                                       _networkRange.replaceAll('.x', ''),
@@ -182,19 +215,26 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
 
                 // Troubleshooting Note
                 Container(
-                  width: 500,
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: AppTheme.danger.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.danger.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: AppTheme.danger.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.lightbulb_outline_rounded, color: AppTheme.danger, size: 20),
+                          const Icon(
+                            Icons.lightbulb_outline_rounded,
+                            color: AppTheme.danger,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Troubleshooting Tips',
@@ -208,7 +248,7 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '• Turn off Mobile Data if the tablet has a SIM card.\n'
+                        '• Turn off Mobile Data if the device has a SIM card.\n'
                         '• Disable any active VPN or Proxy settings.\n'
                         '• If detection fails, check if the Desktop app is "Running".',
                         style: GoogleFonts.inter(
@@ -224,7 +264,8 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
 
                 // Continue Button
                 Container(
-                  width: 500,
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  width: double.infinity,
                   height: 64,
                   decoration: BoxDecoration(
                     gradient: AppTheme.accentGradient,
@@ -241,7 +282,9 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const QrScanScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const QrScanScreen(),
+                        ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -252,25 +295,28 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'I\'M CONNECTED, START SCANNING',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.1,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'I\'M CONNECTED, START SCANNING',
+                            style: GoogleFonts.inter(
+                              fontSize: isMobile ? 14 : 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.1,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(Icons.arrow_forward_rounded, size: 20),
-                      ],
+                          const SizedBox(width: 12),
+                          const Icon(Icons.arrow_forward_rounded, size: 20),
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Refresh IP link
                 TextButton.icon(
                   onPressed: _getHostIp,
@@ -337,10 +383,7 @@ class _ConnectionHelpScreenState extends State<ConnectionHelpScreen> {
                     color: AppTheme.textSecondary,
                   ),
                 ),
-              if (trailing != null) ...[
-                const SizedBox(height: 12),
-                trailing,
-              ],
+              if (trailing != null) ...[const SizedBox(height: 12), trailing],
             ],
           ),
         ),
