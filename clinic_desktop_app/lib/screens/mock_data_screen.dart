@@ -277,7 +277,7 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
   Widget build(BuildContext context) {
     final patientProvider = context.watch<PatientProvider>();
     final mockPatientsCount = patientProvider.allPatientsCount;
-    // We'll fetch the actual list in the generate method to avoid heavy UI rebuilds 
+    // We'll fetch the actual list in the generate method to avoid heavy UI rebuilds
     // with thousands of mock patients.
 
     return SingleChildScrollView(
@@ -519,6 +519,7 @@ class _MockInventoryTab extends StatefulWidget {
 
 class _MockInventoryTabState extends State<_MockInventoryTab> {
   bool _isSeeding = false;
+  int _targetCount = 5;
 
   @override
   Widget build(BuildContext context) {
@@ -574,12 +575,43 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
           Row(
             children: [
               Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    tickMarkShape: const RoundSliderTickMarkShape(
+                      tickMarkRadius: 2.0,
+                    ),
+                    activeTickMarkColor: AppTheme.accent.withValues(alpha: 0.5),
+                    inactiveTickMarkColor: AppTheme.accent.withValues(
+                      alpha: 0.2,
+                    ),
+                  ),
+                  child: Slider(
+                    value: _targetCount.toDouble(),
+                    min: 1,
+                    max: 20,
+                    divisions: 19,
+                    label: _targetCount.toString(),
+                    onChanged: (val) =>
+                        setState(() => _targetCount = val.toInt()),
+                  ),
+                ),
+              ),
+              Text(
+                'Target Items: $_targetCount',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
                 child: ElevatedButton(
                   onPressed: () => _bulkUpdateStock(mode: 'low'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                   ),
-                  child: const Text('Set All to LOW'),
+                  child: Text('Set $_targetCount to LOW'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -589,7 +621,7 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                   ),
-                  child: const Text('Set All to HEALTHY'),
+                  child: Text('Set $_targetCount to HEALTHY'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -599,7 +631,7 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepOrange,
                   ),
-                  child: const Text('Set All to EXPIRING'),
+                  child: Text('Set $_targetCount to EXPIRING'),
                 ),
               ),
             ],
@@ -624,12 +656,22 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
 
   Future<void> _bulkUpdateStock({required String mode}) async {
     final provider = context.read<InventoryProvider>();
-    final items = provider.allItems;
+    final mockItems = provider.allItems
+        .where((i) => i.nodeId == MockDataService.mockNodeId)
+        .toList();
+
+    if (mockItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No mock items found to update.')),
+      );
+      return;
+    }
+
+    mockItems.shuffle();
+    final targets = mockItems.take(_targetCount).toList();
 
     int count = 0;
-    for (final item in items) {
-      if (item.nodeId != MockDataService.mockNodeId) continue;
-
+    for (final item in targets) {
       if (mode == 'expiring') {
         // To make it expiring, we add a batch with an expiry date in 30 days
         await provider.addStockBatch(
