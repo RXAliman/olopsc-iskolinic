@@ -159,6 +159,7 @@ class MockDataService {
     int count, {
     int? year,
   }) async {
+    final patients = <Patient>[];
     for (int i = 0; i < count; i++) {
       DateTime? createdAt;
       if (year != null) {
@@ -168,11 +169,9 @@ class MockDataService {
         final range = end.difference(start).inDays;
         createdAt = start.add(Duration(days: _random.nextInt(range)));
       }
-      await provider.addPatient(
-        generateMockPatient(createdAt: createdAt),
-        nodeId: mockNodeId,
-      );
+      patients.add(generateMockPatient(createdAt: createdAt));
     }
+    await provider.addPatientsBatch(patients);
   }
 
   static Future<void> bulkGenerateVisits(
@@ -181,6 +180,7 @@ class MockDataService {
     int count, {
     int daysBack = 0,
   }) async {
+    final visits = <Visitation>[];
     for (int i = 0; i < count; i++) {
       DateTime? dt;
       if (daysBack > 0) {
@@ -192,16 +192,34 @@ class MockDataService {
           ),
         );
       }
-      final visit = generateMockVisitation(patientId, dateTime: dt);
-      await provider.addVisitation(
-        patientId: visit.patientId,
-        symptoms: visit.symptoms,
-        treatment: visit.treatment,
-        remarks: visit.remarks,
-        dateTime: visit.dateTime,
-        nodeId: mockNodeId,
-      );
+      visits.add(generateMockVisitation(patientId, dateTime: dt));
     }
+    await provider.addVisitationsBatch(visits);
+  }
+
+  static Future<void> bulkGenerateVisitsForMultiplePatients(
+    PatientProvider provider,
+    List<String> patientIds,
+    int countPerPatient, {
+    int daysBack = 0,
+  }) async {
+    final allVisits = <Visitation>[];
+    for (final patientId in patientIds) {
+      for (int i = 0; i < countPerPatient; i++) {
+        DateTime? dt;
+        if (daysBack > 0) {
+          dt = DateTime.now().subtract(
+            Duration(
+              days: _random.nextInt(daysBack),
+              hours: _random.nextInt(24),
+              minutes: _random.nextInt(60),
+            ),
+          );
+        }
+        allVisits.add(generateMockVisitation(patientId, dateTime: dt));
+      }
+    }
+    await provider.addVisitationsBatch(allVisits);
   }
 
   static Future<void> seedDefaultInventory(InventoryProvider provider) async {

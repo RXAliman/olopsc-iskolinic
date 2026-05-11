@@ -308,11 +308,36 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> insertPatientsBatch(List<Patient> patients) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final patient in patients) {
+        batch.insert(
+          'patients',
+          patient.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
   Future<List<Patient>> getPatients() async {
     final db = await database;
     final maps = await db.query(
       'patients',
       where: 'isDeleted = 0',
+      orderBy: 'patientName ASC',
+    );
+    return maps.map((m) => Patient.fromMap(m)).toList();
+  }
+
+  Future<List<Patient>> getMockPatients() async {
+    final db = await database;
+    final maps = await db.query(
+      'patients',
+      where: "isDeleted = 0 AND nodeId = 'MOCK_NODE'",
       orderBy: 'patientName ASC',
     );
     return maps.map((m) => Patient.fromMap(m)).toList();
@@ -473,6 +498,21 @@ class DatabaseHelper {
       visit.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<void> insertVisitationsBatch(List<Visitation> visits) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final visit in visits) {
+        batch.insert(
+          'visitations',
+          visit.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Future<void> updateVisitation(Visitation visit) async {

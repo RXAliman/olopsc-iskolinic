@@ -276,9 +276,9 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
   @override
   Widget build(BuildContext context) {
     final patientProvider = context.watch<PatientProvider>();
-    final mockPatients = patientProvider.patients
-        .where((p) => p.idNumber.startsWith('MOCK-'))
-        .toList();
+    final mockPatientsCount = patientProvider.allPatientsCount;
+    // We'll fetch the actual list in the generate method to avoid heavy UI rebuilds 
+    // with thousands of mock patients.
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -329,24 +329,24 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
                               value: _patientSubsetCount
                                   .clamp(
                                     1,
-                                    mockPatients.isEmpty
+                                    mockPatientsCount == 0
                                         ? 1
-                                        : mockPatients.length,
+                                        : mockPatientsCount,
                                   )
                                   .toDouble(),
                               min: 1,
-                              max: mockPatients.isEmpty
+                              max: mockPatientsCount == 0
                                   ? 1
-                                  : mockPatients.length.toDouble(),
-                              divisions: mockPatients.isEmpty
+                                  : mockPatientsCount.toDouble(),
+                              divisions: mockPatientsCount == 0
                                   ? 1
-                                  : (mockPatients.length > 1
-                                        ? (mockPatients.length > 20
+                                  : (mockPatientsCount > 1
+                                        ? (mockPatientsCount > 20
                                               ? 10
-                                              : mockPatients.length - 1)
+                                              : mockPatientsCount - 1)
                                         : 1),
                               label: _patientSubsetCount.toString(),
-                              onChanged: mockPatients.isEmpty
+                              onChanged: mockPatientsCount == 0
                                   ? null
                                   : (val) => setState(
                                       () => _patientSubsetCount = val.toInt(),
@@ -431,7 +431,7 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: (_isGenerating || mockPatients.isEmpty)
+                      onPressed: (_isGenerating || mockPatientsCount == 0)
                           ? null
                           : _generate,
                       icon: _isGenerating
@@ -450,7 +450,7 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
                       ),
                     ),
                   ),
-                  if (mockPatients.isEmpty)
+                  if (mockPatientsCount == 0)
                     const Padding(
                       padding: EdgeInsets.only(top: 8.0),
                       child: Text(
@@ -473,9 +473,7 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
     setState(() => _isGenerating = true);
 
     try {
-      final mockPatients = provider.patients
-          .where((p) => p.idNumber.startsWith('MOCK-'))
-          .toList();
+      final mockPatients = await DatabaseHelper.instance.getMockPatients();
 
       if (mockPatients.isEmpty) return;
 
@@ -488,14 +486,12 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
         targets = shuffled.take(_patientSubsetCount).toList();
       }
 
-      for (final p in targets) {
-        await MockDataService.bulkGenerateVisits(
-          provider,
-          p.id,
-          _bulkCount,
-          daysBack: _daysBack,
-        );
-      }
+      await MockDataService.bulkGenerateVisitsForMultiplePatients(
+        provider,
+        targets.map((p) => p.id).toList(),
+        _bulkCount,
+        daysBack: _daysBack,
+      );
 
       messenger.showSnackBar(
         SnackBar(

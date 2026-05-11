@@ -311,6 +311,12 @@ class PatientProvider extends ChangeNotifier {
     _autoPush();
   }
 
+  Future<void> addPatientsBatch(List<Patient> patients) async {
+    await _db.insertPatientsBatch(patients);
+    await loadPatients();
+    _autoPush();
+  }
+
   Future<void> updatePatient(Patient patient) async {
     final hlc = _tick();
     final withCrdt = patient.copyWith(hlc: hlc, nodeId: _nodeId);
@@ -456,6 +462,22 @@ class PatientProvider extends ChangeNotifier {
     await loadTodayVisits();
 
     if (_selectedPatient?.id == patientId) {
+      _currentVisitPage = 0;
+      await loadVisitations();
+    } else {
+      notifyListeners();
+    }
+    _autoPush();
+  }
+
+  Future<void> addVisitationsBatch(List<Visitation> visits) async {
+    await _db.insertVisitationsBatch(visits);
+    
+    await loadTodayVisits();
+    
+    // If any of the visits are for the selected patient, refresh.
+    if (_selectedPatient != null && 
+        visits.any((v) => v.patientId == _selectedPatient!.id)) {
       _currentVisitPage = 0;
       await loadVisitations();
     } else {
