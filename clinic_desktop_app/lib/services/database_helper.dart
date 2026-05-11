@@ -644,7 +644,7 @@ class DatabaseHelper {
 
     final maps = await db.rawQuery(
       '''
-      SELECT v.*, p.patientName, p.firstName, p.department, p.role 
+      SELECT v.*, p.patientName, p.firstName, p.department, p.role, p.level 
       FROM visitations v 
       JOIN patients p ON v.patientId = p.id 
       WHERE v.isDeleted = 0 
@@ -725,7 +725,7 @@ class DatabaseHelper {
     args.add(offset);
 
     final maps = await db.rawQuery('''
-      SELECT v.*, p.patientName, p.firstName, p.department, p.role 
+      SELECT v.*, p.patientName, p.firstName, p.department, p.role, p.level 
       FROM visitations v 
       JOIN patients p ON v.patientId = p.id 
       WHERE v.isDeleted = 0 
@@ -1464,6 +1464,39 @@ class DatabaseHelper {
         );
       }
     });
+  }
+
+  /// Gets visitations with patient details for a specific date range.
+  Future<List<Map<String, dynamic>>> getVisitationsWithPatientInfoForRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final db = await database;
+    final startIso = start.toIso8601String();
+    final endIso = end.toIso8601String();
+
+    return await db.rawQuery(
+      '''
+      SELECT v.*, p.department, p.level, p.role
+      FROM visitations v
+      JOIN patients p ON v.patientId = p.id
+      WHERE v.isDeleted = 0 
+        AND v.dateTime >= ? 
+        AND v.dateTime <= ?
+      ORDER BY v.dateTime ASC
+      ''',
+      [startIso, endIso],
+    );
+  }
+
+  /// Gets all patients for export.
+  Future<List<Map<String, dynamic>>> getAllPatientsForExport() async {
+    final db = await database;
+    return await db.query(
+      'patients',
+      where: 'isDeleted = 0',
+      orderBy: 'patientName ASC',
+    );
   }
 
   /// Close the database connection gracefully.

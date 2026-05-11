@@ -38,7 +38,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     });
 
     // 1-hour sleep timer
-    _sleepTimer = Timer(const Duration(hours: 1), () {
+    _sleepTimer = Timer(const Duration(minutes: 30), () {
       if (mounted) {
         setState(() => _isSleeping = true);
         _videoController?.pause();

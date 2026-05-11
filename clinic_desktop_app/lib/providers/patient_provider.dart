@@ -1,18 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
 import '../services/database_helper.dart';
+import '../services/excel_export_service.dart';
 import '../crdt/hlc.dart';
 import '../crdt/node_id.dart';
 import '../providers/inventory_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:csv/csv.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:intl/intl.dart';
-import 'dart:io';
 
 class PatientProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -751,88 +747,21 @@ class PatientProvider extends ChangeNotifier {
 
   // ── Data Export ──────────────────────────────────────────────────
 
-  Future<String?> exportPatientsToCsv() async {
+  Future<String?> exportPatientsReport({String? savePath}) async {
+    _loading = true;
+    notifyListeners();
+
     try {
-      final allPatients = await _db.getPatients();
-
-      List<List<dynamic>> rows = [];
-
-      // Header
-      rows.add([
-        'ID Number',
-        'Last Name',
-        'First Name',
-        'Middle Name',
-        'Extension',
-        'Sex',
-        'Birthdate',
-        'Department',
-        'Role',
-        'Contact Number',
-        'Address',
-        'Guardian 1 Name',
-        'Guardian 1 Contact',
-        'Guardian 2 Name',
-        'Guardian 2 Contact',
-        'Allergic To',
-        'Medical History',
-        'Vaccination History',
-        'Permissions',
-        'Patient Remarks',
-        'Created At',
-      ]);
-
-      for (var p in allPatients) {
-        rows.add([
-          p.idNumber,
-          p.lastName,
-          p.firstName,
-          p.middleName,
-          p.extension,
-          p.sex,
-          p.birthdate != null
-              ? DateFormat('yyyy-MM-dd').format(p.birthdate!)
-              : '',
-          p.department,
-          p.role,
-          p.contactNumber,
-          p.address,
-          p.guardianName,
-          p.guardianContact,
-          p.guardian2Name,
-          p.guardian2Contact,
-          p.allergicTo,
-          jsonEncode(p.pastMedicalHistory),
-          jsonEncode(p.vaccinationHistory),
-          jsonEncode(p.permissions),
-          p.patientRemarks,
-          DateFormat('yyyy-MM-dd HH:mm:ss').format(p.createdAt),
-        ]);
-      }
-
-      String csvData = const ListToCsvConverter().convert(rows);
-
-      String? outputFile = await FilePicker.saveFile(
-        dialogTitle: 'Export Patients List',
-        fileName:
-            'patients_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv',
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
+      final result = await ExcelExportService.instance.exportPatientsReport(
+        savePath: savePath,
       );
-
-      if (outputFile == null) return null;
-
-      // Ensure filename ends with .csv on Windows if not provided
-      if (!outputFile.toLowerCase().endsWith('.csv')) {
-        outputFile += '.csv';
-      }
-
-      final file = File(outputFile);
-      await file.writeAsString(csvData);
-      return outputFile;
+      return result;
     } catch (e) {
       debugPrint('Export error: $e');
       rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
   }
 }

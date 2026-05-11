@@ -515,6 +515,7 @@ class _VisitTileState extends State<_VisitTile> {
     final patientName = visitMap['patientName'] as String? ?? 'Unknown Patient';
     final department = visitMap['department'] as String? ?? 'Unknown';
     final role = visitMap['role'] as String? ?? 'Unknown';
+    final level = visitMap['level'] as String? ?? '';
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -565,7 +566,7 @@ class _VisitTileState extends State<_VisitTile> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$formattedDate • $department ($role)',
+                        '$formattedDate • $role • $department${level.isNotEmpty ? " • $level" : ""}',
                         style: const TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 13,

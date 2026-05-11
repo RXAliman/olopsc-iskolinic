@@ -548,7 +548,7 @@ class _PatientTileState extends State<_PatientTile> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${widget.patient.idNumber}${widget.patient.level.isNotEmpty ? " • ${widget.patient.level}" : ""}',
+                        '${widget.patient.idNumber} • ${widget.patient.role} • ${widget.patient.department}${widget.patient.level.isNotEmpty ? " • ${widget.patient.level}" : ""}',
                         style: const TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 13,

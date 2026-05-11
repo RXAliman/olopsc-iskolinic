@@ -101,11 +101,44 @@ class MockDataService {
         ? _departments[_random.nextInt(_departments.length)]
         : 'General';
 
+    String level = '';
+    if (role == 'Student') {
+      final List<String> levels;
+      switch (department) {
+        case 'Pre-school':
+          levels = ['Nursery', 'Pre-Kinder', 'Kinder'];
+          break;
+        case 'Grade School':
+          levels = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
+          break;
+        case 'Junior High School':
+          levels = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
+          break;
+        case 'Senior High School':
+          levels = ['Grade 11', 'Grade 12'];
+          break;
+        case 'College':
+          levels = ['First Year', 'Second Year', 'Third Year', 'Fourth Year'];
+          break;
+        default:
+          levels = [];
+      }
+      if (levels.isNotEmpty) {
+        level = levels[_random.nextInt(levels.length)];
+      }
+    }
+
     final idNumber = 'MOCK-${_uuid.v4().substring(0, 8).toUpperCase()}';
 
-    // Birthdate between 10 and 25 years ago
+    // Birthdate between 5 and 25 years ago depending on department
+    int baseAge = 5;
+    if (department == 'Junior High School') baseAge = 12;
+    if (department == 'Senior High School') baseAge = 16;
+    if (department == 'College') baseAge = 18;
+    if (department == 'General') baseAge = 25;
+
     final birthdate = DateTime.now().subtract(
-      Duration(days: 365 * (10 + _random.nextInt(15))),
+      Duration(days: 365 * (baseAge + _random.nextInt(10))),
     );
 
     return Patient(
@@ -118,6 +151,7 @@ class MockDataService {
       sex: _random.nextBool() ? 'Male' : 'Female',
       role: role,
       department: department,
+      level: level,
       contactNumber:
           '09${_random.nextInt(100000000).toString().padLeft(9, '0')}',
       address: 'Mock Street, Barangay ${_random.nextInt(100)}, City',

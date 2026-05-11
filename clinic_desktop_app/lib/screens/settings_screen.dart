@@ -9,6 +9,7 @@ import '../providers/sync_provider.dart';
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
 import '../providers/patient_provider.dart';
+import 'package:file_picker/file_picker.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -709,7 +710,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     try {
-      final path = await patientProvider.exportPatientsToCsv();
+      final String? outputFile = await FilePicker.saveFile(
+        dialogTitle: 'Save Patients List',
+        fileName: 'Patients_List_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+
+      if (outputFile == null) return;
+
+      final path = await patientProvider.exportPatientsReport(
+        savePath: outputFile,
+      );
 
       if (path != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
