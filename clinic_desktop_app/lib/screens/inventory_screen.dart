@@ -53,6 +53,94 @@ class _InventoryScreenState extends State<InventoryScreen> {
     'December',
   ];
 
+  void _showExportDialog() async {
+    final inventory = context.read<InventoryProvider>();
+    final years = await inventory.getAvailableYears();
+    final List<int> selectedYears = List.from(years); // Select all by default
+
+    if (!mounted) return;
+
+    final result = await showDialog<List<int>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Export Inventory Report'),
+            content: SizedBox(
+              width: 300,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select the years you want to include in the monthly inventory report.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  if (years.isEmpty)
+                    const Text('No inventory data found.')
+                  else
+                    ...years.map((year) {
+                      return CheckboxListTile(
+                        title: Text(year.toString()),
+                        value: selectedYears.contains(year),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        dense: true,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            if (val == true) {
+                              selectedYears.add(year);
+                            } else {
+                              selectedYears.remove(year);
+                            }
+                          });
+                        },
+                      );
+                    }),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedYears.isEmpty
+                    ? null
+                    : () => Navigator.pop(ctx, selectedYears),
+                child: const Text('Export'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result != null && mounted) {
+      try {
+        final path = await inventory.exportInventoryReport(result);
+        if (path != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Report exported successfully to $path'),
+              backgroundColor: AppTheme.accent,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to export report: $e'),
+              backgroundColor: AppTheme.danger,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   void _showAddNewItemDialog() {
     final nameCtrl = TextEditingController();
     final lowStockCtrl = TextEditingController();
@@ -1125,6 +1213,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                     icon: const Icon(Icons.sync_rounded, size: 18),
                     label: const Text('Reload'),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _showExportDialog,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppTheme.accent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: AppTheme.accent),
+                      ),
+                    ),
+                    icon: const Icon(Icons.file_download_rounded, size: 18),
+                    label: const Text('Export'),
                   ),
                 ],
               ),

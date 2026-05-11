@@ -1337,6 +1337,51 @@ class DatabaseHelper {
     return false;
   }
 
+  // ── Inventory Reporting ──────────────────────────────────────────
+
+  Future<List<int>> getInventoryYears() async {
+    final db = await database;
+    final stocksYears = await db.rawQuery(
+      "SELECT DISTINCT strftime('%Y', createdAt) as year FROM inventory_stocks",
+    );
+    final visitsYears = await db.rawQuery(
+      "SELECT DISTINCT strftime('%Y', dateTime) as year FROM visitations WHERE isDeleted = 0",
+    );
+
+    Set<int> years = {};
+    for (var row in stocksYears) {
+      final y = row['year'];
+      if (y != null) {
+        final parsed = int.tryParse(y.toString());
+        if (parsed != null) years.add(parsed);
+      }
+    }
+    for (var row in visitsYears) {
+      final y = row['year'];
+      if (y != null) {
+        final parsed = int.tryParse(y.toString());
+        if (parsed != null) years.add(parsed);
+      }
+    }
+
+    // Also include current year if empty
+    if (years.isEmpty) {
+      years.add(DateTime.now().year);
+    }
+
+    final sortedYears = years.toList()..sort();
+    return sortedYears;
+  }
+
+  Future<List<Map<String, dynamic>>> getAllVisitationsForReport() async {
+    final db = await database;
+    return await db.query(
+      'visitations',
+      where: 'isDeleted = 0',
+      columns: ['id', 'dateTime', 'consumedSupplies'],
+    );
+  }
+
   // ── Mock Data Management (Dev Only) ──────────────────────────
   
   Future<Map<String, int>> getMockDataStats() async {
@@ -1371,6 +1416,46 @@ class DatabaseHelper {
       await txn.delete('inventory', where: "nodeId = 'MOCK_NODE'");
       await txn.delete('visitations', where: "nodeId = 'MOCK_NODE'");
       await txn.delete('patients', where: "nodeId = 'MOCK_NODE'");
+    });
+  }
+
+  Future<void> randomizeInventoryDates() async {
+    final db = await database;
+    final now = DateTime.now();
+    final random = DateTime.now().millisecondsSinceEpoch;
+    
+    // We'll update inventory and inventory_stocks created within the last 10 years randomly
+    // For simplicity, we just target all MOCK_NODE items
+    final inventory = await db.query('inventory', where: "nodeId = 'MOCK_NODE'");
+    final stocks = await db.query('inventory_stocks', where: "nodeId = 'MOCK_NODE'");
+
+    await db.transaction((txn) async {
+      int seed = random;
+      for (final item in inventory) {
+        seed++;
+        final rand = (seed * 1103515245 + 12345) & 0x7fffffff;
+        final monthsBack = rand % 120; // up to 10 years
+        final newDate = now.subtract(Duration(days: monthsBack * 30));
+        await txn.update(
+          'inventory',
+          {'createdAt': newDate.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [item['id']],
+        );
+      }
+
+      for (final stock in stocks) {
+        seed++;
+        final rand = (seed * 1103515245 + 12345) & 0x7fffffff;
+        final monthsBack = rand % 120;
+        final newDate = now.subtract(Duration(days: monthsBack * 30));
+        await txn.update(
+          'inventory_stocks',
+          {'createdAt': newDate.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [stock['id']],
+        );
+      }
     });
   }
 

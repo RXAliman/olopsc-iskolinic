@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -636,9 +637,56 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
               ),
             ],
           ),
+          const SizedBox(height: 32),
+          Text(
+            'Temporal Data Management',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+          Card(
+            color: Colors.blue.withValues(alpha: 0.05),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _randomizeDates,
+                      icon: const Icon(Icons.shuffle),
+                      label: const Text('Randomize All CreatedAt Dates'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Randomly shifts createdAt of all mock inventory, batches, and visits within the last 10 years. Use this to test reporting.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _randomizeDates() async {
+    final messenger = ScaffoldMessenger.of(context);
+    await DatabaseHelper.instance.randomizeInventoryDates();
+    if (mounted) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('All mock data dates have been randomized.'),
+        ),
+      );
+    }
+    widget.onRefreshStats();
   }
 
   Future<void> _seedDefaults() async {
@@ -673,11 +721,12 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
     int count = 0;
     for (final item in targets) {
       if (mode == 'expiring') {
-        // To make it expiring, we add a batch with an expiry date in 30 days
+        // To make it expiring, we add a batch with an expiry date randomized within the 3-month threshold
+        final randomDays = Random().nextInt(70) + 10; // 10 to 80 days from now
         await provider.addStockBatch(
           itemId: item.id,
           amount: 5,
-          expiryDate: DateTime.now().add(const Duration(days: 30)),
+          expiryDate: DateTime.now().add(Duration(days: randomDays)),
           nodeId: MockDataService.mockNodeId,
         );
         count++;
