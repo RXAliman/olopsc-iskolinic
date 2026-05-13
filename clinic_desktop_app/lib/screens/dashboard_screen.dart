@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:olopsc_iskolinic/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/visitation.dart';
@@ -45,17 +46,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DateTime _now = DateTime.now();
   late final AppLifecycleListener _lifecycleListener;
 
-  final List<_NavItem> _navItems = [
-    _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.people_rounded, 'Patients'),
-    _NavItem(Icons.medical_services_rounded, 'Visits'),
-    _NavItem(Icons.inventory_2_rounded, 'Inventory'),
-    _NavItem(Icons.bar_chart_rounded, 'Analytics'),
-    _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
-    _NavItem(Icons.settings_rounded, 'Settings'),
-    if (!AppConfig.isProduction)
-      _NavItem(Icons.bug_report_rounded, 'Mock Data', isDev: true),
-  ];
+  List<_NavItem> get _navItems {
+    final settings = context.read<SettingsProvider>();
+    return [
+      _NavItem(Icons.dashboard_rounded, 'Dashboard'),
+      _NavItem(Icons.people_rounded, 'Patients'),
+      _NavItem(Icons.medical_services_rounded, 'Visits'),
+      _NavItem(Icons.inventory_2_rounded, 'Inventory'),
+      _NavItem(Icons.bar_chart_rounded, 'Analytics'),
+      _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
+      _NavItem(Icons.settings_rounded, 'Settings'),
+      if (!AppConfig.isProduction && settings.isDeveloperMode)
+        _NavItem(Icons.bug_report_rounded, 'Mock Data', isDev: true),
+    ];
+  }
 
   @override
   void initState() {
@@ -140,6 +144,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBody() {
+    final navItems = _navItems;
+    // Safety check: if selected index is out of bounds (e.g. dev mode toggled off)
+    if (_selectedIndex >= navItems.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() => _selectedIndex = 0);
+      });
+      return _buildDashboardHome();
+    }
+
     switch (_selectedIndex) {
       case 0:
         return _buildDashboardHome();
@@ -839,6 +852,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<SettingsProvider>();
     return Scaffold(
       body: Column(
         children: [
@@ -1050,129 +1064,148 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       const SizedBox(height: 16),
                       // Nav Items
-                      ...List.generate(_navItems.length, (i) {
-                        final item = _navItems[i];
-                        final isSelected = _selectedIndex == i;
+                      Consumer<SettingsProvider>(
+                        builder: (context, settings, _) {
+                          final navItems = _navItems;
+                          return Column(
+                            children: List.generate(navItems.length, (i) {
+                              final item = navItems[i];
+                              final isSelected = _selectedIndex == i;
 
-                        return Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: _isSidebarCollapsed ? 8 : 12,
-                            vertical: 2,
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              onTap: () => setState(() {
-                                _focusSearchOnNextTab = false;
-                                _selectedIndex = i;
-                              }),
-                              borderRadius: BorderRadius.circular(12),
-                              hoverColor: AppTheme.textPrimary.withValues(
-                                alpha: 0.08,
-                              ),
-                              splashColor: AppTheme.textPrimary.withValues(
-                                alpha: 0.12,
-                              ),
-                              highlightColor: AppTheme.textPrimary.withValues(
-                                alpha: 0.05,
-                              ),
-                              child: AnimatedContainer(
-                                duration: _animDuration,
-                                curve: _animCurve,
+                              return Padding(
                                 padding: EdgeInsets.symmetric(
-                                  horizontal: _isSidebarCollapsed ? 0 : 16,
-                                  vertical: 12,
+                                  horizontal: _isSidebarCollapsed ? 8 : 12,
+                                  vertical: 2,
                                 ),
-                                decoration: BoxDecoration(
+                                child: Material(
+                                  color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(12),
-                                  color: isSelected
-                                      ? AppTheme.accent.withValues(alpha: 0.12)
-                                      : Colors.transparent,
-                                  border: isSelected
-                                      ? Border.all(
-                                          color: AppTheme.accent.withValues(
-                                            alpha: 0.3,
-                                          ),
-                                        )
-                                      : Border.all(color: Colors.transparent),
-                                ),
-                                child: _isSidebarCollapsed
-                                    ? Center(
-                                        child: Tooltip(
-                                          message: item.label,
-                                          preferBelow: false,
-                                          child: Icon(
-                                            item.icon,
-                                            size: 20,
-                                            color: isSelected
-                                                ? AppTheme.accent
-                                                : AppTheme.textMuted,
-                                          ),
-                                        ),
-                                      )
-                                    : Row(
-                                        children: [
-                                          Icon(
-                                            item.icon,
-                                            size: 20,
-                                            color: isSelected
-                                                ? AppTheme.accent
-                                                : AppTheme.textMuted,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Flexible(
-                                            child: Text(
-                                              item.label,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: isSelected
-                                                    ? AppTheme.accent
-                                                    : AppTheme.textSecondary,
-                                                fontWeight: isSelected
-                                                    ? FontWeight.w600
-                                                    : FontWeight.w400,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ),
-                                          if (item.isDev) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 1,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.warning
-                                                    .withValues(alpha: 0.15),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                                border: Border.all(
-                                                  color: AppTheme.warning
-                                                      .withValues(alpha: 0.4),
-                                                ),
-                                              ),
-                                              child: Text(
-                                                'DEV',
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: AppTheme.warning,
-                                                  letterSpacing: 1,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: () => setState(() {
+                                      _focusSearchOnNextTab = false;
+                                      _selectedIndex = i;
+                                    }),
+                                    borderRadius: BorderRadius.circular(12),
+                                    hoverColor: AppTheme.textPrimary.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    splashColor: AppTheme.textPrimary
+                                        .withValues(alpha: 0.12),
+                                    highlightColor: AppTheme.textPrimary
+                                        .withValues(alpha: 0.05),
+                                    child: AnimatedContainer(
+                                      duration: _animDuration,
+                                      curve: _animCurve,
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: _isSidebarCollapsed
+                                            ? 0
+                                            : 16,
+                                        vertical: 12,
                                       ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        color: isSelected
+                                            ? AppTheme.accent.withValues(
+                                                alpha: 0.12,
+                                              )
+                                            : Colors.transparent,
+                                        border: isSelected
+                                            ? Border.all(
+                                                color: AppTheme.accent
+                                                    .withValues(alpha: 0.3),
+                                              )
+                                            : Border.all(
+                                                color: Colors.transparent,
+                                              ),
+                                      ),
+                                      child: _isSidebarCollapsed
+                                          ? Center(
+                                              child: Tooltip(
+                                                message: item.label,
+                                                preferBelow: false,
+                                                child: Icon(
+                                                  item.icon,
+                                                  size: 20,
+                                                  color: isSelected
+                                                      ? AppTheme.accent
+                                                      : AppTheme.textMuted,
+                                                ),
+                                              ),
+                                            )
+                                          : Row(
+                                              children: [
+                                                Icon(
+                                                  item.icon,
+                                                  size: 20,
+                                                  color: isSelected
+                                                      ? AppTheme.accent
+                                                      : AppTheme.textMuted,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Flexible(
+                                                  child: Text(
+                                                    item.label,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: isSelected
+                                                          ? AppTheme.accent
+                                                          : AppTheme
+                                                                .textSecondary,
+                                                      fontWeight: isSelected
+                                                          ? FontWeight.w600
+                                                          : FontWeight.w400,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (item.isDev) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 1,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: AppTheme.warning
+                                                          .withValues(
+                                                            alpha: 0.15,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: AppTheme.warning
+                                                            .withValues(
+                                                              alpha: 0.4,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                    child: Text(
+                                                      'DEV',
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 9,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: AppTheme.warning,
+                                                        letterSpacing: 1,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          );
+                        },
+                      ),
 
                       const Spacer(),
 

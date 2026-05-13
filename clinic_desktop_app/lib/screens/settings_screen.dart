@@ -273,6 +273,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 48),
 
+          if (!AppConfig.isProduction) ...[
+            // ── Developer Mode ─────────────────────────────────────────────
+            _buildSectionHeader('Developer Settings', Icons.code_rounded),
+            const SizedBox(height: 16),
+            Container(
+              decoration: AppTheme.glassCard(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Developer Mode',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Enable additional debugging tools and mock data generators. This should only be used for development purposes.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                      Consumer<SettingsProvider>(
+                        builder: (context, settings, _) {
+                          return Switch(
+                            value: settings.isDeveloperMode,
+                            activeThumbColor: AppTheme.accent,
+                            onChanged: (val) =>
+                                settings.toggleDeveloperMode(val),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 48),
+          ],
+
           // ── About & Licenses ──────────────────────────────────────────
           _buildSectionHeader('About ISKOLINIC', Icons.info_outline_rounded),
           const SizedBox(height: 16),
