@@ -20,12 +20,12 @@ class ConnectionScreen extends StatelessWidget {
             children: [
               // ── Header ──────────────────────────────────────────
               Text(
-                'Tablet Connection',
+                'Form App Connection',
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
               const SizedBox(height: 4),
               Text(
-                'Scan the QR code below from the tablet app to connect',
+                'Scan the QR code below from the form app to connect',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 32),
@@ -171,7 +171,7 @@ class ConnectionScreen extends StatelessWidget {
 
           // Hint text
           Text(
-            'Point the tablet camera here',
+            'Point the device camera here',
             style: GoogleFonts.inter(
               fontSize: 13,
               color: AppTheme.textMuted,
@@ -455,22 +455,22 @@ class ConnectionScreen extends StatelessWidget {
           _InstructionStep(
             number: '1',
             text:
-                'Make sure the tablet is connected to the clinic router Wi-Fi.',
+                'Make sure the tablet/smartphone is connected to the clinic router Wi-Fi.',
           ),
           const SizedBox(height: 8),
           _InstructionStep(
             number: '2',
-            text: 'Open the tablet app — it starts with a QR scanner.',
+            text: 'Open the form app and follow the given instructions.',
           ),
           const SizedBox(height: 8),
           _InstructionStep(
             number: '3',
-            text: 'Point the tablet camera at the QR code on the left.',
+            text: 'Point the camera at the QR code on the left.',
           ),
           const SizedBox(height: 8),
           _InstructionStep(
             number: '4',
-            text: 'The tablet will automatically connect and verify.',
+            text: 'The device will automatically connect and verify.',
           ),
         ],
       ),

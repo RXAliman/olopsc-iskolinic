@@ -54,7 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _NavItem(Icons.medical_services_rounded, 'Visits'),
       _NavItem(Icons.inventory_2_rounded, 'Inventory'),
       _NavItem(Icons.bar_chart_rounded, 'Analytics'),
-      _NavItem(Icons.devices_rounded, 'Connect to Tablet'),
+      _NavItem(Icons.devices_rounded, 'Connect to Form App'),
       _NavItem(Icons.settings_rounded, 'Settings'),
       if (!AppConfig.isProduction && settings.isDeveloperMode)
         _NavItem(Icons.bug_report_rounded, 'Mock Data', isDev: true),
