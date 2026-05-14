@@ -24,6 +24,7 @@ class _AnalyticsExportDialogState extends State<AnalyticsExportDialog> {
     'Junior High School': true,
     'Senior High School': true,
     'College': true,
+    'General': true,
   };
 
   final Map<String, bool> _expandDepartments = {
@@ -32,8 +33,11 @@ class _AnalyticsExportDialogState extends State<AnalyticsExportDialog> {
     'Junior High School': false,
     'Senior High School': false,
     'College': false,
+    'General': false,
   };
 
+  bool _includeStudent = true;
+  bool _includeEmployee = true;
   bool _isExporting = false;
 
   @override
@@ -110,6 +114,8 @@ class _AnalyticsExportDialogState extends State<AnalyticsExportDialog> {
           endDate: _endDate,
           departments: _departments,
           expandDepartments: _expandDepartments,
+          includeStudent: _includeStudent,
+          includeEmployee: _includeEmployee,
           savePath: outputFile,
         );
       } else {
@@ -118,6 +124,8 @@ class _AnalyticsExportDialogState extends State<AnalyticsExportDialog> {
           endDate: _endDate,
           departments: _departments,
           expandDepartments: _expandDepartments,
+          includeStudent: _includeStudent,
+          includeEmployee: _includeEmployee,
           savePath: outputFile,
         );
       }
@@ -257,6 +265,48 @@ class _AnalyticsExportDialogState extends State<AnalyticsExportDialog> {
             ),
             const SizedBox(height: 24),
 
+            // Roles
+            Text('Roles', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.cardLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.dividerColor),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CheckboxListTile(
+                      title:
+                          const Text('Student', style: TextStyle(fontSize: 14)),
+                      value: _includeStudent,
+                      onChanged: (val) {
+                        setState(() => _includeStudent = val ?? false);
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                    ),
+                  ),
+                  Expanded(
+                    child: CheckboxListTile(
+                      title: const Text(
+                        'Employee',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      value: _includeEmployee,
+                      onChanged: (val) {
+                        setState(() => _includeEmployee = val ?? false);
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
             // Departments
             Text('Departments', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 12),
@@ -268,38 +318,50 @@ class _AnalyticsExportDialogState extends State<AnalyticsExportDialog> {
               ),
               child: Column(
                 children: _departments.keys.map((dept) {
-                  return CheckboxListTile(
-                    title: Text(dept, style: const TextStyle(fontSize: 14)),
-                    value: _departments[dept],
-                    onChanged: (val) {
-                      setState(() => _departments[dept] = val ?? false);
-                    },
-                    secondary: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Expand',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textSecondary,
-                          ),
+                  final bool isEnabled = _includeStudent || _includeEmployee;
+
+                  return IgnorePointer(
+                    ignoring: !isEnabled,
+                    child: Opacity(
+                      opacity: isEnabled ? 1.0 : 0.4,
+                      child: CheckboxListTile(
+                        title: Text(dept, style: const TextStyle(fontSize: 14)),
+                        value: isEnabled ? _departments[dept] : false,
+                        onChanged: (val) {
+                          setState(() => _departments[dept] = val ?? false);
+                        },
+                        secondary: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Expand',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            Checkbox(
+                              value: isEnabled
+                                  ? _expandDepartments[dept]
+                                  : false,
+                              onChanged: isEnabled && _departments[dept] == true
+                                  ? (val) {
+                                      setState(
+                                        () =>
+                                            _expandDepartments[dept] =
+                                                val ?? false,
+                                      );
+                                    }
+                                  : null,
+                            ),
+                          ],
                         ),
-                        Checkbox(
-                          value: _expandDepartments[dept],
-                          onChanged: _departments[dept] == true
-                              ? (val) {
-                                  setState(
-                                    () =>
-                                        _expandDepartments[dept] = val ?? false,
-                                  );
-                                }
-                              : null,
-                        ),
-                      ],
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 8),
+                        dense: true,
+                      ),
                     ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    dense: true,
                   );
                 }).toList(),
               ),

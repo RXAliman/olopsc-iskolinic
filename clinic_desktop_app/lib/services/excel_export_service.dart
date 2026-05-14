@@ -19,11 +19,13 @@ class ExcelExportService {
     required DateTime endDate,
     required Map<String, bool> departments,
     required Map<String, bool> expandDepartments,
+    required bool includeStudent,
+    required bool includeEmployee,
     String? savePath,
   }) async {
     // Fetch data on main thread (SQLite needs main thread context)
-    final List<Map<String, dynamic>> visitationsData = await _db
-        .getVisitationsWithPatientInfoForRange(startDate, endDate);
+    final List<Map<String, dynamic>> visitationsData =
+        await _db.getVisitationsWithPatientInfoForRange(startDate, endDate);
     final List<CustomSymptom> customSymptoms = await _db.getAllCustomSymptoms();
 
     // Offload the heavy Excel generation to an isolate
@@ -32,6 +34,8 @@ class ExcelExportService {
       'customSymptoms': customSymptoms.map((s) => s.name).toList(),
       'departments': departments,
       'expandDepartments': expandDepartments,
+      'includeStudent': includeStudent,
+      'includeEmployee': includeEmployee,
     });
 
     if (fileBytes == null) return null;
@@ -39,7 +43,8 @@ class ExcelExportService {
     return _saveBytes(
       fileBytes,
       savePath: savePath,
-      defaultFileName: 'Symptoms_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+      defaultFileName:
+          'Symptoms_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
     );
   }
 
@@ -48,20 +53,57 @@ class ExcelExportService {
     final List<String> customSymptomNames = params['customSymptoms'];
     final Map<String, bool> departments = params['departments'];
     final Map<String, bool> expandDepartments = params['expandDepartments'];
+    final bool includeStudent = params['includeStudent'];
+    final bool includeEmployee = params['includeEmployee'];
 
     final excel = Excel.createExcel();
-    final Sheet sheet = excel['Symptoms Report'];
-    excel.delete('Sheet1');
-
     final List<String> allSymptoms = [...kSymptomsList, ...customSymptomNames];
 
+    if (includeStudent) {
+      _fillSymptomsSheet(
+        sheet: excel['Student Symptoms'],
+        visitationsData: visitationsData,
+        targetRole: 'Student',
+        departments: departments,
+        expandDepartments: expandDepartments,
+        allSymptoms: allSymptoms,
+      );
+    }
+
+    if (includeEmployee) {
+      _fillSymptomsSheet(
+        sheet: excel['Employee Symptoms'],
+        visitationsData: visitationsData,
+        targetRole: 'Employee',
+        departments: departments,
+        expandDepartments: expandDepartments,
+        allSymptoms: allSymptoms,
+      );
+    }
+
+    if (excel.sheets.containsKey('Sheet1')) {
+      excel.delete('Sheet1');
+    }
+
+    return excel.save();
+  }
+
+  static void _fillSymptomsSheet({
+    required Sheet sheet,
+    required List<Map<String, dynamic>> visitationsData,
+    required String targetRole,
+    required Map<String, bool> departments,
+    required Map<String, bool> expandDepartments,
+    required List<String> allSymptoms,
+  }) {
     // Header Row
     sheet.appendRow([
       TextCellValue('Department/Level'),
       ...allSymptoms.map((s) => TextCellValue(s)),
     ]);
 
-    final rowsToProcess = _getRowsToProcessStatic(departments, expandDepartments);
+    final rowsToProcess =
+        _getRowsToProcessStatic(departments, expandDepartments);
 
     for (final rowInfo in rowsToProcess) {
       final String rowLabel = rowInfo['label'];
@@ -73,12 +115,15 @@ class ExcelExportService {
       for (final symptom in allSymptoms) {
         int count = 0;
         for (final visitMap in visitationsData) {
-          final List<dynamic> visitSymptoms = visitMap['symptoms'] is String 
-              ? (visitMap['symptoms'] as String).split(',') 
-              : (visitMap['symptoms'] as List? ?? []);
-          
-          final String? visitDept = visitMap['department'] as String?;
-          final String? visitLevel = visitMap['level'] as String?;
+          final String visitRole = visitMap['role'] as String? ?? '';
+          if (visitRole != targetRole) continue;
+
+          final String symptomsRaw = visitMap['symptoms'] as String? ?? '';
+          final List<String> visitSymptoms =
+              symptomsRaw.isEmpty ? [] : symptomsRaw.split('|');
+
+          final String visitDept = visitMap['department'] as String? ?? '';
+          final String visitLevel = visitMap['level'] as String? ?? '';
 
           bool matches = false;
           if (level != null) {
@@ -95,8 +140,6 @@ class ExcelExportService {
       }
       sheet.appendRow(rowData);
     }
-
-    return excel.save();
   }
 
   Future<String?> exportSuppliesReport({
@@ -104,23 +147,29 @@ class ExcelExportService {
     required DateTime endDate,
     required Map<String, bool> departments,
     required Map<String, bool> expandDepartments,
+    required bool includeStudent,
+    required bool includeEmployee,
     String? savePath,
   }) async {
     // Fetch data on main thread
-    final List<Map<String, dynamic>> visitationsData = await _db
-        .getVisitationsWithPatientInfoForRange(startDate, endDate);
+    final List<Map<String, dynamic>> visitationsData =
+        await _db.getVisitationsWithPatientInfoForRange(startDate, endDate);
     final List<InventoryItem> inventory = await _db.getAllInventory();
 
     // Offload to isolate
     final List<int>? fileBytes = await compute(_generateSuppliesExcelBytes, {
       'visitationsData': visitationsData,
-      'inventory': inventory.map((item) => {
-        'id': item.id,
-        'itemName': item.itemName,
-        'clinic': item.clinic,
-      }).toList(),
+      'inventory': inventory
+          .map((item) => {
+                'id': item.id,
+                'itemName': item.itemName,
+                'clinic': item.clinic,
+              })
+          .toList(),
       'departments': departments,
       'expandDepartments': expandDepartments,
+      'includeStudent': includeStudent,
+      'includeEmployee': includeEmployee,
     });
 
     if (fileBytes == null) return null;
@@ -128,7 +177,8 @@ class ExcelExportService {
     return _saveBytes(
       fileBytes,
       savePath: savePath,
-      defaultFileName: 'Supplies_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+      defaultFileName:
+          'Supplies_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
     );
   }
 
@@ -137,11 +187,10 @@ class ExcelExportService {
     final List<Map<String, dynamic>> inventoryData = params['inventory'];
     final Map<String, bool> departments = params['departments'];
     final Map<String, bool> expandDepartments = params['expandDepartments'];
+    final bool includeStudent = params['includeStudent'];
+    final bool includeEmployee = params['includeEmployee'];
 
     final excel = Excel.createExcel();
-    final Sheet sheet = excel['Supplies Used Report'];
-    excel.delete('Sheet1');
-
     final List<String> allSupplies = inventoryData.map((item) {
       final name = item['itemName'] as String;
       final clinic = item['clinic'] as String;
@@ -156,12 +205,53 @@ class ExcelExportService {
       supplyIdToName[item['id']] = displayName;
     }
 
+    if (includeStudent) {
+      _fillSuppliesSheet(
+        sheet: excel['Student Supplies'],
+        visitationsData: visitationsData,
+        targetRole: 'Student',
+        departments: departments,
+        expandDepartments: expandDepartments,
+        allSupplies: allSupplies,
+        supplyIdToName: supplyIdToName,
+      );
+    }
+
+    if (includeEmployee) {
+      _fillSuppliesSheet(
+        sheet: excel['Employee Supplies'],
+        visitationsData: visitationsData,
+        targetRole: 'Employee',
+        departments: departments,
+        expandDepartments: expandDepartments,
+        allSupplies: allSupplies,
+        supplyIdToName: supplyIdToName,
+      );
+    }
+
+    if (excel.sheets.containsKey('Sheet1')) {
+      excel.delete('Sheet1');
+    }
+
+    return excel.save();
+  }
+
+  static void _fillSuppliesSheet({
+    required Sheet sheet,
+    required List<Map<String, dynamic>> visitationsData,
+    required String targetRole,
+    required Map<String, bool> departments,
+    required Map<String, bool> expandDepartments,
+    required List<String> allSupplies,
+    required Map<String, String> supplyIdToName,
+  }) {
     sheet.appendRow([
       TextCellValue('Department/Level'),
       ...allSupplies.map((s) => TextCellValue(s)),
     ]);
 
-    final rowsToProcess = _getRowsToProcessStatic(departments, expandDepartments);
+    final rowsToProcess =
+        _getRowsToProcessStatic(departments, expandDepartments);
 
     for (final rowInfo in rowsToProcess) {
       final String rowLabel = rowInfo['label'];
@@ -173,12 +263,15 @@ class ExcelExportService {
       for (final supplyName in allSupplies) {
         int count = 0;
         for (final visitMap in visitationsData) {
-          final List<dynamic> suppliesUsed = visitMap['suppliesUsed'] is String
-              ? (visitMap['suppliesUsed'] as String).split(',')
-              : (visitMap['suppliesUsed'] as List? ?? []);
-          
-          final String? visitDept = visitMap['department'] as String?;
-          final String? visitLevel = visitMap['level'] as String?;
+          final String visitRole = visitMap['role'] as String? ?? '';
+          if (visitRole != targetRole) continue;
+
+          final String suppliesRaw = visitMap['suppliesUsed'] as String? ?? '';
+          final List<String> suppliesUsed =
+              suppliesRaw.isEmpty ? [] : suppliesRaw.split('|');
+
+          final String visitDept = visitMap['department'] as String? ?? '';
+          final String visitLevel = visitMap['level'] as String? ?? '';
 
           bool matches = false;
           if (level != null) {
@@ -190,10 +283,11 @@ class ExcelExportService {
           if (matches) {
             for (final usedSupply in suppliesUsed) {
               final String usedStr = usedSupply.toString();
-              final idPart = usedStr.contains(':') ? usedStr.split(':')[0] : usedStr;
-              final resolvedName = supplyIdToName[idPart] ?? 
+              final idPart =
+                  usedStr.contains(':') ? usedStr.split(':')[0] : usedStr;
+              final resolvedName = supplyIdToName[idPart] ??
                   (usedStr.contains(':') ? usedStr.split(':')[1] : usedStr);
-              
+
               if (resolvedName == supplyName) {
                 count++;
               }
@@ -204,8 +298,6 @@ class ExcelExportService {
       }
       sheet.appendRow(rowData);
     }
-
-    return excel.save();
   }
 
   Future<String?> exportPatientsReport({String? savePath}) async {
@@ -275,18 +367,31 @@ class ExcelExportService {
       {'dept': 'College', 'levels': ['First Year', 'Second Year', 'Third Year', 'Fourth Year']},
     ];
 
+    final Set<String> processedDepts = {};
+
     for (final config in deptConfigs) {
       final String dept = config['dept'];
+      processedDepts.add(dept);
       if (departments[dept] == true) {
         if (expandDepartments[dept] == true) {
           for (final level in config['levels']) {
             rows.add({'label': level, 'dept': dept, 'level': level});
           }
+          // Include students with no level in the expanded department report
+          rows.add({'label': '$dept (Uncategorized)', 'dept': dept, 'level': ''});
         } else {
           rows.add({'label': dept, 'dept': dept, 'level': null});
         }
       }
     }
+
+    // Handle any other departments that might have been passed (e.g. Employees)
+    for (final dept in departments.keys) {
+      if (!processedDepts.contains(dept) && departments[dept] == true) {
+        rows.add({'label': dept, 'dept': dept, 'level': null});
+      }
+    }
+
     return rows;
   }
 
