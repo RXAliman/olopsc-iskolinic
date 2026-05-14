@@ -29,7 +29,7 @@ class DatabaseHelper {
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 5,
+        version: 7,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -193,13 +193,18 @@ class DatabaseHelper {
 
       final Map<String, List<Map<String, dynamic>>> groups = {};
       for (final item in items) {
-        final key = "${item['itemName']}_${item['clinic']}";
+        final key = "${item['itemName']}_${item['clinic']}_${item['itemType']}"
+            .toLowerCase()
+            .trim();
         groups.putIfAbsent(key, () => []).add(item);
       }
 
       final now = DateTime.now().toIso8601String();
 
       for (final group in groups.values) {
+        // Sort by ID to be deterministic across nodes
+        group.sort((a, b) => (a['id'] as String).compareTo(b['id'] as String));
+
         // The first item in the group is our survivor
         final survivor = group.first;
         final survivorId = survivor['id'] as String;
@@ -221,10 +226,16 @@ class DatabaseHelper {
           }
         }
 
-        // 2b. Delete all other items in the group from the inventory table
+        // 2b. Soft-delete all other items in the group from the inventory table
+        // We use soft-delete so it syncs correctly to other nodes.
+        // We use a fresh HLC to ensure this delete propagates and wins over old states.
+        final migrationHlc = HLC
+            .now(survivor['nodeId'] as String? ?? 'migration')
+            .pack();
         for (int i = 1; i < group.length; i++) {
-          await db.delete(
+          await db.update(
             'inventory',
+            {'isDeleted': 1, 'hlc': migrationHlc, 'nodeId': survivor['nodeId']},
             where: 'id = ?',
             whereArgs: [group[i]['id']],
           );
@@ -253,6 +264,173 @@ class DatabaseHelper {
       await db.execute(
         "ALTER TABLE patients ADD COLUMN level TEXT NOT NULL DEFAULT ''",
       );
+    }
+
+    if (oldVersion < 6) {
+      // Cleanup any remaining duplicates that were not correctly merged/deleted in previous versions
+      // OR were re-introduced by sync because of hard deletes in version 3.
+      final List<Map<String, dynamic>> items = await db.query(
+        'inventory',
+        where: 'isDeleted = 0',
+      );
+
+      final Map<String, List<Map<String, dynamic>>> groups = {};
+      for (final item in items) {
+        // We use itemName + clinic + itemType as the key to identify duplicates
+        final key = "${item['itemName']}_${item['clinic']}_${item['itemType']}"
+            .toLowerCase()
+            .trim();
+        groups.putIfAbsent(key, () => []).add(item);
+      }
+
+      // We need an HLC for the soft-delete. We try to get the node ID from meta.
+      final List<Map<String, dynamic>> meta = await db.query(
+        'meta',
+        where: 'key = ?',
+        whereArgs: ['nodeId'],
+      );
+      final String nodeId = meta.isNotEmpty
+          ? meta.first['value'] as String
+          : 'migration_node';
+      final String hlc = HLC.now(nodeId).pack();
+
+      for (final group in groups.values) {
+        if (group.length <= 1) continue;
+
+        // Sort by ID to be deterministic across nodes
+        group.sort((a, b) => (a['id'] as String).compareTo(b['id'] as String));
+
+        final survivorId = group.first['id'] as String;
+
+        for (int i = 1; i < group.length; i++) {
+          final duplicateId = group[i]['id'] as String;
+
+          // 1. Move all stocks from duplicate to survivor
+          await db.update(
+            'inventory_stocks',
+            {'itemId': survivorId, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'itemId = ?',
+            whereArgs: [duplicateId],
+          );
+
+          // 2. Soft-delete the duplicate item in the inventory table
+          await db.update(
+            'inventory',
+            {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'id = ?',
+            whereArgs: [duplicateId],
+          );
+        }
+      }
+
+      // 3. Restoration: Un-merge items that were incorrectly merged despite having different types
+      // This specifically handles items where legacy stocks are pointing to a survivor of a different type.
+      final List<Map<String, dynamic>> deletedItems = await db.query(
+        'inventory',
+        where: 'isDeleted = 1',
+      );
+
+      for (final deletedItem in deletedItems) {
+        final deletedId = deletedItem['id'] as String;
+        final legacyStockId = "legacy_$deletedId";
+
+        // Find if this item's legacy stock exists and is pointing elsewhere
+        final List<Map<String, dynamic>> stocks = await db.query(
+          'inventory_stocks',
+          where: 'id = ?',
+          whereArgs: [legacyStockId],
+        );
+
+        if (stocks.isNotEmpty) {
+          final currentItemId = stocks.first['itemId'] as String;
+          if (currentItemId != deletedId) {
+            // It was merged. Check if types match.
+            final List<Map<String, dynamic>> survivors = await db.query(
+              'inventory',
+              where: 'id = ?',
+              whereArgs: [currentItemId],
+            );
+
+            if (survivors.isNotEmpty) {
+              final survivor = survivors.first;
+              final sType = survivor['itemType']
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+              final dType = deletedItem['itemType']
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+
+              if (sType != dType) {
+                // Incorrectly merged! Un-merge by restoring the item and its legacy stock.
+                await db.update(
+                  'inventory_stocks',
+                  {'itemId': deletedId, 'hlc': hlc, 'nodeId': nodeId},
+                  where: 'id = ?',
+                  whereArgs: [legacyStockId],
+                );
+                await db.update(
+                  'inventory',
+                  {'isDeleted': 0, 'hlc': hlc, 'nodeId': nodeId},
+                  where: 'id = ?',
+                  whereArgs: [deletedId],
+                );
+              }
+            }
+          }
+        }
+      }
+      if (oldVersion < 7) {
+        // Re-run cleanup to fix the "zeroed-out" duplicates caused by the case-sensitive bug in version 6.
+        final List<Map<String, dynamic>> items = await db.query(
+          'inventory',
+          where: 'isDeleted = 0',
+        );
+
+        final Map<String, List<Map<String, dynamic>>> groups = {};
+        for (final item in items) {
+          final key =
+              "${item['itemName']}_${item['clinic']}_${item['itemType']}"
+                  .toLowerCase()
+                  .trim();
+          groups.putIfAbsent(key, () => []).add(item);
+        }
+
+        final List<Map<String, dynamic>> meta = await db.query(
+          'meta',
+          where: 'key = ?',
+          whereArgs: ['nodeId'],
+        );
+        final String nodeId = meta.isNotEmpty
+            ? meta.first['value'] as String
+            : 'migration_node';
+        final String hlc = HLC.now(nodeId).pack();
+
+        for (final group in groups.values) {
+          if (group.length <= 1) continue;
+          group.sort(
+            (a, b) => (a['id'] as String).compareTo(b['id'] as String),
+          );
+          final survivorId = group.first['id'] as String;
+
+          for (int i = 1; i < group.length; i++) {
+            final duplicateId = group[i]['id'] as String;
+            await db.update(
+              'inventory_stocks',
+              {'itemId': survivorId, 'hlc': hlc, 'nodeId': nodeId},
+              where: 'itemId = ?',
+              whereArgs: [duplicateId],
+            );
+            await db.update(
+              'inventory',
+              {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+              where: 'id = ?',
+              whereArgs: [duplicateId],
+            );
+          }
+        }
+      }
     }
   }
 
@@ -1093,12 +1271,15 @@ class DatabaseHelper {
 
     return await db.transaction((txn) async {
       // Mark visitations deleted if their patient is deleted or missing
-      final count = await txn.rawUpdate('''
+      final count = await txn.rawUpdate(
+        '''
         UPDATE visitations 
         SET isDeleted = 1, hlc = ?, nodeId = ?
         WHERE isDeleted = 0 
           AND patientId NOT IN (SELECT id FROM patients WHERE isDeleted = 0)
-      ''', [hlcStr, nodeIdStr]);
+      ''',
+        [hlcStr, nodeIdStr],
+      );
 
       return count;
     });
@@ -1390,27 +1571,39 @@ class DatabaseHelper {
   }
 
   // ── Mock Data Management (Dev Only) ──────────────────────────
-  
+
   Future<Map<String, int>> getMockDataStats() async {
     final db = await database;
     final Map<String, int> stats = {};
 
-    final patients = await db.rawQuery("SELECT COUNT(*) as count FROM patients WHERE nodeId = 'MOCK_NODE'");
+    final patients = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM patients WHERE nodeId = 'MOCK_NODE'",
+    );
     stats['patients'] = patients.first['count'] as int? ?? 0;
 
-    final visits = await db.rawQuery("SELECT COUNT(*) as count FROM visitations WHERE nodeId = 'MOCK_NODE'");
+    final visits = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM visitations WHERE nodeId = 'MOCK_NODE'",
+    );
     stats['visitations'] = visits.first['count'] as int? ?? 0;
 
-    final inventory = await db.rawQuery("SELECT COUNT(*) as count FROM inventory WHERE nodeId = 'MOCK_NODE'");
+    final inventory = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM inventory WHERE nodeId = 'MOCK_NODE'",
+    );
     stats['inventory'] = inventory.first['count'] as int? ?? 0;
 
-    final stocks = await db.rawQuery("SELECT COUNT(*) as count FROM inventory_stocks WHERE nodeId = 'MOCK_NODE'");
+    final stocks = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM inventory_stocks WHERE nodeId = 'MOCK_NODE'",
+    );
     stats['stocks'] = stocks.first['count'] as int? ?? 0;
 
-    final totalPatients = await db.rawQuery("SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0");
+    final totalPatients = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0",
+    );
     stats['totalActivePatients'] = totalPatients.first['count'] as int? ?? 0;
 
-    final totalVisits = await db.rawQuery("SELECT COUNT(*) as count FROM visitations WHERE isDeleted = 0");
+    final totalVisits = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM visitations WHERE isDeleted = 0",
+    );
     stats['totalActiveVisitations'] = totalVisits.first['count'] as int? ?? 0;
 
     return stats;
@@ -1430,11 +1623,17 @@ class DatabaseHelper {
     final db = await database;
     final now = DateTime.now();
     final random = DateTime.now().millisecondsSinceEpoch;
-    
+
     // We'll update inventory and inventory_stocks created within the last 10 years randomly
     // For simplicity, we just target all MOCK_NODE items
-    final inventory = await db.query('inventory', where: "nodeId = 'MOCK_NODE'");
-    final stocks = await db.query('inventory_stocks', where: "nodeId = 'MOCK_NODE'");
+    final inventory = await db.query(
+      'inventory',
+      where: "nodeId = 'MOCK_NODE'",
+    );
+    final stocks = await db.query(
+      'inventory_stocks',
+      where: "nodeId = 'MOCK_NODE'",
+    );
 
     await db.transaction((txn) async {
       int seed = random;
