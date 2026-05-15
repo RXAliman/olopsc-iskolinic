@@ -25,6 +25,8 @@ class AppConfig {
   // ── GitHub Repository ───────────────────────────────────────────
   static const String _repoOwner = 'RXAliman';
   static const String _repoName = 'olopsc-iskolinic';
+  static String get repoOwner => _repoOwner;
+  static String get repoName => _repoName;
 
   // ── Update Check URLs ──────────────────────────────────────────
   // Prod: /releases/latest — only returns full (non-pre-release) releases

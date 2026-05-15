@@ -131,6 +131,55 @@ class UpdateService {
     }
   }
 
+  /// Fetches the release info for a specific version tag from GitHub.
+  ///
+  /// Tries tag formats `v1.0.2` and `1.0.2`. Returns `null` if not found
+  /// or on any error.
+  static Future<UpdateInfo?> fetchRelease(String version) async {
+    // Try with and without 'v' prefix
+    final tagsToTry = [
+      'v$version',
+      version,
+    ];
+
+    for (final tag in tagsToTry) {
+      try {
+        final url =
+            'https://api.github.com/repos/${AppConfig.repoOwner}/${AppConfig.repoName}/releases/tags/$tag';
+        final client = HttpClient();
+        client.connectionTimeout = _checkTimeout;
+
+        final request = await client.getUrl(Uri.parse(url));
+        request.headers.set('Accept', 'application/vnd.github+json');
+        request.headers.set('User-Agent', 'OLOPSC-IskoLinic-Desktop');
+
+        final response = await request.close().timeout(_checkTimeout);
+
+        if (response.statusCode != 200) {
+          await response.drain<void>();
+          client.close();
+          continue;
+        }
+
+        final body = await response
+            .transform(utf8.decoder)
+            .join()
+            .timeout(_checkTimeout);
+        client.close();
+
+        final decoded = jsonDecode(body) as Map<String, dynamic>;
+        final info = UpdateInfo.fromGitHubRelease(decoded);
+
+        if (info.downloadUrl.isNotEmpty) {
+          return info;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
   // ── Installer Download ────────────────────────────────────────
 
   /// Downloads the installer from [url] to a temporary directory.
@@ -213,6 +262,82 @@ class UpdateService {
     await sink.close();
 
     return file;
+  }
+
+  /// Fetches all releases from GitHub that are older than [currentVersion].
+  /// Filters by pre-release suffix based on [isProduction].
+  static Future<List<UpdateInfo>> fetchOlderReleases(
+    String currentVersion,
+    bool isProduction,
+  ) async {
+    try {
+      final url =
+          'https://api.github.com/repos/${AppConfig.repoOwner}/${AppConfig.repoName}/releases';
+      final client = HttpClient();
+      client.connectionTimeout = _checkTimeout;
+
+      final request = await client.getUrl(Uri.parse(url));
+      request.headers.set('Accept', 'application/vnd.github+json');
+      request.headers.set('User-Agent', 'OLOPSC-IskoLinic-Desktop');
+
+      final response = await request.close().timeout(_checkTimeout);
+
+      if (response.statusCode != 200) {
+        await response.drain<void>();
+        client.close();
+        return [];
+      }
+
+      final body = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(_checkTimeout);
+      client.close();
+
+      final decoded = jsonDecode(body);
+      if (decoded is! List) return [];
+
+      final releases =
+          decoded
+              .map((json) => UpdateInfo.fromGitHubRelease(json as Map<String, dynamic>))
+              .where((info) => info.downloadUrl.isNotEmpty)
+              // Filter by version (must be older)
+              .where((info) => _isOlderVersion(info.version, currentVersion))
+              // Filter by environment:
+              // - Prod: Only show versions WITHOUT '-pre'
+              // - Dev: Only show versions WITH '-pre'
+              .where((info) {
+                final isPre = info.version.contains('-pre');
+                return isProduction ? !isPre : isPre;
+              })
+              .toList();
+
+      // Sort by version descending (newest of the old ones first)
+      releases.sort((a, b) => _compareVersions(b.version, a.version));
+
+      return releases;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Returns true if [remote] is older than [current].
+  static bool _isOlderVersion(String remote, String current) {
+    return _compareVersions(current, remote) > 0;
+  }
+
+  /// Compares two versions. Returns > 0 if v1 > v2, < 0 if v1 < v2, 0 if equal.
+  static int _compareVersions(String v1, String v2) {
+    final p1 = _parseVersion(v1);
+    final p2 = _parseVersion(v2);
+
+    for (int i = 0; i < 3; i++) {
+      final r1 = i < p1.length ? p1[i] : 0;
+      final r2 = i < p2.length ? p2[i] : 0;
+      if (r1 > r2) return 1;
+      if (r1 < r2) return -1;
+    }
+    return 0;
   }
 
   /// Compares two semantic version strings.

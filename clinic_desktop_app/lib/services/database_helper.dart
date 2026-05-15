@@ -2,12 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
 import '../models/inventory_item.dart';
 import '../models/custom_symptom.dart';
 import '../crdt/hlc.dart';
 import '../constants/app_config.dart';
+import 'database_backup_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -27,6 +29,21 @@ class DatabaseHelper {
     final databaseFactory = databaseFactoryFfi;
     final dir = await getApplicationSupportDirectory();
     final dbPath = p.join(dir.path, AppConfig.databaseName);
+
+    // ── Pre-migration backup ────────────────────────────────────────
+    // Create a backup of the database BEFORE openDatabase triggers
+    // any onCreate/onUpgrade migrations, so we can roll back if needed.
+    try {
+      String appVersion = '0.0.0';
+      try {
+        final packageInfo = await PackageInfo.fromPlatform();
+        appVersion = packageInfo.version;
+      } catch (_) {}
+      await DatabaseBackupService.createPreMigrationBackup(appVersion);
+    } catch (e) {
+      debugPrint('DatabaseHelper: Pre-migration backup failed (non-fatal): $e');
+    }
+
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(

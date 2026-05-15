@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,8 +9,11 @@ import '../providers/settings_provider.dart';
 import '../providers/sync_provider.dart';
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
+import '../services/database_backup_service.dart';
+import '../services/update_service.dart';
 import '../providers/patient_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -267,6 +271,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 48),
+
+          // ── Database Backup & Restore ───────────────────────────────────
+          _buildSectionHeader(
+            'Database Backup & Restore',
+            Icons.restore_rounded,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: AppTheme.glassCard(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Automatic Backups',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'A backup of the database is automatically created every time the app starts, before any updates or migrations are applied. '
+                  'You can restore a previous backup if an update causes issues. Up to ${DatabaseBackupService.maxBackups} backups are kept.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 20),
+                _buildBackupsList(),
               ],
             ),
           ),
@@ -797,6 +834,489 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
+  }
+
+  Widget _buildBackupsList() {
+    return FutureBuilder<List<BackupInfo>>(
+      future: DatabaseBackupService.listBackups(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+
+        final backups = snapshot.data ?? [];
+
+        if (backups.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.cardLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 20,
+                  color: AppTheme.textMuted,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'No backups available yet. A backup will be created the next time the app starts.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final dateFormatter = DateFormat('MMM d, yyyy – h:mm a');
+
+        return Column(
+          children: backups.map((backup) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppTheme.cardLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.dividerColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.storage_rounded,
+                      color: AppTheme.accent,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'v${backup.appVersion}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${dateFormatter.format(backup.createdAt)}  ·  ${backup.formattedSize}',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _handleRestore(context, backup),
+                    icon: const Icon(Icons.restore_rounded, size: 16),
+                    label: const Text('Restore/Revert'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.warning,
+                      side: BorderSide(
+                        color: AppTheme.warning.withValues(alpha: 0.5),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleRestore(BuildContext context, BackupInfo backup) async {
+    String? selectedRevertVersion;
+    late Future<List<UpdateInfo>> olderReleasesFuture;
+
+    olderReleasesFuture = () async {
+      final packageInfo = await PackageInfo.fromPlatform();
+      return await UpdateService.fetchOlderReleases(
+        packageInfo.version,
+        AppConfig.isProduction,
+      );
+    }();
+
+    // Step 1: Confirm with user (includes version selector)
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppTheme.warning),
+              SizedBox(width: 10),
+              Text('Restore Database Backup'),
+            ],
+          ),
+          content: FutureBuilder<List<UpdateInfo>>(
+            future: olderReleasesFuture,
+            builder: (context, snapshot) {
+              final olderReleases = snapshot.data ?? [];
+              final isLoading =
+                  snapshot.connectionState == ConnectionState.waiting;
+
+              // Auto-select matching version once loaded if not already selected
+              if (!isLoading && selectedRevertVersion == null) {
+                if (olderReleases.any((r) => r.version == backup.appVersion)) {
+                  // We can't call setDialogState directly here during build,
+                  // but we can set the local variable for the initial value.
+                  selectedRevertVersion = backup.appVersion;
+                }
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'You are about to restore the database to the backup from v${backup.appVersion} '
+                    '(${backup.formattedSize}).',
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.danger.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.danger.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_rounded,
+                          size: 18,
+                          color: AppTheme.danger.withValues(alpha: 0.7),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'This will replace the current database with the backup. '
+                            'A backup of the current state will be saved first. '
+                            'The app will need to restart after restoring.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.danger.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Select App Version to Revert Back To (Optional)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardLight,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.dividerColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: selectedRevertVersion,
+                        isExpanded: true,
+                        hint: isLoading
+                            ? const Text('Loading older versions...')
+                            : const Text('Do not revert app version'),
+                        disabledHint: isLoading
+                            ? const Text('Loading older versions...')
+                            : null,
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text(
+                              'Only Restore Database (Keep Current App Version)',
+                            ),
+                          ),
+                          ...olderReleases.map(
+                            (release) => DropdownMenuItem<String?>(
+                              value: release.version,
+                              child: Text(
+                                'Revert to v${release.version}${release.version == backup.appVersion ? " (Matches Backup)" : ""}',
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: isLoading
+                            ? null
+                            : (val) {
+                                setDialogState(
+                                  () => selectedRevertVersion = val,
+                                );
+                              },
+                      ),
+                    ),
+                  ),
+                  if (selectedRevertVersion != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'The app will download and install v$selectedRevertVersion after restoring the database.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.accent.withValues(alpha: 0.8),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.warning,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // Step 2: Verify PIN
+    final isAuthorized = await _verifyPinBeforeExport();
+    if (!isAuthorized || !context.mounted) return;
+
+    // Step 3: Close DB and restore
+    try {
+      await DatabaseHelper.instance.close();
+      final success = await DatabaseBackupService.restoreBackup(backup);
+
+      if (!success) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to restore backup. Please try again.'),
+              backgroundColor: AppTheme.danger,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 4: If user opted to revert app version, download the selected version
+      if (selectedRevertVersion != null && context.mounted) {
+        await _handleAppVersionRevert(context, selectedRevertVersion!);
+      } else if (context.mounted) {
+        // Just show the restart dialog
+        await _showRestoreCompleteDialog(context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Restore error: $e'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleAppVersionRevert(
+    BuildContext context,
+    String targetVersion,
+  ) async {
+    // Show a downloading dialog
+    double downloadProgress = 0;
+    bool downloadStarted = false;
+    String statusText = 'Finding v$targetVersion release...';
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          // Start the download process (only once)
+          if (!downloadStarted) {
+            downloadStarted = true;
+            _downloadOldVersion(
+              targetVersion,
+              onStatus: (status) {
+                if (ctx.mounted) {
+                  setDialogState(() => statusText = status);
+                }
+              },
+              onProgress: (progress) {
+                if (ctx.mounted) {
+                  setDialogState(() => downloadProgress = progress);
+                }
+              },
+              onComplete: (installerFile) {
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  if (installerFile != null) {
+                    // Launch the old installer and exit
+                    UpdateService.launchInstallerAndExit(installerFile);
+                  } else {
+                    // Download failed, show the restart dialog instead
+                    _showRestoreCompleteDialog(
+                      context,
+                      extraMessage:
+                          'Could not download v$targetVersion. The database was restored, but '
+                          'the app version could not be reverted. You may need to manually install '
+                          'the older version.',
+                    );
+                  }
+                }
+              },
+            );
+          }
+
+          final percent = (downloadProgress * 100).toInt();
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.downloading_rounded, color: AppTheme.accent),
+                const SizedBox(width: 10),
+                Text(
+                  downloadProgress > 0
+                      ? 'Downloading v$targetVersion...'
+                      : 'Preparing Download',
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(statusText),
+                const SizedBox(height: 20),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: downloadProgress > 0 ? downloadProgress : null,
+                    backgroundColor: AppTheme.cardLight,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppTheme.accent,
+                    ),
+                    minHeight: 6,
+                  ),
+                ),
+                if (downloadProgress > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '$percent%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.accent,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _downloadOldVersion(
+    String targetVersion, {
+    required void Function(String status) onStatus,
+    required void Function(double progress) onProgress,
+    required void Function(File? installerFile) onComplete,
+  }) async {
+    try {
+      onStatus('Looking up v$targetVersion on GitHub...');
+      final release = await UpdateService.fetchRelease(targetVersion);
+
+      if (release == null || release.downloadUrl.isEmpty) {
+        onStatus('Release v$targetVersion not found.');
+        await Future.delayed(const Duration(seconds: 1));
+        onComplete(null);
+        return;
+      }
+
+      onStatus('Downloading installer...');
+      final file = await UpdateService.downloadInstaller(release.downloadUrl, (
+        progress,
+      ) {
+        onProgress(progress);
+        final percent = (progress * 100).toInt();
+        onStatus('Downloading installer... $percent%');
+      });
+
+      onComplete(file);
+    } catch (e) {
+      onStatus('Download failed: $e');
+      await Future.delayed(const Duration(seconds: 1));
+      onComplete(null);
+    }
+  }
+
+  Future<void> _showRestoreCompleteDialog(
+    BuildContext context, {
+    String? extraMessage,
+  }) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: AppTheme.accent),
+            SizedBox(width: 10),
+            Text('Restore Complete'),
+          ],
+        ),
+        content: Text(
+          extraMessage ??
+              'The database has been restored successfully. '
+                  'Please close and reopen the application for the changes to take effect.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              exit(0);
+            },
+            child: const Text('Close App'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildTeamMember(String assetPath, String name, String role) {

@@ -131,6 +131,10 @@ class _SplashScreenState extends State<SplashScreen>
 
     try {
       // Step 1: Database & patients
+      _setStatus('Backing up database...');
+      // The backup happens automatically inside DatabaseHelper._initDatabase()
+      // when the DB getter is first accessed below.
+
       _setStatus('Loading patient database...');
 
       // Step 2: Settings & Persistence
