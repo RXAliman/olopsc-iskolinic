@@ -40,6 +40,25 @@ class SyncClient {
   /// Called after a sync batch has been merged, with the set of changed IDs.
   void Function(Set<String> changedIds)? onSyncComplete;
 
+  /// Called when syncing starts or stops.
+  void Function(bool isSyncing)? onSyncStatusChanged;
+  
+  int _activeSyncTasks = 0;
+  bool get isSyncing => _activeSyncTasks > 0;
+
+  void _startSyncTask() {
+    _activeSyncTasks++;
+    if (_activeSyncTasks == 1) onSyncStatusChanged?.call(true);
+  }
+
+  void _endSyncTask() {
+    _activeSyncTasks--;
+    if (_activeSyncTasks <= 0) {
+      _activeSyncTasks = 0;
+      onSyncStatusChanged?.call(false);
+    }
+  }
+
   static const int _batchSize = 50;
   static const Duration _heartbeatInterval = Duration(minutes: 3);
 
@@ -127,12 +146,16 @@ class SyncClient {
     _subscription?.cancel();
     _channel?.sink.close();
     _channel = null;
+    _activeSyncTasks = 0;
+    onSyncStatusChanged?.call(false);
     _setState(SyncConnectionState.disconnected);
   }
 
   void _onDisconnected() {
     _heartbeatTimer?.cancel();
     _channel = null;
+    _activeSyncTasks = 0;
+    onSyncStatusChanged?.call(false);
     _setState(SyncConnectionState.disconnected);
     _scheduleReconnect();
   }
@@ -168,6 +191,7 @@ class SyncClient {
   /// Send a batch of local changes to the relay server.
   /// Called by SyncProvider after every local write.
   Future<void> pushChanges() async {
+    _startSyncTask();
     try {
       if (_state != SyncConnectionState.connected) return;
 
@@ -293,9 +317,8 @@ class SyncClient {
       if (sentMaxHlc != lastPush) {
         await _db.setMeta('lastPushHlc', sentMaxHlc);
       }
-    } catch (e, stack) {
-      debugPrint('SyncClient: FATAL error in pushChanges: $e');
-      debugPrint(stack.toString());
+    } finally {
+      _endSyncTask();
     }
   }
 
@@ -377,6 +400,7 @@ class SyncClient {
 
   /// Request any changes we've missed from the server.
   Future<void> _requestSync() async {
+    _startSyncTask();
     _currentSyncMaxHlc = ''; // Reset when we begin a new request
     final lastSync = await _db.getMeta('lastSyncHlc') ?? '';
     _send({
@@ -409,30 +433,33 @@ class SyncClient {
 
           if (senderNodeId == nodeId) return;
 
-          final records =
-              (msg['records'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _startSyncTask();
+          try {
+            final records =
+                (msg['records'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
-          final batch = SyncBatch(
-            patients: table == 'patients' ? records : [],
-            visitations: table == 'visitations' ? records : [],
-            inventory: table == 'inventory' ? records : [],
-            inventoryStocks: table == 'inventory_stocks' ? records : [],
-            customSymptoms: table == 'custom_symptoms' ? records : [],
-          );
+            final batch = SyncBatch(
+              patients: table == 'patients' ? records : [],
+              visitations: table == 'visitations' ? records : [],
+              inventory: table == 'inventory' ? records : [],
+              inventoryStocks: table == 'inventory_stocks' ? records : [],
+              customSymptoms: table == 'custom_symptoms' ? records : [],
+            );
 
-          final result = await SyncIsolate.mergeBatch(batch);
-          final allChanged = {
-            ...result.changedPatientIds,
-            ...result.changedVisitationIds,
-            ...result.changedInventoryIds,
-            ...result.changedInventoryStockIds,
-            ...result.changedCustomSymptomIds,
-          };
+            final result = await SyncIsolate.mergeBatch(batch);
+            final allChanged = {
+              ...result.changedPatientIds,
+              ...result.changedVisitationIds,
+              ...result.changedInventoryIds,
+              ...result.changedInventoryStockIds,
+              ...result.changedCustomSymptomIds,
+            };
 
-
-
-          if (allChanged.isNotEmpty) {
-            onSyncComplete?.call(allChanged);
+            if (allChanged.isNotEmpty) {
+              onSyncComplete?.call(allChanged);
+            }
+          } finally {
+            _endSyncTask();
           }
           break;
 
@@ -496,6 +523,7 @@ class SyncClient {
               'batchSize': _batchSize,
             });
           } else {
+            _endSyncTask();
             // Full sync complete — update marker conditionally based on received HLC
             if (_currentSyncMaxHlc.isNotEmpty) {
               final currentLocal = await _db.getMeta('lastSyncHlc') ?? '';

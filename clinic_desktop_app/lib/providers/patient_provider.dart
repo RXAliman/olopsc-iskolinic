@@ -334,6 +334,7 @@ class PatientProvider extends ChangeNotifier {
   Future<void> refreshAll() async {
     await loadPatients();
     await loadTodayVisits();
+    await loadGlobalVisits();
     if (_selectedPatient != null) {
       await loadVisitations();
     }
@@ -400,6 +401,13 @@ class PatientProvider extends ChangeNotifier {
     _currentVisitPage = 0;
     await loadVisitations();
     notifyListeners();
+  }
+
+  Future<void> selectPatientById(String id) async {
+    final patient = await _db.getPatient(id);
+    if (patient != null) {
+      await selectPatient(patient);
+    }
   }
 
   Future<void> loadVisitations() async {
@@ -606,6 +614,9 @@ class PatientProvider extends ChangeNotifier {
   // ── Global Visits (Visits Tab) ───────────────────────────────────
 
   Future<void> loadGlobalVisits() async {
+    _loading = true;
+    notifyListeners();
+
     _totalGlobalVisits = await _db.getGlobalVisitCount(
       selectedDepartments: _visitsSelectedDepartments,
       includeStudent: _visitsIncludeStudent,
@@ -622,6 +633,7 @@ class PatientProvider extends ChangeNotifier {
       includeEmployee: _visitsIncludeEmployee,
       date: _visitsSelectedDate,
     );
+    _loading = false;
     notifyListeners();
   }
 

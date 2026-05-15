@@ -987,10 +987,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           builder: (context, sync, _) {
                             final isConnected = sync.isConnected;
                             final isConnecting = sync.isConnecting;
+                            final isSyncing = sync.isSyncing;
 
                             final Color bgColor;
                             final String label;
                             final IconData icon;
+
+                            if (isSyncing && isConnected) {
+                              return Container(
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF3b82f6,
+                                  ), // Using IskOlinic primary blue
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: IntrinsicWidth(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          14,
+                                          6,
+                                          14,
+                                          4,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.cloud_sync_rounded,
+                                              size: 16,
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const Text(
+                                              'Syncing',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const LinearProgressIndicator(
+                                        minHeight: 2,
+                                        backgroundColor: Colors.white24,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
 
                             if (isConnected) {
                               bgColor = Colors.green;

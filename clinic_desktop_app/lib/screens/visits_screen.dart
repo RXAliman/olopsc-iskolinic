@@ -529,21 +529,13 @@ class _VisitTileState extends State<_VisitTile> {
           onTap: () async {
             // Option to open patient detail when tapping the visit
             final patientId = visitMap['patientId'] as String;
-            final db = context.read<PatientProvider>();
-            final p = db.patients.where((p) => p.id == patientId).firstOrNull;
-            if (p != null && context.mounted) {
-              await db.selectPatient(p);
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (_) => const PatientDetailScreen(),
-                );
-              }
-            } else {
-              // Load patient if not in the current page list
-              // Since we are showing global visits, the patient might not be in the current `provider.patients`
-              // We should ideally fetch the specific patient from DB, but for now we skip or do a custom fetch.
-              // Actually we can do a simple select if we had a fetch method.
+            final provider = context.read<PatientProvider>();
+            await provider.selectPatientById(patientId);
+            if (context.mounted && provider.selectedPatient != null) {
+              showDialog(
+                context: context,
+                builder: (_) => const PatientDetailScreen(),
+              );
             }
           },
           child: Padding(
