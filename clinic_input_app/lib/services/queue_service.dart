@@ -23,8 +23,10 @@ class QueueService {
     required String guardian2Contact,
     required String allergicTo,
     required List<String> symptoms,
+    required String customChiefComplaint,
     required String role,
     required String department,
+    required String level,
     String? existingPatientId,
   }) async {
     if (!_connection.isConnected) {
@@ -36,9 +38,7 @@ class QueueService {
     // Re-verify connection before submitting
     final reachable = await _connection.checkConnection();
     if (!reachable) {
-      throw Exception(
-        'Lost connection to the desktop app. Please reconnect.',
-      );
+      throw Exception('Lost connection to the desktop app. Please reconnect.');
     }
 
     final data = {
@@ -58,16 +58,13 @@ class QueueService {
       'guardian2Contact': guardian2Contact,
       'allergicTo': allergicTo,
       'symptoms': symptoms,
+      'customChiefComplaint': customChiefComplaint,
       'role': role,
       'department': department,
+      'level': level,
       if (existingPatientId != null) 'existingPatientId': existingPatientId,
     };
 
-    final success = await _connection.submitPatient(data);
-    if (!success) {
-      throw Exception(
-        'Failed to submit the form. Please try again.',
-      );
-    }
+    await DesktopConnectionService.instance.submitPatient(data);
   }
 }

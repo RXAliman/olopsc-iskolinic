@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'device_service.dart';
 
 /// Manages the tablet's connection to the desktop app's local HTTP server.
 ///
@@ -72,13 +73,12 @@ class DesktopConnectionService {
       // ignore: avoid_print
       print('[DesktopConnection] Health check: GET $url');
       final response = await http
-          .get(
-            Uri.parse(url),
-            headers: _authHeaders,
-          )
+          .get(Uri.parse(url), headers: _authHeaders)
           .timeout(const Duration(seconds: 10));
       // ignore: avoid_print
-      print('[DesktopConnection] Response: ${response.statusCode} ${response.body}');
+      print(
+        '[DesktopConnection] Response: ${response.statusCode} ${response.body}',
+      );
       return response.statusCode == 200;
     } catch (e) {
       // ignore: avoid_print
@@ -99,10 +99,7 @@ class DesktopConnectionService {
   Future<List<Map<String, dynamic>>> fetchPatients() async {
     try {
       final response = await http
-          .get(
-            Uri.parse('$baseUrl/api/patients'),
-            headers: _authHeaders,
-          )
+          .get(Uri.parse('$baseUrl/api/patients'), headers: _authHeaders)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -119,13 +116,16 @@ class DesktopConnectionService {
   /// Fetch a single patient by their ID number.
   ///
   /// Returns a map of patient details or null if not found.
-  Future<Map<String, dynamic>?> fetchPatientByIdNumber(String idNumber) async {
+  Future<Map<String, dynamic>?> fetchPatientByIdNumber(
+    String idNumber, {
+    String? requestId,
+  }) async {
     try {
+      var url = '$baseUrl/api/patients/search?idNumber=$idNumber';
+      if (requestId != null) url += '&requestId=$requestId';
+
       final response = await http
-          .get(
-            Uri.parse('$baseUrl/api/patients/search?idNumber=$idNumber'),
-            headers: _authHeaders,
-          )
+          .get(Uri.parse(url), headers: _authHeaders)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -138,6 +138,45 @@ class DesktopConnectionService {
     }
   }
 
+  /// Request permission to edit/view full details of a patient.
+  Future<Map<String, dynamic>?> requestEdit(String idNumber) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/edit-requests'),
+            headers: {..._authHeaders, 'Content-Type': 'application/json'},
+            body: jsonEncode({'idNumber': idNumber}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Check the status of a pending edit request.
+  Future<Map<String, dynamic>?> checkEditRequestStatus(String requestId) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/api/edit-requests/$requestId'),
+            headers: _authHeaders,
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Submit a new patient (and optional visitation) to the desktop database.
   ///
   /// Returns `true` on success.
@@ -146,10 +185,7 @@ class DesktopConnectionService {
       final response = await http
           .post(
             Uri.parse('$baseUrl/api/patients'),
-            headers: {
-              ..._authHeaders,
-              'Content-Type': 'application/json',
-            },
+            headers: {..._authHeaders, 'Content-Type': 'application/json'},
             body: jsonEncode(data),
           )
           .timeout(const Duration(seconds: 10));
@@ -157,10 +193,10 @@ class DesktopConnectionService {
       if (response.statusCode == 201) {
         return true;
       }
-      return false;
-    } catch (_) {
-      _connected = false;
-      return false;
+      final body = jsonDecode(response.body);
+      throw Exception(body['error'] ?? 'Server error ${response.statusCode}');
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -173,7 +209,10 @@ class DesktopConnectionService {
   }
 
   /// Standard auth headers for every request.
-  Map<String, String> get _authHeaders => {
-        'Authorization': 'Bearer $_token',
-      };
+  Map<String, String> get _authHeaders {
+    return {
+      'Authorization': 'Bearer $_token',
+      'X-Device-Model': DeviceService.instance.cachedModel ?? 'Unknown Device',
+    };
+  }
 }

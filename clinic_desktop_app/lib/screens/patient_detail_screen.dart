@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import '../providers/patient_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../theme/app_theme.dart';
@@ -84,9 +85,36 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                             patient.patientName,
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
-                          Text(
-                            patient.idNumber,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          Row(
+                            children: [
+                              Text(
+                                patient.idNumber,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                onPressed: () {
+                                  Clipboard.setData(
+                                    ClipboardData(text: patient.idNumber),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'ID Number ${patient.idNumber} copied',
+                                      ),
+                                      duration: const Duration(seconds: 2),
+                                      behavior: SnackBarBehavior.floating,
+                                      width: 300,
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy_rounded, size: 16),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Copy ID Number',
+                                color: AppTheme.textMuted,
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -256,7 +284,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                   : '—',
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(width: 16),
                                           Expanded(
                                             child: _InfoCell(
                                               icon: Icons.groups,
@@ -270,6 +298,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                           ),
                                         ],
                                       ),
+                                      if (patient.level.isNotEmpty) ...[
+                                        const SizedBox(height: 20),
+                                        _InfoCell(
+                                          icon: Icons.layers_outlined,
+                                          label: 'Level',
+                                          value: patient.level,
+                                        ),
+                                      ],
                                       const SizedBox(height: 20),
                                       Row(
                                         children: [
@@ -696,6 +732,30 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                                         )
                                                         .toList(),
                                                   ),
+                                                if (visit.customChiefComplaint.isNotEmpty) ...[
+                                                  const SizedBox(height: 6),
+                                                  Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      const Text(
+                                                        'Other: ',
+                                                        style: TextStyle(
+                                                          color: AppTheme.textMuted,
+                                                          fontSize: 13,
+                                                        ),
+                                                      ),
+                                                      Expanded(
+                                                        child: Text(
+                                                          visit.customChiefComplaint,
+                                                          style: const TextStyle(
+                                                            color: AppTheme.textPrimary,
+                                                            fontSize: 13,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                                 if (visit
                                                         .treatment
                                                         .isNotEmpty ||

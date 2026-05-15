@@ -20,12 +20,12 @@ class ConnectionScreen extends StatelessWidget {
             children: [
               // ── Header ──────────────────────────────────────────
               Text(
-                'Tablet Connection',
+                'Form App Connection',
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
               const SizedBox(height: 4),
               Text(
-                'Scan the QR code below from the tablet app to connect',
+                'Scan the QR code below from the form app to connect',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 32),
@@ -44,7 +44,11 @@ class ConnectionScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildConnectionInfoCard(context, server),
-                        if (server.connectedDevices.isNotEmpty) ...[
+                        if (server.pendingRequests.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          _buildRequestsCard(context, server),
+                        ],
+                        if (server.connectedDeviceModels.isNotEmpty) ...[
                           const SizedBox(height: 20),
                           _buildDevicesCard(context, server),
                         ] else ...[
@@ -167,7 +171,7 @@ class ConnectionScreen extends StatelessWidget {
 
           // Hint text
           Text(
-            'Point the tablet camera here',
+            'Point the device camera here',
             style: GoogleFonts.inter(
               fontSize: 13,
               color: AppTheme.textMuted,
@@ -209,6 +213,18 @@ class ConnectionScreen extends StatelessWidget {
                 ? '${server.authToken.substring(0, 8)}…'
                 : '—',
           ),
+          const SizedBox(height: 10),
+          _InfoRow(
+            icon: Icons.wifi_rounded,
+            label: 'Host IP Address',
+            value: server.isRunning ? server.localIp : '—',
+          ),
+          const SizedBox(height: 10),
+          _InfoRow(
+            icon: Icons.settings_input_component_rounded,
+            label: 'Server Port',
+            value: server.isRunning ? server.port.toString() : '—',
+          ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
@@ -249,11 +265,18 @@ class ConnectionScreen extends StatelessWidget {
                 'Connected Devices',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+              const Spacer(),
+              IconButton(
+                onPressed: () => server.refreshDevices(),
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: 'Refresh list',
+                color: AppTheme.accent,
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          ...server.connectedDevices.map(
-            (ip) => Padding(
+          ...server.connectedDeviceModels.map(
+            (model) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -273,8 +296,8 @@ class ConnectionScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      ip,
-                      style: GoogleFonts.chivoMono(
+                      model,
+                      style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimary,
@@ -284,6 +307,108 @@ class ConnectionScreen extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// List of pending edit requests from tablets.
+  Widget _buildRequestsCard(BuildContext context, LocalServerProvider server) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.accent.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.security_rounded,
+                color: AppTheme.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Pending Edit Requests',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.accentDim,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => server.clearRequests(),
+                child: const Text('Clear All'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: server.pendingRequests.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final req = server.pendingRequests[index];
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.dividerColor),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ID: ${req.idNumber}',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            'From: ${req.deviceModel}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => server.denyRequest(req.id),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.danger,
+                          ),
+                          child: const Text('Deny'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => server.approveRequest(req.id),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.accent,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Approve'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -330,22 +455,22 @@ class ConnectionScreen extends StatelessWidget {
           _InstructionStep(
             number: '1',
             text:
-                'Make sure the tablet is connected to the clinic router Wi-Fi.',
+                'Make sure the tablet/smartphone is connected to the clinic router Wi-Fi.',
           ),
           const SizedBox(height: 8),
           _InstructionStep(
             number: '2',
-            text: 'Open the tablet app — it starts with a QR scanner.',
+            text: 'Open the form app and follow the given instructions.',
           ),
           const SizedBox(height: 8),
           _InstructionStep(
             number: '3',
-            text: 'Point the tablet camera at the QR code on the left.',
+            text: 'Point the camera at the QR code on the left.',
           ),
           const SizedBox(height: 8),
           _InstructionStep(
             number: '4',
-            text: 'The tablet will automatically connect and verify.',
+            text: 'The device will automatically connect and verify.',
           ),
         ],
       ),

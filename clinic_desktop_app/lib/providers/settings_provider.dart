@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SettingsProvider extends ChangeNotifier {
   static const String _keyConnectionMode = 'connection_mode';
   static const String _keyRetentionYears = 'retention_years';
+  static const String _keyDeveloperMode = 'developer_mode';
 
   // 0: Offline, 1: LAN (Disabled), 2: Relay
   int _connectionMode = 2;
@@ -11,6 +12,9 @@ class SettingsProvider extends ChangeNotifier {
 
   int _retentionYears = 5;
   int get retentionYears => _retentionYears;
+
+  bool _isDeveloperMode = false;
+  bool get isDeveloperMode => _isDeveloperMode;
 
   bool _initialized = false;
   bool get initialized => _initialized;
@@ -20,6 +24,7 @@ class SettingsProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _connectionMode = prefs.getInt(_keyConnectionMode) ?? 2;
     _retentionYears = prefs.getInt(_keyRetentionYears) ?? 5;
+    _isDeveloperMode = prefs.getBool(_keyDeveloperMode) ?? false;
     _initialized = true;
     notifyListeners();
   }
@@ -45,5 +50,14 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyRetentionYears, years);
+  }
+
+  /// Toggle and persist developer mode
+  Future<void> toggleDeveloperMode(bool value) async {
+    if (value == _isDeveloperMode) return;
+    _isDeveloperMode = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyDeveloperMode, value);
   }
 }

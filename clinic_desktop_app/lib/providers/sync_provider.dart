@@ -21,6 +21,7 @@ class SyncProvider extends ChangeNotifier {
 
   bool get isConnected => _connectionState == SyncConnectionState.connected;
   bool get isConnecting => _connectionState == SyncConnectionState.connecting;
+  bool get isSyncing => _client?.isSyncing ?? false;
 
   /// Initialize the sync system.
   /// Call this after PatientProvider.initCrdt() has been called.
@@ -50,6 +51,10 @@ class SyncProvider extends ChangeNotifier {
 
     _client!.onStateChanged = () {
       _connectionState = _client!.state;
+      notifyListeners();
+    };
+
+    _client!.onSyncStatusChanged = (_) {
       notifyListeners();
     };
 
@@ -125,6 +130,10 @@ class SyncProvider extends ChangeNotifier {
 
     _client!.onStateChanged = () {
       _connectionState = _client!.state;
+      notifyListeners();
+    };
+
+    _client!.onSyncStatusChanged = (_) {
       notifyListeners();
     };
 

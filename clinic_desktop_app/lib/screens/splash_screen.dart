@@ -11,6 +11,7 @@ import '../providers/custom_symptom_provider.dart';
 import '../providers/local_server_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/update_service.dart';
+import '../services/database_helper.dart';
 import '../theme/app_theme.dart';
 
 /// Callback signature for when the splash screen finishes initialization.
@@ -130,11 +131,22 @@ class _SplashScreenState extends State<SplashScreen>
 
     try {
       // Step 1: Database & patients
+      _setStatus('Backing up database...');
+      // The backup happens automatically inside DatabaseHelper._initDatabase()
+      // when the DB getter is first accessed below.
+
       _setStatus('Loading patient database...');
 
       // Step 2: Settings & Persistence
       final settingsProvider = SettingsProvider();
       await settingsProvider.loadSettings();
+
+      // Step 3: Data Retention Purge
+      _setStatus('Cleaning database...');
+      await DatabaseHelper.instance.purgeOldRecords(
+        settingsProvider.retentionYears,
+      );
+      await DatabaseHelper.instance.removeDetachedVisitations();
 
       final patientProvider = PatientProvider();
       await patientProvider.initCrdt();

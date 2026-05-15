@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../providers/analytics_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/analytics_export_dialog.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -20,6 +21,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -134,6 +140,55 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                         Tab(text: 'Supplies Used'),
                       ],
                     ),
+                  ),
+                  const Spacer(),
+
+                  // Export Button
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AnalyticsExportDialog(
+                          type: _tabController.index == 0
+                              ? 'symptoms'
+                              : 'supplies',
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.file_download_outlined, size: 20),
+                    label: Text(
+                      _tabController.index == 0
+                          ? 'Export Symptoms Report'
+                          : 'Export Supplies Report',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // Reload Button
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryLight,
+                      foregroundColor: AppTheme.accent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: AppTheme.accent),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                    ),
+                    onPressed: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Refreshing analytics data...'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                      await provider.loadAnalytics();
+                    },
+                    icon: const Icon(Icons.sync_rounded),
+                    label: const Text('Reload'),
                   ),
                 ],
               ),

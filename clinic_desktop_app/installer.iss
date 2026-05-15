@@ -37,6 +37,7 @@ SetupIconFile=windows\runner\resources\app_icon.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+DisableWelcomePage=no
 PrivilegesRequired=lowest
 ; Close the running app before installing (handles auto-updates too)
 CloseApplications=force
@@ -55,6 +56,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "build\windows\x64\runner\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "build\windows\x64\runner\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "build\windows\x64\runner\Release\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "assets\installer_banner.bmp"; Flags: dontcopy
+
+
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -135,3 +139,38 @@ begin
     end;
   end;
 end;
+
+procedure InitializeWizard();
+var
+  BannerImage: TBitmapImage;
+begin
+  // Extract and display custom banner on the Welcome page
+  ExtractTemporaryFile('installer_banner.bmp');
+
+  
+  // Hide the default side image in modern style
+  WizardForm.WizardBitmapImage.Visible := False;
+  
+  // Create and position the new top banner
+  BannerImage := TBitmapImage.Create(WizardForm);
+  BannerImage.Parent := WizardForm.WelcomePage;
+  BannerImage.Bitmap.LoadFromFile(ExpandConstant('{tmp}\installer_banner.bmp'));
+
+  BannerImage.Left := 0;
+  BannerImage.Top := 0;
+  BannerImage.Width := WizardForm.WelcomePage.Width;
+  BannerImage.Height := BannerImage.Width div 4; // Maintain 16:4 (4:1) aspect ratio
+  BannerImage.Stretch := True;
+
+  // Move the welcome text below the banner
+  WizardForm.WelcomeLabel1.Font.Size := 14;
+  WizardForm.WelcomeLabel1.Font.Style := [fsBold];
+  WizardForm.WelcomeLabel1.Left := ScaleX(20);
+  WizardForm.WelcomeLabel1.Top := BannerImage.Height + ScaleY(20);
+  WizardForm.WelcomeLabel1.Width := WizardForm.WelcomePage.Width - ScaleX(40);
+  
+  WizardForm.WelcomeLabel2.Left := ScaleX(20);
+  WizardForm.WelcomeLabel2.Top := WizardForm.WelcomeLabel1.Top + WizardForm.WelcomeLabel1.Height + ScaleY(10);
+  WizardForm.WelcomeLabel2.Width := WizardForm.WelcomePage.Width - ScaleX(40);
+end;
+

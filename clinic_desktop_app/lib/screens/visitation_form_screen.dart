@@ -34,6 +34,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _treatmentCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
+  final _customChiefComplaintCtrl = TextEditingController();
   final Set<String> _selectedSymptoms = {};
   final Set<String> _selectedSupplies = {};
   final Set<String> _fullyConsumedSupplies = {};
@@ -62,6 +63,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       _selectedSymptoms.addAll(widget.visitation!.symptoms);
       _selectedSupplies.addAll(widget.visitation!.suppliesUsed);
       _fullyConsumedSupplies.addAll(widget.visitation!.consumedSupplies);
+      _customChiefComplaintCtrl.text = widget.visitation!.customChiefComplaint;
     }
 
     final pId = widget.visitation?.patientId ?? widget.patientId;
@@ -91,6 +93,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   void dispose() {
     _treatmentCtrl.dispose();
     _remarksCtrl.dispose();
+    _customChiefComplaintCtrl.dispose();
     super.dispose();
   }
 
@@ -105,10 +108,13 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
       );
       return;
     }
-    if (_selectedSymptoms.isEmpty) {
+    if (_selectedSymptoms.isEmpty &&
+        _customChiefComplaintCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one symptom'),
+          content: Text(
+            'Please select at least one symptom or enter a custom chief complaint',
+          ),
           backgroundColor: AppTheme.danger,
         ),
       );
@@ -152,6 +158,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         consumedSupplies: consumedSupplies,
         treatment: _treatmentCtrl.text.trim(),
         remarks: _remarksCtrl.text.trim(),
+        customChiefComplaint: _customChiefComplaintCtrl.text.trim(),
       );
       await context.read<PatientProvider>().updateVisitation(updated);
     } else {
@@ -162,6 +169,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
         consumedSupplies: consumedSupplies,
         treatment: _treatmentCtrl.text.trim(),
         remarks: _remarksCtrl.text.trim(),
+        customChiefComplaint: _customChiefComplaintCtrl.text.trim(),
       );
     }
 
@@ -294,9 +302,9 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                           final query = textEditingValue.text;
                           return await DatabaseHelper.instance
                               .searchPatientsPaginated(
-                                query,
-                                10, // top 10 matches
-                                0, // offset 0
+                                query: query,
+                                limit: 10, // top 10 matches
+                                offset: 0, // offset 0
                               );
                         },
                         onSelected: (selection) {
@@ -520,6 +528,22 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                             );
                           },
                         ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _customChiefComplaintCtrl,
+                          maxLength: 150,
+                          decoration: const InputDecoration(
+                            labelText: 'Other Chief Complaint',
+                            hintText: 'Enter any complaint not listed above',
+                            prefixIcon: Icon(Icons.edit_note_rounded),
+                            counterText: '',
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(150),
+                          ],
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
+                        ),
                         const SizedBox(height: 10),
                         const Divider(),
                         const SizedBox(height: 10),
@@ -543,30 +567,6 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                               ),
                             );
                           },
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.info_outline_rounded,
-                                size: 14,
-                                color: AppTheme.textMuted,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Note: Please manually verify the supply\'s physical expiration date before use.',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppTheme.textMuted,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                         const SizedBox(height: 20),
 

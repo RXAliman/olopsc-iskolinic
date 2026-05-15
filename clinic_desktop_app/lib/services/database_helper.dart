@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
 import '../models/inventory_item.dart';
 import '../models/custom_symptom.dart';
 import '../crdt/hlc.dart';
 import '../constants/app_config.dart';
+import 'database_backup_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -26,10 +29,28 @@ class DatabaseHelper {
     final databaseFactory = databaseFactoryFfi;
     final dir = await getApplicationSupportDirectory();
     final dbPath = p.join(dir.path, AppConfig.databaseName);
+
+    // ── Pre-migration backup ────────────────────────────────────────
+    // Create a backup of the database BEFORE openDatabase triggers
+    // any onCreate/onUpgrade migrations, so we can roll back if needed.
+    try {
+      String appVersion = '0.0.0';
+      try {
+        final packageInfo = await PackageInfo.fromPlatform();
+        appVersion = packageInfo.version;
+      } catch (_) {}
+      await DatabaseBackupService.createPreMigrationBackup(appVersion);
+    } catch (e) {
+      debugPrint('DatabaseHelper: Pre-migration backup failed (non-fatal): $e');
+    }
+
     return await databaseFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 7,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -65,7 +86,8 @@ class DatabaseHelper {
         patientRemarks TEXT NOT NULL DEFAULT '',
         permissions TEXT NOT NULL DEFAULT '{}',
         role TEXT NOT NULL DEFAULT '',
-        department TEXT NOT NULL DEFAULT ''
+        department TEXT NOT NULL DEFAULT '',
+        level TEXT NOT NULL DEFAULT ''
       )
     ''');
     await db.execute('''
@@ -78,6 +100,7 @@ class DatabaseHelper {
         consumedSupplies TEXT NOT NULL DEFAULT '',
         treatment TEXT,
         remarks TEXT,
+        customChiefComplaint TEXT NOT NULL DEFAULT '',
         hlc TEXT NOT NULL DEFAULT '',
         nodeId TEXT NOT NULL DEFAULT '',
         isDeleted INTEGER NOT NULL DEFAULT 0,
@@ -132,6 +155,29 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_custom_symptoms_hlc ON custom_symptoms (hlc)',
     );
+    // Inventory Stocks table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS inventory_stocks (
+        id TEXT PRIMARY KEY,
+        itemId TEXT NOT NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        expiryDate TEXT,
+        createdAt TEXT NOT NULL,
+        hlc TEXT NOT NULL DEFAULT '',
+        nodeId TEXT NOT NULL DEFAULT '',
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (itemId) REFERENCES inventory (id)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_itemId ON inventory_stocks (itemId)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_expiry ON inventory_stocks (expiryDate)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_hlc ON inventory_stocks (hlc)',
+    );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -145,6 +191,267 @@ class DatabaseHelper {
         "UPDATE inventory SET clinic = 'Clinic B' "
         "WHERE clinic = 'Grade School Clinic'",
       );
+    }
+    if (oldVersion < 3) {
+      // 1. Create inventory_stocks table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_stocks (
+          id TEXT PRIMARY KEY,
+          itemId TEXT NOT NULL,
+          amount INTEGER NOT NULL DEFAULT 0,
+          expiryDate TEXT,
+          createdAt TEXT NOT NULL,
+          hlc TEXT NOT NULL DEFAULT '',
+          nodeId TEXT NOT NULL DEFAULT '',
+          isDeleted INTEGER NOT NULL DEFAULT 0,
+          FOREIGN KEY (itemId) REFERENCES inventory (id)
+        )
+      ''');
+
+      // 2. Migrate existing inventory to stocks
+      // We group by itemName + clinic to keep them separate per clinic as requested
+      final List<Map<String, dynamic>> items = await db.query('inventory');
+
+      final Map<String, List<Map<String, dynamic>>> groups = {};
+      for (final item in items) {
+        final key = "${item['itemName']}_${item['clinic']}_${item['itemType']}"
+            .toLowerCase()
+            .trim();
+        groups.putIfAbsent(key, () => []).add(item);
+      }
+
+      final now = DateTime.now().toIso8601String();
+
+      for (final group in groups.values) {
+        // Sort by ID to be deterministic across nodes
+        group.sort((a, b) => (a['id'] as String).compareTo(b['id'] as String));
+
+        // The first item in the group is our survivor
+        final survivor = group.first;
+        final survivorId = survivor['id'] as String;
+
+        // 2a. Create a separate stock batch for EACH item in the group
+        for (final item in group) {
+          final qty = item['quantity'] as int? ?? 0;
+          if (qty > 0) {
+            await db.insert('inventory_stocks', {
+              'id': 'legacy_${item['id']}',
+              'itemId': survivorId,
+              'amount': qty,
+              'expiryDate': null,
+              'createdAt': now,
+              'hlc': item['hlc'],
+              'nodeId': item['nodeId'],
+              'isDeleted': 0,
+            });
+          }
+        }
+
+        // 2b. Soft-delete all other items in the group from the inventory table
+        // We use soft-delete so it syncs correctly to other nodes.
+        // We use a fresh HLC to ensure this delete propagates and wins over old states.
+        final migrationHlc = HLC
+            .now(survivor['nodeId'] as String? ?? 'migration')
+            .pack();
+        for (int i = 1; i < group.length; i++) {
+          await db.update(
+            'inventory',
+            {'isDeleted': 1, 'hlc': migrationHlc, 'nodeId': survivor['nodeId']},
+            where: 'id = ?',
+            whereArgs: [group[i]['id']],
+          );
+        }
+      }
+
+      // 3. Add indices for the new table
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_itemId ON inventory_stocks (itemId)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_expiry ON inventory_stocks (expiryDate)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_inventory_stocks_hlc ON inventory_stocks (hlc)',
+      );
+    }
+    if (oldVersion < 4) {
+      // Add customChiefComplaint column to visitations
+      await db.execute(
+        "ALTER TABLE visitations ADD COLUMN customChiefComplaint TEXT NOT NULL DEFAULT ''",
+      );
+    }
+    if (oldVersion < 5) {
+      // Add level column to patients
+      await db.execute(
+        "ALTER TABLE patients ADD COLUMN level TEXT NOT NULL DEFAULT ''",
+      );
+    }
+
+    if (oldVersion < 6) {
+      // Cleanup any remaining duplicates that were not correctly merged/deleted in previous versions
+      // OR were re-introduced by sync because of hard deletes in version 3.
+      final List<Map<String, dynamic>> items = await db.query(
+        'inventory',
+        where: 'isDeleted = 0',
+      );
+
+      final Map<String, List<Map<String, dynamic>>> groups = {};
+      for (final item in items) {
+        // We use itemName + clinic + itemType as the key to identify duplicates
+        final key = "${item['itemName']}_${item['clinic']}_${item['itemType']}"
+            .toLowerCase()
+            .trim();
+        groups.putIfAbsent(key, () => []).add(item);
+      }
+
+      // We need an HLC for the soft-delete. We try to get the node ID from meta.
+      final List<Map<String, dynamic>> meta = await db.query(
+        'meta',
+        where: 'key = ?',
+        whereArgs: ['nodeId'],
+      );
+      final String nodeId = meta.isNotEmpty
+          ? meta.first['value'] as String
+          : 'migration_node';
+      final String hlc = HLC.now(nodeId).pack();
+
+      for (final group in groups.values) {
+        if (group.length <= 1) continue;
+
+        // Sort by ID to be deterministic across nodes
+        group.sort((a, b) => (a['id'] as String).compareTo(b['id'] as String));
+
+        final survivorId = group.first['id'] as String;
+
+        for (int i = 1; i < group.length; i++) {
+          final duplicateId = group[i]['id'] as String;
+
+          // 1. Move all stocks from duplicate to survivor
+          await db.update(
+            'inventory_stocks',
+            {'itemId': survivorId, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'itemId = ?',
+            whereArgs: [duplicateId],
+          );
+
+          // 2. Soft-delete the duplicate item in the inventory table
+          await db.update(
+            'inventory',
+            {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'id = ?',
+            whereArgs: [duplicateId],
+          );
+        }
+      }
+
+      // 3. Restoration: Un-merge items that were incorrectly merged despite having different types
+      // This specifically handles items where legacy stocks are pointing to a survivor of a different type.
+      final List<Map<String, dynamic>> deletedItems = await db.query(
+        'inventory',
+        where: 'isDeleted = 1',
+      );
+
+      for (final deletedItem in deletedItems) {
+        final deletedId = deletedItem['id'] as String;
+        final legacyStockId = "legacy_$deletedId";
+
+        // Find if this item's legacy stock exists and is pointing elsewhere
+        final List<Map<String, dynamic>> stocks = await db.query(
+          'inventory_stocks',
+          where: 'id = ?',
+          whereArgs: [legacyStockId],
+        );
+
+        if (stocks.isNotEmpty) {
+          final currentItemId = stocks.first['itemId'] as String;
+          if (currentItemId != deletedId) {
+            // It was merged. Check if types match.
+            final List<Map<String, dynamic>> survivors = await db.query(
+              'inventory',
+              where: 'id = ?',
+              whereArgs: [currentItemId],
+            );
+
+            if (survivors.isNotEmpty) {
+              final survivor = survivors.first;
+              final sType = survivor['itemType']
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+              final dType = deletedItem['itemType']
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+
+              if (sType != dType) {
+                // Incorrectly merged! Un-merge by restoring the item and its legacy stock.
+                await db.update(
+                  'inventory_stocks',
+                  {'itemId': deletedId, 'hlc': hlc, 'nodeId': nodeId},
+                  where: 'id = ?',
+                  whereArgs: [legacyStockId],
+                );
+                await db.update(
+                  'inventory',
+                  {'isDeleted': 0, 'hlc': hlc, 'nodeId': nodeId},
+                  where: 'id = ?',
+                  whereArgs: [deletedId],
+                );
+              }
+            }
+          }
+        }
+      }
+      if (oldVersion < 7) {
+        // Re-run cleanup to fix the "zeroed-out" duplicates caused by the case-sensitive bug in version 6.
+        final List<Map<String, dynamic>> items = await db.query(
+          'inventory',
+          where: 'isDeleted = 0',
+        );
+
+        final Map<String, List<Map<String, dynamic>>> groups = {};
+        for (final item in items) {
+          final key =
+              "${item['itemName']}_${item['clinic']}_${item['itemType']}"
+                  .toLowerCase()
+                  .trim();
+          groups.putIfAbsent(key, () => []).add(item);
+        }
+
+        final List<Map<String, dynamic>> meta = await db.query(
+          'meta',
+          where: 'key = ?',
+          whereArgs: ['nodeId'],
+        );
+        final String nodeId = meta.isNotEmpty
+            ? meta.first['value'] as String
+            : 'migration_node';
+        final String hlc = HLC.now(nodeId).pack();
+
+        for (final group in groups.values) {
+          if (group.length <= 1) continue;
+          group.sort(
+            (a, b) => (a['id'] as String).compareTo(b['id'] as String),
+          );
+          final survivorId = group.first['id'] as String;
+
+          for (int i = 1; i < group.length; i++) {
+            final duplicateId = group[i]['id'] as String;
+            await db.update(
+              'inventory_stocks',
+              {'itemId': survivorId, 'hlc': hlc, 'nodeId': nodeId},
+              where: 'itemId = ?',
+              whereArgs: [duplicateId],
+            );
+            await db.update(
+              'inventory',
+              {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+              where: 'id = ?',
+              whereArgs: [duplicateId],
+            );
+          }
+        }
+      }
     }
   }
 
@@ -165,6 +472,37 @@ class DatabaseHelper {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  // ── Helpers ─────────────────────────────────────────────────────
+
+  String _buildPatientFilterClause(
+    List<String>? selectedDepartments,
+    bool includeStudent,
+    bool includeEmployee, {
+    String tablePrefix = '',
+  }) {
+    final prefix = tablePrefix.isNotEmpty ? '$tablePrefix.' : '';
+    List<String> roleConditions = [];
+    if (includeStudent) roleConditions.add("${prefix}role = 'Student'");
+    if (includeEmployee) roleConditions.add("${prefix}role = 'Employee'");
+
+    if (roleConditions.isEmpty) {
+      return "1=0"; // No roles selected, match nothing
+    }
+
+    String roleClause = "(${roleConditions.join(' OR ')})";
+
+    if (selectedDepartments == null) {
+      return roleClause;
+    }
+
+    if (selectedDepartments.isEmpty) {
+      return "1=0"; // Departments list provided but empty, match nothing
+    }
+
+    final deptList = selectedDepartments.map((d) => "'$d'").join(',');
+    return "($roleClause AND ${prefix}department IN ($deptList))";
+  }
+
   // ── Patient CRUD (with soft-delete) ─────────────────────────────
 
   Future<void> insertPatient(Patient patient) async {
@@ -174,6 +512,21 @@ class DatabaseHelper {
       patient.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<void> insertPatientsBatch(List<Patient> patients) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final patient in patients) {
+        batch.insert(
+          'patients',
+          patient.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Future<List<Patient>> getPatients() async {
@@ -186,11 +539,32 @@ class DatabaseHelper {
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
 
-  Future<List<Patient>> getPatientsPaginated(int limit, int offset) async {
+  Future<List<Patient>> getMockPatients() async {
     final db = await database;
     final maps = await db.query(
       'patients',
-      where: 'isDeleted = 0',
+      where: "isDeleted = 0 AND nodeId = 'MOCK_NODE'",
+      orderBy: 'patientName ASC',
+    );
+    return maps.map((m) => Patient.fromMap(m)).toList();
+  }
+
+  Future<List<Patient>> getPatientsPaginated({
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
+    final db = await database;
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
+    final maps = await db.query(
+      'patients',
+      where: 'isDeleted = 0 AND $filterClause',
       orderBy: 'patientName ASC',
       limit: limit,
       offset: offset,
@@ -198,24 +572,41 @@ class DatabaseHelper {
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
 
-  Future<int> getPatientCount() async {
+  Future<int> getPatientCount({
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0',
+      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND $filterClause',
     );
     return result.first['count'] as int? ?? 0;
   }
 
-  Future<List<Patient>> searchPatientsPaginated(
-    String query,
-    int limit,
-    int offset,
-  ) async {
+  Future<List<Patient>> searchPatientsPaginated({
+    required String query,
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
     final maps = await db.query(
       'patients',
       where:
-          'isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
+          'isDeleted = 0 AND $filterClause AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
       whereArgs: ['%$query%', '%$query%', '%$query%', '%$query%'],
       orderBy: 'patientName ASC',
       limit: limit,
@@ -224,10 +615,20 @@ class DatabaseHelper {
     return maps.map((m) => Patient.fromMap(m)).toList();
   }
 
-  Future<int> searchPatientCount(String query) async {
+  Future<int> searchPatientCount({
+    required String query,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+    );
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
+      'SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0 AND $filterClause AND (patientName LIKE ? OR idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ?)',
       ['%$query%', '%$query%', '%$query%', '%$query%'],
     );
     return result.first['count'] as int? ?? 0;
@@ -305,6 +706,21 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> insertVisitationsBatch(List<Visitation> visits) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final visit in visits) {
+        batch.insert(
+          'visitations',
+          visit.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
   Future<void> updateVisitation(Visitation visit) async {
     final db = await database;
     await db.update(
@@ -375,41 +791,148 @@ class DatabaseHelper {
     return maps.map((m) => Visitation.fromMap(m)).toList();
   }
 
-  Future<int> getTodayVisitCount() async {
+  Future<int> getTodayVisitCount({
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).toIso8601String();
     final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
+
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM visitations WHERE isDeleted = 0 AND dateTime >= ? AND dateTime < ?',
+      '''
+      SELECT COUNT(v.id) as count 
+      FROM visitations v
+      JOIN patients p ON v.patientId = p.id
+      WHERE v.isDeleted = 0 
+        AND v.dateTime >= ? 
+        AND v.dateTime < ?
+        AND $filterClause
+      ''',
       [start, end],
     );
     return result.first['count'] as int? ?? 0;
   }
 
   /// Gets today's visitations along with the patient's name, paginated.
-  Future<List<Map<String, dynamic>>> getTodayVisitationsPaginated(
-    int limit,
-    int offset,
-  ) async {
+  Future<List<Map<String, dynamic>>> getTodayVisitationsPaginated({
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+  }) async {
     final db = await database;
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).toIso8601String();
     final end = DateTime(now.year, now.month, now.day + 1).toIso8601String();
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
 
     final maps = await db.rawQuery(
       '''
-      SELECT v.*, p.patientName, p.firstName 
+      SELECT v.*, p.patientName, p.firstName, p.department, p.role, p.level 
       FROM visitations v 
       JOIN patients p ON v.patientId = p.id 
       WHERE v.isDeleted = 0 
         AND v.dateTime >= ? 
         AND v.dateTime < ?
+        AND $filterClause
       ORDER BY v.dateTime DESC
       LIMIT ? OFFSET ?
       ''',
       [start, end, limit, offset],
     );
+
+    return maps;
+  }
+
+  /// Global visit count with filters.
+  Future<int> getGlobalVisitCount({
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+    DateTime? date,
+  }) async {
+    final db = await database;
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
+
+    String dateClause = '';
+    List<dynamic> args = [];
+    if (date != null) {
+      final dateStr =
+          "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      dateClause = ' AND v.dateTime LIKE ?';
+      args.add('$dateStr%');
+    }
+
+    final result = await db.rawQuery('''
+      SELECT COUNT(v.id) as count 
+      FROM visitations v
+      JOIN patients p ON v.patientId = p.id
+      WHERE v.isDeleted = 0 
+        AND $filterClause
+        $dateClause
+      ''', args);
+    return result.first['count'] as int? ?? 0;
+  }
+
+  /// Global paginated visitations with filters.
+  Future<List<Map<String, dynamic>>> getGlobalVisitationsPaginated({
+    required int limit,
+    required int offset,
+    List<String>? selectedDepartments,
+    bool includeStudent = true,
+    bool includeEmployee = true,
+    DateTime? date,
+  }) async {
+    final db = await database;
+    final filterClause = _buildPatientFilterClause(
+      selectedDepartments,
+      includeStudent,
+      includeEmployee,
+      tablePrefix: 'p',
+    );
+
+    String dateClause = '';
+    List<dynamic> args = [];
+    if (date != null) {
+      final dateStr =
+          "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      dateClause = ' AND v.dateTime LIKE ?';
+      args.add('$dateStr%');
+    }
+
+    args.add(limit);
+    args.add(offset);
+
+    final maps = await db.rawQuery('''
+      SELECT v.*, p.patientName, p.firstName, p.department, p.role, p.level 
+      FROM visitations v 
+      JOIN patients p ON v.patientId = p.id 
+      WHERE v.isDeleted = 0 
+        AND $filterClause
+        $dateClause
+      ORDER BY v.dateTime DESC
+      LIMIT ? OFFSET ?
+      ''', args);
 
     return maps;
   }
@@ -551,12 +1074,24 @@ class DatabaseHelper {
 
   Future<List<InventoryItem>> getAllInventory() async {
     final db = await database;
-    final maps = await db.query(
+    final itemMaps = await db.query(
       'inventory',
       where: 'isDeleted = 0',
       orderBy: 'itemName ASC',
     );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+
+    final List<InventoryItem> items = [];
+    for (final itemMap in itemMaps) {
+      final itemId = itemMap['id'] as String;
+      final stockMaps = await db.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0',
+        whereArgs: [itemId],
+      );
+      final stocks = stockMaps.map((m) => StockBatch.fromMap(m)).toList();
+      items.add(InventoryItem.fromMap(itemMap, stocks: stocks));
+    }
+    return items;
   }
 
   Future<int> getInventoryCount(String query) async {
@@ -576,7 +1111,7 @@ class DatabaseHelper {
     required bool ascending,
   }) async {
     final db = await database;
-    final maps = await db.query(
+    final itemMaps = await db.query(
       'inventory',
       where: 'isDeleted = 0 AND itemName LIKE ?',
       whereArgs: ['%$query%'],
@@ -584,27 +1119,46 @@ class DatabaseHelper {
       limit: limit,
       offset: offset,
     );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+
+    final List<InventoryItem> items = [];
+    for (final itemMap in itemMaps) {
+      final itemId = itemMap['id'] as String;
+      final stockMaps = await db.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0',
+        whereArgs: [itemId],
+      );
+      final stocks = stockMaps.map((m) => StockBatch.fromMap(m)).toList();
+      items.add(InventoryItem.fromMap(itemMap, stocks: stocks));
+    }
+    return items;
   }
 
   Future<List<InventoryItem>> getAllInventoryItems() async {
     final db = await database;
-    final maps = await db.query(
+    final itemMaps = await db.query(
       'inventory',
       where: 'isDeleted = 0',
       orderBy: 'itemName ASC',
     );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+
+    final List<InventoryItem> items = [];
+    for (final itemMap in itemMaps) {
+      final itemId = itemMap['id'] as String;
+      final stockMaps = await db.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0',
+        whereArgs: [itemId],
+      );
+      final stocks = stockMaps.map((m) => StockBatch.fromMap(m)).toList();
+      items.add(InventoryItem.fromMap(itemMap, stocks: stocks));
+    }
+    return items;
   }
 
   Future<List<InventoryItem>> getLowStockItems() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'inventory',
-      where: 'quantity <= lowStockAmount AND isDeleted = 0',
-      orderBy: 'itemName ASC',
-    );
-    return maps.map((m) => InventoryItem.fromMap(m)).toList();
+    final allItems = await getAllInventoryItems();
+    return allItems.where((item) => item.isLowStock).toList();
   }
 
   Future<void> deleteInventoryItemSoft(
@@ -613,12 +1167,20 @@ class DatabaseHelper {
     required String nodeId,
   }) async {
     final db = await database;
-    await db.update(
-      'inventory',
-      {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.transaction((txn) async {
+      await txn.update(
+        'inventory',
+        {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      await txn.update(
+        'inventory_stocks',
+        {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+        where: 'itemId = ?',
+        whereArgs: [id],
+      );
+    });
   }
 
   Future<void> updateInventoryItem(InventoryItem item) async {
@@ -631,6 +1193,41 @@ class DatabaseHelper {
     );
   }
 
+  // ── Inventory Stock CRUD ────────────────────────────────────────
+
+  Future<void> insertStockBatch(StockBatch batch) async {
+    final db = await database;
+    await db.insert(
+      'inventory_stocks',
+      batch.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateStockBatch(StockBatch batch) async {
+    final db = await database;
+    await db.update(
+      'inventory_stocks',
+      batch.toMap(),
+      where: 'id = ?',
+      whereArgs: [batch.id],
+    );
+  }
+
+  Future<void> deleteStockBatch(
+    String id, {
+    required String hlc,
+    required String nodeId,
+  }) async {
+    final db = await database;
+    await db.update(
+      'inventory_stocks',
+      {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<int> deductStock(
     String itemId,
     int qty, {
@@ -639,53 +1236,73 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     return await db.transaction<int>((txn) async {
-      final List<Map<String, dynamic>> results = await txn.query(
-        'inventory',
-        where: 'id = ?',
+      // Fetch active batches, ordered by expiry date (null expiry at the end)
+      final List<Map<String, dynamic>> stockMaps = await txn.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0 AND amount > 0',
         whereArgs: [itemId],
+        orderBy: 'expiryDate ASC, createdAt ASC',
       );
 
-      if (results.isEmpty) return 0;
+      if (stockMaps.isEmpty) return 0;
 
-      final currentQty = results.first['quantity'] as int;
-      final newQty = currentQty - qty;
+      int remainingToDeduct = qty;
+      for (final map in stockMaps) {
+        if (remainingToDeduct <= 0) break;
 
-      await txn.update(
-        'inventory',
-        {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
-        where: 'id = ?',
-        whereArgs: [itemId],
-      );
+        final batchId = map['id'] as String;
+        final currentAmount = map['amount'] as int;
 
-      return qty;
+        if (currentAmount <= remainingToDeduct) {
+          // Consume whole batch — soft-delete it
+          remainingToDeduct -= currentAmount;
+          await txn.update(
+            'inventory_stocks',
+            {'amount': 0, 'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'id = ?',
+            whereArgs: [batchId],
+          );
+        } else {
+          // Partially consume batch
+          final newAmount = currentAmount - remainingToDeduct;
+          remainingToDeduct = 0;
+          await txn.update(
+            'inventory_stocks',
+            {'amount': newAmount, 'hlc': hlc, 'nodeId': nodeId},
+            where: 'id = ?',
+            whereArgs: [batchId],
+          );
+        }
+      }
+
+      // Return the actual amount deducted
+      return qty - remainingToDeduct;
     });
   }
 
-  Future<void> addStock(
-    String itemId,
-    int qty, {
-    required String hlc,
-    required String nodeId,
-  }) async {
+  // addStock is no longer needed in this form because we use insertStockBatch
+  // to add new specific batches with expiries.
+
+  Future<int> removeDetachedVisitations() async {
     final db = await database;
-    await db.transaction((txn) async {
-      final List<Map<String, dynamic>> results = await txn.query(
-        'inventory',
-        where: 'id = ?',
-        whereArgs: [itemId],
+
+    // Get node ID to mark soft delete
+    final nodeIdStr = await getMeta('nodeId') ?? 'unknown';
+    final hlcStr = HLC.now(nodeIdStr).pack();
+
+    return await db.transaction((txn) async {
+      // Mark visitations deleted if their patient is deleted or missing
+      final count = await txn.rawUpdate(
+        '''
+        UPDATE visitations 
+        SET isDeleted = 1, hlc = ?, nodeId = ?
+        WHERE isDeleted = 0 
+          AND patientId NOT IN (SELECT id FROM patients WHERE isDeleted = 0)
+      ''',
+        [hlcStr, nodeIdStr],
       );
 
-      if (results.isEmpty) return;
-
-      final currentQty = results.first['quantity'] as int;
-      final newQty = currentQty + qty;
-
-      await txn.update(
-        'inventory',
-        {'quantity': newQty, 'hlc': hlc, 'nodeId': nodeId},
-        where: 'id = ?',
-        whereArgs: [itemId],
-      );
+      return count;
     });
   }
 
@@ -727,6 +1344,18 @@ class DatabaseHelper {
     });
   }
 
+  /// Count active patient records older than [years] years.
+  Future<int> countOldRecords(int years) async {
+    final db = await database;
+    final thresholdDate = DateTime.now().subtract(Duration(days: years * 365));
+    final thresholdIso = thresholdDate.toIso8601String();
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as cnt FROM patients WHERE createdAt < ? AND isDeleted = 0',
+      [thresholdIso],
+    );
+    return (result.first['cnt'] as int?) ?? 0;
+  }
+
   Future<void> garbageCollectTombstones() async {
     final db = await database;
     // 30 days in milliseconds
@@ -761,18 +1390,6 @@ class DatabaseHelper {
           }
         }
       }
-    });
-  }
-
-  // TODO: Delete this after testing
-  /// Clears all tables in the database.
-  Future<void> clearAllData() async {
-    final db = await database;
-    await db.transaction((txn) async {
-      await txn.delete('visitations');
-      await txn.delete('patients');
-      await txn.delete('inventory');
-      await txn.delete('meta');
     });
   }
 
@@ -884,6 +1501,228 @@ class DatabaseHelper {
       return true;
     }
     return false;
+  }
+
+  // ── Inventory Stocks CRDT ──────────────────────────────────────
+
+  Future<List<StockBatch>> getInventoryStockChangesSince(
+    String sinceHlc,
+  ) async {
+    final db = await database;
+    final maps = await db.query(
+      'inventory_stocks',
+      where: 'hlc > ?',
+      whereArgs: [sinceHlc],
+      orderBy: 'hlc ASC',
+    );
+    return maps.map((m) => StockBatch.fromMap(m)).toList();
+  }
+
+  Future<bool> upsertInventoryStockFromRemote(StockBatch remote) async {
+    try {
+      final db = await database;
+      final existing = await db.query(
+        'inventory_stocks',
+        where: 'id = ?',
+        whereArgs: [remote.id],
+      );
+
+      if (existing.isEmpty) {
+        await db.insert('inventory_stocks', remote.toMap());
+        return true;
+      }
+
+      final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
+      final remoteHlc = HLC.unpack(remote.hlc);
+
+      if (remoteHlc > localHlc) {
+        await db.update(
+          'inventory_stocks',
+          remote.toMap(),
+          where: 'id = ?',
+          whereArgs: [remote.id],
+        );
+        return true;
+      }
+      return false;
+    } catch (e) {
+      // Log the full error to see exactly what's failing (casting, constraints, etc.)
+      debugPrint('DatabaseHelper: Error upserting stock batch (ID: ${remote.id}, ItemID: ${remote.itemId}): $e');
+      return false;
+    }
+  }
+
+  // ── Inventory Reporting ──────────────────────────────────────────
+
+  Future<List<int>> getInventoryYears() async {
+    final db = await database;
+    final stocksYears = await db.rawQuery(
+      "SELECT DISTINCT strftime('%Y', createdAt) as year FROM inventory_stocks",
+    );
+    final visitsYears = await db.rawQuery(
+      "SELECT DISTINCT strftime('%Y', dateTime) as year FROM visitations WHERE isDeleted = 0",
+    );
+
+    Set<int> years = {};
+    for (var row in stocksYears) {
+      final y = row['year'];
+      if (y != null) {
+        final parsed = int.tryParse(y.toString());
+        if (parsed != null) years.add(parsed);
+      }
+    }
+    for (var row in visitsYears) {
+      final y = row['year'];
+      if (y != null) {
+        final parsed = int.tryParse(y.toString());
+        if (parsed != null) years.add(parsed);
+      }
+    }
+
+    // Also include current year if empty
+    if (years.isEmpty) {
+      years.add(DateTime.now().year);
+    }
+
+    final sortedYears = years.toList()..sort();
+    return sortedYears;
+  }
+
+  Future<List<Map<String, dynamic>>> getAllVisitationsForReport() async {
+    final db = await database;
+    return await db.query(
+      'visitations',
+      where: 'isDeleted = 0',
+      columns: ['id', 'dateTime', 'consumedSupplies'],
+    );
+  }
+
+  // ── Mock Data Management (Dev Only) ──────────────────────────
+
+  Future<Map<String, int>> getMockDataStats() async {
+    final db = await database;
+    final Map<String, int> stats = {};
+
+    final patients = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM patients WHERE nodeId = 'MOCK_NODE'",
+    );
+    stats['patients'] = patients.first['count'] as int? ?? 0;
+
+    final visits = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM visitations WHERE nodeId = 'MOCK_NODE'",
+    );
+    stats['visitations'] = visits.first['count'] as int? ?? 0;
+
+    final inventory = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM inventory WHERE nodeId = 'MOCK_NODE'",
+    );
+    stats['inventory'] = inventory.first['count'] as int? ?? 0;
+
+    final stocks = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM inventory_stocks WHERE nodeId = 'MOCK_NODE'",
+    );
+    stats['stocks'] = stocks.first['count'] as int? ?? 0;
+
+    final totalPatients = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0",
+    );
+    stats['totalActivePatients'] = totalPatients.first['count'] as int? ?? 0;
+
+    final totalVisits = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM visitations WHERE isDeleted = 0",
+    );
+    stats['totalActiveVisitations'] = totalVisits.first['count'] as int? ?? 0;
+
+    return stats;
+  }
+
+  Future<void> nukeMockData() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('inventory_stocks', where: "nodeId = 'MOCK_NODE'");
+      await txn.delete('inventory', where: "nodeId = 'MOCK_NODE'");
+      await txn.delete('visitations', where: "nodeId = 'MOCK_NODE'");
+      await txn.delete('patients', where: "nodeId = 'MOCK_NODE'");
+    });
+  }
+
+  Future<void> randomizeInventoryDates() async {
+    final db = await database;
+    final now = DateTime.now();
+    final random = DateTime.now().millisecondsSinceEpoch;
+
+    // We'll update inventory and inventory_stocks created within the last 10 years randomly
+    // For simplicity, we just target all MOCK_NODE items
+    final inventory = await db.query(
+      'inventory',
+      where: "nodeId = 'MOCK_NODE'",
+    );
+    final stocks = await db.query(
+      'inventory_stocks',
+      where: "nodeId = 'MOCK_NODE'",
+    );
+
+    await db.transaction((txn) async {
+      int seed = random;
+      for (final item in inventory) {
+        seed++;
+        final rand = (seed * 1103515245 + 12345) & 0x7fffffff;
+        final monthsBack = rand % 120; // up to 10 years
+        final newDate = now.subtract(Duration(days: monthsBack * 30));
+        await txn.update(
+          'inventory',
+          {'createdAt': newDate.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [item['id']],
+        );
+      }
+
+      for (final stock in stocks) {
+        seed++;
+        final rand = (seed * 1103515245 + 12345) & 0x7fffffff;
+        final monthsBack = rand % 120;
+        final newDate = now.subtract(Duration(days: monthsBack * 30));
+        await txn.update(
+          'inventory_stocks',
+          {'createdAt': newDate.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [stock['id']],
+        );
+      }
+    });
+  }
+
+  /// Gets visitations with patient details for a specific date range.
+  Future<List<Map<String, dynamic>>> getVisitationsWithPatientInfoForRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final db = await database;
+    final startIso = start.toIso8601String();
+    final endIso = end.toIso8601String();
+
+    return await db.rawQuery(
+      '''
+      SELECT v.*, p.department, p.level, p.role
+      FROM visitations v
+      JOIN patients p ON v.patientId = p.id
+      WHERE v.isDeleted = 0 
+        AND v.dateTime >= ? 
+        AND v.dateTime <= ?
+      ORDER BY v.dateTime ASC
+      ''',
+      [startIso, endIso],
+    );
+  }
+
+  /// Gets all patients for export.
+  Future<List<Map<String, dynamic>>> getAllPatientsForExport() async {
+    final db = await database;
+    return await db.query(
+      'patients',
+      where: 'isDeleted = 0',
+      orderBy: 'patientName ASC',
+    );
   }
 
   /// Close the database connection gracefully.

@@ -14,7 +14,27 @@ class LocalServerProvider extends ChangeNotifier {
   int get port => _service.port;
   String get authToken => _service.authToken;
   String get qrPayload => _service.qrPayload;
-  Set<String> get connectedDevices => _service.connectedDevices;
+  List<String> get connectedDeviceModels => _service.connectedDeviceModels;
+  List<EditRequest> get pendingRequests => _service.pendingRequests;
+
+  void approveRequest(String id) {
+    _service.approveRequest(id);
+    notifyListeners();
+  }
+
+  void denyRequest(String id) {
+    _service.denyRequest(id);
+    notifyListeners();
+  }
+
+  void clearRequests() {
+    _service.clearRequests();
+    notifyListeners();
+  }
+
+  void refreshDevices() {
+    notifyListeners();
+  }
 
   /// Start the server and notify listeners.
   Future<void> startServer({int port = 8080}) async {

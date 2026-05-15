@@ -9,6 +9,7 @@ import '../models/visitation.dart';
 import '../services/database_helper.dart';
 import '../crdt/hlc.dart';
 import '../crdt/node_id.dart';
+import 'package:flutter/foundation.dart';
 
 /// Lightweight HTTP server embedded in the desktop app.
 ///
@@ -23,8 +24,14 @@ class LocalServerService {
   String _authToken = '';
   String _localIp = '';
   int _port = 8080;
-  final Map<String, DateTime> _connectedDevices = {};
+  final Map<String, ({DateTime lastSeen, String model})> _connectedDevices = {};
   static const _deviceTimeout = Duration(seconds: 60);
+
+  // Edit Request Tracking
+  final List<EditRequest> _editRequests = [];
+
+  List<EditRequest> get pendingRequests =>
+      _editRequests.where((r) => !r.isApproved && !r.isDenied).toList();
 
   bool get isRunning => _server != null;
   String get authToken => _authToken;
@@ -32,12 +39,12 @@ class LocalServerService {
   int get port => _port;
 
   /// Returns only devices that have made a request within the last 60 seconds.
-  Set<String> get connectedDevices {
+  List<String> get connectedDeviceModels {
     final now = DateTime.now();
     _connectedDevices.removeWhere(
-      (_, lastSeen) => now.difference(lastSeen) > _deviceTimeout,
+      (_, data) => now.difference(data.lastSeen) > _deviceTimeout,
     );
-    return _connectedDevices.keys.toSet();
+    return _connectedDevices.values.map((d) => d.model).toList();
   }
 
   /// JSON payload to encode in the QR code.
@@ -114,8 +121,41 @@ class LocalServerService {
           );
         }
 
+        final requestId = request.url.queryParameters['requestId'];
+        bool hasApproval = false;
+
+        if (requestId != null && requestId.isNotEmpty) {
+          try {
+            final req = _editRequests.firstWhere((r) => r.id == requestId);
+            if (req.isApproved && req.idNumber == idNumber) {
+              hasApproval = true;
+            }
+          } catch (_) {
+            // Request not found or not approved
+          }
+        }
+
         final map = patient.toMap();
         map['isDeleted'] = (map['isDeleted'] as int?) == 1;
+
+        if (!hasApproval) {
+          // REDACT SENSITIVE INFO
+          final publicFields = [
+            'id',
+            'firstName',
+            'lastName',
+            'middleName',
+            'extension',
+            'patientName',
+            'idNumber',
+            'role',
+            'department',
+          ];
+          map.removeWhere((key, value) => !publicFields.contains(key));
+          map['isPartial'] = true;
+        } else {
+          map['isPartial'] = false;
+        }
 
         return shelf.Response.ok(
           jsonEncode(map),
@@ -126,6 +166,63 @@ class LocalServerService {
           body: jsonEncode({'error': e.toString()}),
           headers: {'Content-Type': 'application/json'},
         );
+      }
+    });
+
+    // Request Edit Access
+    router.post('/api/edit-requests', (shelf.Request request) async {
+      try {
+        final body = await request.readAsString();
+        final data = jsonDecode(body) as Map<String, dynamic>;
+        final idNumber = data['idNumber'] as String?;
+
+        if (idNumber == null) return shelf.Response.badRequest();
+
+        final remoteIp =
+            (request.context['shelf.io.connection_info'] as HttpConnectionInfo?)
+                ?.remoteAddress
+                .address ??
+            'unknown';
+        final deviceModel = request.headers['x-device-model'] ?? 'Tablet';
+
+        // Remove old requests for this device/patient to avoid clutter
+        _editRequests.removeWhere(
+          (r) => r.remoteIp == remoteIp && r.idNumber == idNumber,
+        );
+
+        final editReq = EditRequest(
+          id: const Uuid().v4(),
+          idNumber: idNumber,
+          deviceModel: deviceModel,
+          remoteIp: remoteIp,
+          createdAt: DateTime.now(),
+        );
+
+        _editRequests.add(editReq);
+        onDevicesChanged?.call(); // Refresh UI
+
+        return shelf.Response.ok(
+          jsonEncode(editReq.toMap()),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } catch (e) {
+        return shelf.Response.internalServerError(body: e.toString());
+      }
+    });
+
+    // Poll Edit Request Status
+    router.get('/api/edit-requests/<id>', (
+      shelf.Request request,
+      String id,
+    ) async {
+      try {
+        final req = _editRequests.firstWhere((r) => r.id == id);
+        return shelf.Response.ok(
+          jsonEncode(req.toMap()),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } catch (_) {
+        return shelf.Response.notFound(jsonEncode({'error': 'Not found'}));
       }
     });
 
@@ -144,6 +241,15 @@ class LocalServerService {
         Patient? existingRecord;
         if (existingId != null && existingId.isNotEmpty) {
           existingRecord = await DatabaseHelper.instance.getPatient(existingId);
+        }
+
+        // Fallback to idNumber lookup if GUID is missing or not found
+        if (existingRecord == null) {
+          final idNumber = data['idNumber'] as String? ?? '';
+          if (idNumber.isNotEmpty) {
+            existingRecord =
+                await DatabaseHelper.instance.getPatientByIdNumber(idNumber);
+          }
         }
 
         final patientId = existingRecord?.id ?? const Uuid().v4();
@@ -168,20 +274,64 @@ class LocalServerService {
           extension: ext,
           patientName: patientName,
           idNumber: data['idNumber'] as String? ?? '',
-          birthdate: data['birthdate'] != null
+          birthdate:
+              (data['birthdate'] != null &&
+                  (data['birthdate'] as String).isNotEmpty)
               ? DateTime.tryParse(data['birthdate'] as String)
               : existingRecord?.birthdate,
-          sex: data['sex'] as String? ?? '',
-          contactNumber: data['contactNumber'] as String? ?? '',
-          address: data['address'] as String? ?? '',
-          guardianName: data['guardianName'] as String? ?? '',
-          guardianContact: data['guardianContact'] as String? ?? '',
-          guardian2Name: data['guardian2Name'] as String? ?? '',
-          guardian2Contact: data['guardian2Contact'] as String? ?? '',
-          allergicTo: data['allergicTo'] as String? ?? '',
-          role: data['role'] as String? ?? existingRecord?.role ?? '',
+          sex: (data['sex'] != null && (data['sex'] as String).isNotEmpty)
+              ? data['sex'] as String
+              : existingRecord?.sex ?? '',
+          contactNumber:
+              (data['contactNumber'] != null &&
+                  (data['contactNumber'] as String).isNotEmpty)
+              ? data['contactNumber'] as String
+              : existingRecord?.contactNumber ?? '',
+          address:
+              (data['address'] != null &&
+                  (data['address'] as String).isNotEmpty)
+              ? data['address'] as String
+              : existingRecord?.address ?? '',
+          guardianName:
+              (data['guardianName'] != null &&
+                  (data['guardianName'] as String).isNotEmpty)
+              ? data['guardianName'] as String
+              : existingRecord?.guardianName ?? '',
+          guardianContact:
+              (data['guardianContact'] != null &&
+                  (data['guardianContact'] as String).isNotEmpty)
+              ? data['guardianContact'] as String
+              : existingRecord?.guardianContact ?? '',
+          guardian2Name:
+              (data['guardian2Name'] != null &&
+                  (data['guardian2Name'] as String).isNotEmpty)
+              ? data['guardian2Name'] as String
+              : existingRecord?.guardian2Name ?? '',
+          guardian2Contact:
+              (data['guardian2Contact'] != null &&
+                  (data['guardian2Contact'] as String).isNotEmpty)
+              ? data['guardian2Contact'] as String
+              : existingRecord?.guardian2Contact ?? '',
+          allergicTo:
+              (data['allergicTo'] != null &&
+                  (data['allergicTo'] as String).isNotEmpty)
+              ? data['allergicTo'] as String
+              : existingRecord?.allergicTo ?? '',
+          role: (data['role'] != null && (data['role'] as String).isNotEmpty)
+              ? data['role'] as String
+              : existingRecord?.role ?? '',
           department:
-              data['department'] as String? ?? existingRecord?.department ?? '',
+              (data['department'] != null &&
+                  (data['department'] as String).isNotEmpty)
+              ? data['department'] as String
+              : existingRecord?.department ?? '',
+          level: (data['level'] != null && (data['level'] as String).isNotEmpty)
+              ? data['level'] as String
+              : existingRecord?.level ?? '',
+          pastMedicalHistory: existingRecord?.pastMedicalHistory ?? [],
+          vaccinationHistory: existingRecord?.vaccinationHistory ?? [],
+          patientRemarks: existingRecord?.patientRemarks ?? '',
+          permissions: existingRecord?.permissions ?? {},
           createdAt: existingRecord?.createdAt ?? now,
           updatedAt: now,
           hlc: hlcStr,
@@ -194,13 +344,18 @@ class LocalServerService {
           await DatabaseHelper.instance.insertPatient(patient);
         }
 
-        // If symptoms are included, create a visitation record too
+        // If symptoms or custom chief complaints are included, create a visitation record too
         final symptoms = data['symptoms'] as List<dynamic>?;
-        if (symptoms != null && symptoms.isNotEmpty) {
+        final customChiefComplaint =
+            data['customChiefComplaint'] as String? ?? '';
+
+        if ((symptoms != null && symptoms.isNotEmpty) ||
+            customChiefComplaint.isNotEmpty) {
           final visitation = Visitation(
             id: const Uuid().v4(),
             patientId: patientId,
-            symptoms: symptoms.cast<String>(),
+            symptoms: symptoms?.cast<String>() ?? [],
+            customChiefComplaint: customChiefComplaint,
             hlc: HLC.now(nodeId).send().pack(),
             nodeId: nodeId,
           );
@@ -215,9 +370,11 @@ class LocalServerService {
           body: jsonEncode({'id': patientId, 'status': 'created'}),
           headers: {'Content-Type': 'application/json'},
         );
-      } catch (e) {
+      } catch (e, stack) {
+        debugPrint('Error in POST /api/patients: $e');
+        debugPrint(stack.toString());
         return shelf.Response.internalServerError(
-          body: jsonEncode({'error': e.toString()}),
+          body: jsonEncode({'error': e.toString(), 'stack': stack.toString()}),
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -233,9 +390,14 @@ class LocalServerService {
                       as HttpConnectionInfo?)
                   ?.remoteAddress
                   .address;
+          final deviceModel = request.headers['x-device-model'] ?? 'Tablet';
+
           if (remoteIp != null) {
             final isNew = !_connectedDevices.containsKey(remoteIp);
-            _connectedDevices[remoteIp] = DateTime.now();
+            _connectedDevices[remoteIp] = (
+              lastSeen: DateTime.now(),
+              model: deviceModel,
+            );
             if (isNew) {
               onDevicesChanged?.call();
             }
@@ -307,6 +469,28 @@ class LocalServerService {
   void regenerateToken() {
     _authToken = const Uuid().v4();
     _connectedDevices.clear();
+    _editRequests.clear();
+    onDevicesChanged?.call();
+  }
+
+  void approveRequest(String id) {
+    final index = _editRequests.indexWhere((r) => r.id == id);
+    if (index != -1) {
+      _editRequests[index].isApproved = true;
+      onDevicesChanged?.call();
+    }
+  }
+
+  void denyRequest(String id) {
+    final index = _editRequests.indexWhere((r) => r.id == id);
+    if (index != -1) {
+      _editRequests[index].isDenied = true;
+      onDevicesChanged?.call();
+    }
+  }
+
+  void clearRequests() {
+    _editRequests.clear();
     onDevicesChanged?.call();
   }
 
@@ -349,4 +533,34 @@ class LocalServerService {
     } catch (_) {}
     return '127.0.0.1';
   }
+}
+
+class EditRequest {
+  final String id;
+  final String idNumber;
+  final String deviceModel;
+  final String remoteIp;
+  bool isApproved;
+  bool isDenied;
+  final DateTime createdAt;
+
+  EditRequest({
+    required this.id,
+    required this.idNumber,
+    required this.deviceModel,
+    required this.remoteIp,
+    this.isApproved = false,
+    this.isDenied = false,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'idNumber': idNumber,
+    'deviceModel': deviceModel,
+    'remoteIp': remoteIp,
+    'isApproved': isApproved,
+    'isDenied': isDenied,
+    'createdAt': createdAt.toIso8601String(),
+  };
 }

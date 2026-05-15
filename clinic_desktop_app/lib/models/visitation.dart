@@ -7,6 +7,7 @@ class Visitation {
   final List<String> consumedSupplies;
   final String treatment;
   final String remarks;
+  final String customChiefComplaint;
 
   // CRDT fields
   final String hlc;
@@ -22,6 +23,7 @@ class Visitation {
     this.consumedSupplies = const [],
     this.treatment = '',
     this.remarks = '',
+    this.customChiefComplaint = '',
     this.hlc = '',
     this.nodeId = '',
     this.isDeleted = false,
@@ -36,6 +38,7 @@ class Visitation {
     List<String>? consumedSupplies,
     String? treatment,
     String? remarks,
+    String? customChiefComplaint,
     String? hlc,
     String? nodeId,
     bool? isDeleted,
@@ -49,6 +52,7 @@ class Visitation {
       consumedSupplies: consumedSupplies ?? this.consumedSupplies,
       treatment: treatment ?? this.treatment,
       remarks: remarks ?? this.remarks,
+      customChiefComplaint: customChiefComplaint ?? this.customChiefComplaint,
       hlc: hlc ?? this.hlc,
       nodeId: nodeId ?? this.nodeId,
       isDeleted: isDeleted ?? this.isDeleted,
@@ -65,6 +69,7 @@ class Visitation {
       'consumedSupplies': consumedSupplies.join('|'),
       'treatment': treatment,
       'remarks': remarks,
+      'customChiefComplaint': customChiefComplaint,
       'hlc': hlc,
       'nodeId': nodeId,
       'isDeleted': isDeleted ? 1 : 0,
@@ -84,6 +89,7 @@ class Visitation {
       consumedSupplies: consumedStr.isEmpty ? [] : consumedStr.split('|'),
       treatment: map['treatment'] as String? ?? '',
       remarks: map['remarks'] as String? ?? '',
+      customChiefComplaint: map['customChiefComplaint'] as String? ?? '',
       hlc: map['hlc'] as String? ?? '',
       nodeId: map['nodeId'] as String? ?? '',
       isDeleted: (map['isDeleted'] as int? ?? 0) == 1,

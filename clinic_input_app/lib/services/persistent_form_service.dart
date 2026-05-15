@@ -10,8 +10,16 @@ class PersistentFormService {
 
   bool get isEmpty => firstName.trim().isEmpty && lastName.trim().isEmpty;
 
+  bool get hasData =>
+      studentNumber.isNotEmpty ||
+      firstName.isNotEmpty ||
+      lastName.isNotEmpty ||
+      _selectedSymptoms.isNotEmpty ||
+      customChiefComplaint.isNotEmpty;
+
   /// Update core patient fields from a data map (e.g. from desktop API).
   void updateFromMap(Map<String, dynamic> data) {
+    isPartial = data['isPartial'] as bool? ?? false;
     existingPatientId = data['id'] as String?;
     firstName = data['firstName'] as String? ?? '';
     lastName = data['lastName'] as String? ?? '';
@@ -82,6 +90,7 @@ class PersistentFormService {
     guardian2Name = data['guardian2Name'] as String? ?? '';
     guardian2Contact = data['guardian2Contact'] as String? ?? '';
     allergicTo = data['allergicTo'] as String? ?? '';
+    level = data['level'] as String? ?? '';
   }
 
   // ── Patient Info ─────────────────────────────────────────────────
@@ -96,6 +105,7 @@ class PersistentFormService {
   String? sex;
   String? role;
   String? department;
+  String level = '';
   String contactNumber = '';
   String address = '';
   String guardianName = '';
@@ -103,6 +113,8 @@ class PersistentFormService {
   String guardian2Name = '';
   String guardian2Contact = '';
   String allergicTo = '';
+  String customChiefComplaint = '';
+  bool isPartial = false;
 
   // ── Visitation Info ──────────────────────────────────────────────
   final Set<String> _selectedSymptoms = {};
@@ -134,6 +146,9 @@ class PersistentFormService {
     guardian2Name = '';
     guardian2Contact = '';
     allergicTo = '';
+    level = '';
+    customChiefComplaint = '';
+    isPartial = false;
     _selectedSymptoms.clear();
   }
 }
