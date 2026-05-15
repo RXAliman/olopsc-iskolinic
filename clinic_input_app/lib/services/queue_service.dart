@@ -38,9 +38,7 @@ class QueueService {
     // Re-verify connection before submitting
     final reachable = await _connection.checkConnection();
     if (!reachable) {
-      throw Exception(
-        'Lost connection to the desktop app. Please reconnect.',
-      );
+      throw Exception('Lost connection to the desktop app. Please reconnect.');
     }
 
     final data = {
@@ -67,11 +65,6 @@ class QueueService {
       if (existingPatientId != null) 'existingPatientId': existingPatientId,
     };
 
-    final success = await _connection.submitPatient(data);
-    if (!success) {
-      throw Exception(
-        'Failed to submit the form. Please try again.',
-      );
-    }
+    await DesktopConnectionService.instance.submitPatient(data);
   }
 }

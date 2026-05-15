@@ -73,13 +73,12 @@ class DesktopConnectionService {
       // ignore: avoid_print
       print('[DesktopConnection] Health check: GET $url');
       final response = await http
-          .get(
-            Uri.parse(url),
-            headers: _authHeaders,
-          )
+          .get(Uri.parse(url), headers: _authHeaders)
           .timeout(const Duration(seconds: 10));
       // ignore: avoid_print
-      print('[DesktopConnection] Response: ${response.statusCode} ${response.body}');
+      print(
+        '[DesktopConnection] Response: ${response.statusCode} ${response.body}',
+      );
       return response.statusCode == 200;
     } catch (e) {
       // ignore: avoid_print
@@ -100,10 +99,7 @@ class DesktopConnectionService {
   Future<List<Map<String, dynamic>>> fetchPatients() async {
     try {
       final response = await http
-          .get(
-            Uri.parse('$baseUrl/api/patients'),
-            headers: _authHeaders,
-          )
+          .get(Uri.parse('$baseUrl/api/patients'), headers: _authHeaders)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -148,10 +144,7 @@ class DesktopConnectionService {
       final response = await http
           .post(
             Uri.parse('$baseUrl/api/edit-requests'),
-            headers: {
-              ..._authHeaders,
-              'Content-Type': 'application/json',
-            },
+            headers: {..._authHeaders, 'Content-Type': 'application/json'},
             body: jsonEncode({'idNumber': idNumber}),
           )
           .timeout(const Duration(seconds: 10));
@@ -192,10 +185,7 @@ class DesktopConnectionService {
       final response = await http
           .post(
             Uri.parse('$baseUrl/api/patients'),
-            headers: {
-              ..._authHeaders,
-              'Content-Type': 'application/json',
-            },
+            headers: {..._authHeaders, 'Content-Type': 'application/json'},
             body: jsonEncode(data),
           )
           .timeout(const Duration(seconds: 10));
@@ -203,10 +193,10 @@ class DesktopConnectionService {
       if (response.statusCode == 201) {
         return true;
       }
-      return false;
-    } catch (_) {
-      _connected = false;
-      return false;
+      final body = jsonDecode(response.body);
+      throw Exception(body['error'] ?? 'Server error ${response.statusCode}');
+    } catch (e) {
+      rethrow;
     }
   }
 

@@ -9,6 +9,7 @@ import '../models/visitation.dart';
 import '../services/database_helper.dart';
 import '../crdt/hlc.dart';
 import '../crdt/node_id.dart';
+import 'package:flutter/foundation.dart';
 
 /// Lightweight HTTP server embedded in the desktop app.
 ///
@@ -242,6 +243,15 @@ class LocalServerService {
           existingRecord = await DatabaseHelper.instance.getPatient(existingId);
         }
 
+        // Fallback to idNumber lookup if GUID is missing or not found
+        if (existingRecord == null) {
+          final idNumber = data['idNumber'] as String? ?? '';
+          if (idNumber.isNotEmpty) {
+            existingRecord =
+                await DatabaseHelper.instance.getPatientByIdNumber(idNumber);
+          }
+        }
+
         final patientId = existingRecord?.id ?? const Uuid().v4();
 
         // Build patientName from parts: "LAST, FIRST MIDDLE EXT"
@@ -264,39 +274,64 @@ class LocalServerService {
           extension: ext,
           patientName: patientName,
           idNumber: data['idNumber'] as String? ?? '',
-          birthdate: (data['birthdate'] != null && (data['birthdate'] as String).isNotEmpty)
+          birthdate:
+              (data['birthdate'] != null &&
+                  (data['birthdate'] as String).isNotEmpty)
               ? DateTime.tryParse(data['birthdate'] as String)
               : existingRecord?.birthdate,
           sex: (data['sex'] != null && (data['sex'] as String).isNotEmpty)
               ? data['sex'] as String
               : existingRecord?.sex ?? '',
-          contactNumber: (data['contactNumber'] != null && (data['contactNumber'] as String).isNotEmpty)
+          contactNumber:
+              (data['contactNumber'] != null &&
+                  (data['contactNumber'] as String).isNotEmpty)
               ? data['contactNumber'] as String
               : existingRecord?.contactNumber ?? '',
-          address: (data['address'] != null && (data['address'] as String).isNotEmpty)
+          address:
+              (data['address'] != null &&
+                  (data['address'] as String).isNotEmpty)
               ? data['address'] as String
               : existingRecord?.address ?? '',
-          guardianName: (data['guardianName'] != null && (data['guardianName'] as String).isNotEmpty)
+          guardianName:
+              (data['guardianName'] != null &&
+                  (data['guardianName'] as String).isNotEmpty)
               ? data['guardianName'] as String
               : existingRecord?.guardianName ?? '',
-          guardianContact: (data['guardianContact'] != null && (data['guardianContact'] as String).isNotEmpty)
+          guardianContact:
+              (data['guardianContact'] != null &&
+                  (data['guardianContact'] as String).isNotEmpty)
               ? data['guardianContact'] as String
               : existingRecord?.guardianContact ?? '',
-          guardian2Name: (data['guardian2Name'] != null && (data['guardian2Name'] as String).isNotEmpty)
+          guardian2Name:
+              (data['guardian2Name'] != null &&
+                  (data['guardian2Name'] as String).isNotEmpty)
               ? data['guardian2Name'] as String
               : existingRecord?.guardian2Name ?? '',
-          guardian2Contact: (data['guardian2Contact'] != null && (data['guardian2Contact'] as String).isNotEmpty)
+          guardian2Contact:
+              (data['guardian2Contact'] != null &&
+                  (data['guardian2Contact'] as String).isNotEmpty)
               ? data['guardian2Contact'] as String
               : existingRecord?.guardian2Contact ?? '',
-          allergicTo: (data['allergicTo'] != null && (data['allergicTo'] as String).isNotEmpty)
+          allergicTo:
+              (data['allergicTo'] != null &&
+                  (data['allergicTo'] as String).isNotEmpty)
               ? data['allergicTo'] as String
               : existingRecord?.allergicTo ?? '',
           role: (data['role'] != null && (data['role'] as String).isNotEmpty)
               ? data['role'] as String
               : existingRecord?.role ?? '',
-          department: (data['department'] != null && (data['department'] as String).isNotEmpty)
+          department:
+              (data['department'] != null &&
+                  (data['department'] as String).isNotEmpty)
               ? data['department'] as String
               : existingRecord?.department ?? '',
+          level: (data['level'] != null && (data['level'] as String).isNotEmpty)
+              ? data['level'] as String
+              : existingRecord?.level ?? '',
+          pastMedicalHistory: existingRecord?.pastMedicalHistory ?? [],
+          vaccinationHistory: existingRecord?.vaccinationHistory ?? [],
+          patientRemarks: existingRecord?.patientRemarks ?? '',
+          permissions: existingRecord?.permissions ?? {},
           createdAt: existingRecord?.createdAt ?? now,
           updatedAt: now,
           hlc: hlcStr,
@@ -311,7 +346,8 @@ class LocalServerService {
 
         // If symptoms or custom chief complaints are included, create a visitation record too
         final symptoms = data['symptoms'] as List<dynamic>?;
-        final customChiefComplaint = data['customChiefComplaint'] as String? ?? '';
+        final customChiefComplaint =
+            data['customChiefComplaint'] as String? ?? '';
 
         if ((symptoms != null && symptoms.isNotEmpty) ||
             customChiefComplaint.isNotEmpty) {
@@ -334,9 +370,11 @@ class LocalServerService {
           body: jsonEncode({'id': patientId, 'status': 'created'}),
           headers: {'Content-Type': 'application/json'},
         );
-      } catch (e) {
+      } catch (e, stack) {
+        debugPrint('Error in POST /api/patients: $e');
+        debugPrint(stack.toString());
         return shelf.Response.internalServerError(
-          body: jsonEncode({'error': e.toString()}),
+          body: jsonEncode({'error': e.toString(), 'stack': stack.toString()}),
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -517,12 +555,12 @@ class EditRequest {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'idNumber': idNumber,
-        'deviceModel': deviceModel,
-        'remoteIp': remoteIp,
-        'isApproved': isApproved,
-        'isDenied': isDenied,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'idNumber': idNumber,
+    'deviceModel': deviceModel,
+    'remoteIp': remoteIp,
+    'isApproved': isApproved,
+    'isDenied': isDenied,
+    'createdAt': createdAt.toIso8601String(),
+  };
 }

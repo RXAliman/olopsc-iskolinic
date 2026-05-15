@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../formatters/uppercase_text.dart';
 import '../models/patient.dart';
 import '../providers/patient_provider.dart';
+import '../services/database_helper.dart';
 import '../theme/app_theme.dart';
 
 class PatientFormScreen extends StatefulWidget {
@@ -21,6 +22,8 @@ class PatientFormScreen extends StatefulWidget {
 
 class _PatientFormScreenState extends State<PatientFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _idFieldKey = GlobalKey<FormFieldState>();
+  final _idFocusNode = FocusNode();
   late TextEditingController _firstNameCtrl;
   late TextEditingController _lastNameCtrl;
   late TextEditingController _middleNameCtrl;
@@ -52,6 +55,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
   bool _marikinaStVincent = false;
   bool _othersPermission = false;
   bool _hasAttemptedSave = false;
+  String? _idErrorMessage;
 
   bool get isEditing => widget.patient != null;
 
@@ -103,6 +107,17 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
       _customExtensionCtrl = TextEditingController(text: ext);
     }
     _numberCtrl = TextEditingController(text: widget.patient?.idNumber ?? '');
+    _numberCtrl.addListener(() {
+      if (_idErrorMessage != null) {
+        setState(() => _idErrorMessage = null);
+      }
+    });
+
+    _idFocusNode.addListener(() {
+      if (!_idFocusNode.hasFocus && _numberCtrl.text.trim().isNotEmpty) {
+        _validateIdUniqueness();
+      }
+    });
     _addressCtrl = TextEditingController(text: widget.patient?.address ?? '');
     _guardianNameCtrl = TextEditingController(
       text: widget.patient?.guardianName ?? '',
@@ -208,11 +223,44 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     _allergicToCtrl.dispose();
     _patientRemarksCtrl.dispose();
     _othersSpecifyCtrl.dispose();
+    _idFocusNode.dispose();
     super.dispose();
   }
 
+  Future<void> _validateIdUniqueness() async {
+    final idNumber = _numberCtrl.text.trim();
+    if (idNumber.isEmpty) {
+      if (_idErrorMessage != null) {
+        setState(() => _idErrorMessage = null);
+        _idFieldKey.currentState?.validate();
+      }
+      return;
+    }
+
+    final existing = await DatabaseHelper.instance.getPatientByIdNumber(
+      idNumber,
+    );
+
+    if (existing != null && existing.id != widget.patient?.id) {
+      setState(() => _idErrorMessage = 'ID Number already exists');
+    } else {
+      if (_idErrorMessage != null) {
+        setState(() => _idErrorMessage = null);
+      }
+    }
+    // Re-validate ONLY the ID field to show/hide the error message immediately
+    _idFieldKey.currentState?.validate();
+  }
+
   Future<void> _save() async {
+    final provider = context.read<PatientProvider>();
     setState(() => _hasAttemptedSave = true);
+
+    // Async validation for ID number uniqueness
+    await _validateIdUniqueness();
+
+    if (!mounted) return;
+
     // Check custom required validation for Birthdate
     bool isValid = _formKey.currentState!.validate();
     if (_selectedBirthdate == null) {
@@ -220,7 +268,7 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
     }
     if (!isValid) return;
 
-    final provider = context.read<PatientProvider>();
+    if (!mounted) return;
 
     final firstName = _firstNameCtrl.text.trim();
     final lastName = _lastNameCtrl.text.trim();
@@ -321,106 +369,109 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: DefaultTabController(
-        length: 3,
-        initialIndex: widget.initialTabIndex,
-        child: Container(
-          width: 760,
-          padding: const EdgeInsets.all(32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.accentGradient,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        isEditing
-                            ? Icons.edit_rounded
-                            : Icons.person_add_rounded,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      isEditing ? 'Edit Record' : 'New Record',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TabBar(
-                  tabs: [
-                    Tab(text: 'Personal Information'),
-                    Tab(text: 'Medical Information'),
-                    Tab(text: 'Permissions'),
-                  ],
-                  labelColor: Colors.white,
-                  labelStyle: TextStyle(
-                    fontFamily: GoogleFonts.inter().fontFamily,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  unselectedLabelStyle: TextStyle(
-                    fontFamily: GoogleFonts.inter().fontFamily,
-                    fontWeight: FontWeight.normal,
-                  ),
-                  indicator: BoxDecoration(
-                    color: AppTheme.accent,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      topRight: Radius.circular(12),
-                    ),
-                  ),
-                  dividerColor: AppTheme.accent,
-                  dividerHeight: 2,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                ),
-                const SizedBox(height: 16),
-
-                // Tabbed Fields
-                Flexible(
-                  child: TabBarView(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Dialog(
+        child: DefaultTabController(
+          length: 3,
+          initialIndex: widget.initialTabIndex,
+          child: Container(
+            width: 760,
+            padding: const EdgeInsets.all(32),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      _buildPersonalTab(),
-                      _buildMedicalTab(),
-                      _buildPermissionsTab(),
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.accentGradient,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          isEditing
+                              ? Icons.edit_rounded
+                              : Icons.person_add_rounded,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        isEditing ? 'Edit Record' : 'New Record',
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                  const SizedBox(height: 16),
+                  TabBar(
+                    tabs: [
+                      Tab(text: 'Personal Information'),
+                      Tab(text: 'Medical Information'),
+                      Tab(text: 'Permissions'),
+                    ],
+                    labelColor: Colors.white,
+                    labelStyle: TextStyle(
+                      fontFamily: GoogleFonts.inter().fontFamily,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _save,
-                      child: Text(isEditing ? 'Save' : 'Add'),
+                    unselectedLabelStyle: TextStyle(
+                      fontFamily: GoogleFonts.inter().fontFamily,
+                      fontWeight: FontWeight.normal,
                     ),
-                  ],
-                ),
-              ],
+                    indicator: BoxDecoration(
+                      color: AppTheme.accent,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                    ),
+                    dividerColor: AppTheme.accent,
+                    dividerHeight: 2,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Tabbed Fields
+                  Flexible(
+                    child: TabBarView(
+                      children: [
+                        _buildPersonalTab(),
+                        _buildMedicalTab(),
+                        _buildPermissionsTab(),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _save,
+                        child: Text(isEditing ? 'Save' : 'Add'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -594,7 +645,9 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
 
             // ID Number
             TextFormField(
+              key: _idFieldKey,
               controller: _numberCtrl,
+              focusNode: _idFocusNode,
               maxLength: 16,
               decoration: InputDecoration(
                 label: RichText(
@@ -619,8 +672,10 @@ class _PatientFormScreenState extends State<PatientFormScreen> {
                 UpperCaseTextFormatter(),
                 LengthLimitingTextInputFormatter(16),
               ],
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Required';
+                return _idErrorMessage;
+              },
             ),
             const SizedBox(height: 16),
 

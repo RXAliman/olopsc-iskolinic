@@ -26,6 +26,7 @@ class _InputFormScreenState extends State<InputFormScreen> {
   bool _hasAttemptedSubmit = false;
   bool _isPartialResult = false;
   bool _isRequestingEdit = false;
+  String? _idErrorMessage;
 
   // ── Patient fields ───────────────────────────────────────────────
   final _firstNameCtrl = TextEditingController();
@@ -90,7 +91,12 @@ class _InputFormScreenState extends State<InputFormScreen> {
     _customExtensionCtrl.addListener(
       () => p.customExtension = _customExtensionCtrl.text,
     );
-    _numberCtrl.addListener(() => p.studentNumber = _numberCtrl.text);
+    _numberCtrl.addListener(() {
+      p.studentNumber = _numberCtrl.text;
+      if (_idErrorMessage != null) {
+        setState(() => _idErrorMessage = null);
+      }
+    });
     _contactCtrl.addListener(() => p.contactNumber = _contactCtrl.text);
     _addressCtrl.addListener(() => p.address = _addressCtrl.text);
     _guardianNameCtrl.addListener(
@@ -351,6 +357,31 @@ class _InputFormScreenState extends State<InputFormScreen> {
 
   Future<void> _submit() async {
     setState(() => _hasAttemptedSubmit = true);
+
+    // Tablet validation for ID uniqueness (only for new patients)
+    if (PersistentFormService.instance.existingPatientId == null) {
+      final idNumber = _numberCtrl.text.trim();
+      if (idNumber.isNotEmpty) {
+        setState(() => _isSubmitting = true);
+        try {
+          final existing = await DesktopConnectionService.instance
+              .fetchPatientByIdNumber(idNumber);
+          if (existing != null && mounted) {
+            setState(() {
+              _idErrorMessage = 'This ID is already registered. Please use it.';
+              _isSubmitting = false;
+            });
+            _formKey.currentState!.validate();
+            return;
+          }
+        } catch (_) {
+          // Ignore lookup errors, let the server handle it
+        } finally {
+          if (mounted) setState(() => _isSubmitting = false);
+        }
+      }
+    }
+
     bool isValid = _formKey.currentState!.validate();
 
     // Only manually validate birthdate if it's visible (not in partial/restricted view)
@@ -360,6 +391,8 @@ class _InputFormScreenState extends State<InputFormScreen> {
     }
 
     if (!isValid) return;
+
+    if (!mounted) return;
 
     if (_selectedSymptoms.isEmpty &&
         _customChiefComplaintCtrl.text.trim().isEmpty) {
@@ -696,8 +729,10 @@ class _InputFormScreenState extends State<InputFormScreen> {
                   UpperCaseTextFormatter(),
                   LengthLimitingTextInputFormatter(16),
                 ],
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  return _idErrorMessage;
+                },
               ),
 
               const SizedBox(height: 14),
