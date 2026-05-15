@@ -28,6 +28,10 @@ class _InputFormScreenState extends State<InputFormScreen> {
   bool _isRequestingEdit = false;
   String? _idErrorMessage;
 
+  /// Whether autofill has populated the form with an existing patient's data.
+  bool get _isAutofilled =>
+      PersistentFormService.instance.existingPatientId != null;
+
   // ── Patient fields ───────────────────────────────────────────────
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
@@ -691,48 +695,128 @@ class _InputFormScreenState extends State<InputFormScreen> {
               const SizedBox(height: 16),
 
               // ID Number (At the top now)
-              TextFormField(
-                controller: _numberCtrl,
-                focusNode: _idFocusNode,
-                maxLength: 16,
-                decoration: InputDecoration(
-                  label: RichText(
-                    text: TextSpan(
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w400),
-                      children: [
-                        TextSpan(
-                          text: 'ID Number ',
-                          style: TextStyle(color: AppTheme.textSecondary),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: _isAutofilled,
+                      child: TextFormField(
+                        controller: _numberCtrl,
+                        focusNode: _idFocusNode,
+                        readOnly: _isAutofilled,
+                      maxLength: 16,
+                      decoration: InputDecoration(
+                        label: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w400),
+                            children: [
+                              TextSpan(
+                                text: 'ID Number ',
+                                style: TextStyle(color: AppTheme.textSecondary),
+                              ),
+                              TextSpan(
+                                text: '*',
+                                style: TextStyle(color: AppTheme.danger),
+                              ),
+                            ],
+                          ),
                         ),
-                        TextSpan(
-                          text: '*',
-                          style: TextStyle(color: AppTheme.danger),
-                        ),
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                        counterText: '',
+                        suffixIcon: _isAutofilling
+                            ? const Padding(
+                                padding: EdgeInsets.all(12.0),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : _isAutofilled
+                                ? const Icon(
+                                    Icons.lock_rounded,
+                                    size: 18,
+                                    color: AppTheme.textMuted,
+                                  )
+                                : null,
+                      ),
+                      onFieldSubmitted: (v) => _searchPatient(v),
+                      inputFormatters: [
+                        UpperCaseTextFormatter(),
+                        LengthLimitingTextInputFormatter(16),
                       ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        return _idErrorMessage;
+                      },
+                    ),
                     ),
                   ),
-                  prefixIcon: const Icon(Icons.badge_outlined),
-                  counterText: '',
-                  suffixIcon: _isAutofilling
-                      ? const Padding(
-                          padding: EdgeInsets.all(12.0),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                  if (_isAutofilled) ...[
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.danger.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: AppTheme.danger,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text('Clear Form?'),
+                                ],
+                              ),
+                              content: const Text(
+                                'This will remove all entered data. Are you sure you want to clear the form?',
+                              ),
+                              actions: [
+                                OutlinedButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.danger,
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Clear'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) _resetForm();
+                        },
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text('Clear'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.danger,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
                           ),
-                        )
-                      : null,
-                ),
-                onFieldSubmitted: (v) => _searchPatient(v),
-                inputFormatters: [
-                  UpperCaseTextFormatter(),
-                  LengthLimitingTextInputFormatter(16),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  return _idErrorMessage;
-                },
               ),
 
               const SizedBox(height: 14),
