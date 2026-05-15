@@ -572,193 +572,202 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _showItemDetailDialog(InventoryItem item) {
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        child: Container(
-          width: 700,
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (ctx) => Consumer<InventoryProvider>(
+        builder: (context, provider, _) {
+          final currentItem = provider.allItems.firstWhere(
+            (i) => i.id == item.id,
+            orElse: () => item,
+          );
+
+          return Dialog(
+            child: Container(
+              width: 700,
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        item.itemName,
-                        style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentItem.itemName,
+                            style: Theme.of(ctx).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${currentItem.itemType} • ${currentItem.clinic}',
+                            style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${item.itemType} • ${item.clinic}',
-                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textMuted,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.accent.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Total Stock',
+                              style: TextStyle(
+                                color: AppTheme.accent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              currentItem.quantity.toString(),
+                              style: TextStyle(
+                                color: AppTheme.accent,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppTheme.accent.withValues(alpha: 0.2),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Stock Batches (FIFO)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  if (currentItem.stocks.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text(
+                          'No stocks available.',
+                          style: TextStyle(color: AppTheme.textMuted),
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppTheme.dividerColor),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: currentItem.stocks.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (ctx, index) {
+                            final batch = currentItem.stocks[index];
+                            final isExpiring =
+                                batch.expiryDate != null &&
+                                batch.expiryDate!
+                                        .difference(DateTime.now())
+                                        .inDays <=
+                                    90;
+
+                            return ListTile(
+                              leading: Icon(
+                                Icons.inventory_2_outlined,
+                                color: isExpiring
+                                    ? AppTheme.danger
+                                    : AppTheme.textMuted,
+                              ),
+                              title: Text('Amount: ${batch.amount}'),
+                              subtitle: Text(
+                                batch.expiryDate == null
+                                    ? 'No Expiry'
+                                    : 'Expires: ${batch.expiryDate!.month}/${batch.expiryDate!.year}',
+                                style: TextStyle(
+                                  color: isExpiring ? AppTheme.danger : null,
+                                  fontWeight: isExpiring ? FontWeight.bold : null,
+                                ),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 20),
+                                onPressed: () {
+                                  _showAddStockBatchDialog(currentItem, batch: batch);
+                                },
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Total Stock',
-                          style: TextStyle(
-                            color: AppTheme.accent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _showAddStockBatchDialog(currentItem);
+                        },
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Add Stock'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accent,
+                          foregroundColor: Colors.white,
                         ),
-                        Text(
-                          item.quantity.toString(),
-                          style: TextStyle(
-                            color: AppTheme.accent,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _showRemoveDialog(currentItem);
+                        },
+                        icon: const Icon(Icons.remove_circle_outline),
+                        label: const Text('Remove Stock'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
                         ),
-                      ],
-                    ),
+                      ),
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _showEditItemDialog(currentItem);
+                        },
+                        icon: const Icon(Icons.edit_note_rounded),
+                        label: const Text('Edit Item'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.textSecondary,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _showDeleteConfirmationDialog(currentItem);
+                        },
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Delete'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.danger,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'Stock Batches (FIFO)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              if (item.stocks.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: Text(
-                      'No stocks available.',
-                      style: TextStyle(color: AppTheme.textMuted),
-                    ),
-                  ),
-                )
-              else
-                Flexible(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppTheme.dividerColor),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: item.stocks.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (ctx, index) {
-                        final batch = item.stocks[index];
-                        final isExpiring =
-                            batch.expiryDate != null &&
-                            batch.expiryDate!
-                                    .difference(DateTime.now())
-                                    .inDays <=
-                                90;
-
-                        return ListTile(
-                          leading: Icon(
-                            Icons.inventory_2_outlined,
-                            color: isExpiring
-                                ? AppTheme.danger
-                                : AppTheme.textMuted,
-                          ),
-                          title: Text('Amount: ${batch.amount}'),
-                          subtitle: Text(
-                            batch.expiryDate == null
-                                ? 'No Expiry'
-                                : 'Expires: ${batch.expiryDate!.month}/${batch.expiryDate!.year}',
-                            style: TextStyle(
-                              color: isExpiring ? AppTheme.danger : null,
-                              fontWeight: isExpiring ? FontWeight.bold : null,
-                            ),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 20),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _showAddStockBatchDialog(item, batch: batch);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      _showAddStockBatchDialog(item);
-                    },
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Add Stock'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.accent,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      _showRemoveDialog(item);
-                    },
-                    icon: const Icon(Icons.remove_circle_outline),
-                    label: const Text('Remove Stock'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      _showEditItemDialog(item);
-                    },
-                    icon: const Icon(Icons.edit_note_rounded),
-                    label: const Text('Edit Item'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.textSecondary,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      _showDeleteConfirmationDialog(item);
-                    },
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    label: const Text('Delete'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.danger,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
+
 
   void _showAddStockBatchDialog(InventoryItem item, {StockBatch? batch}) {
     final qtyCtrl = TextEditingController(text: batch?.amount.toString() ?? '');
@@ -1093,10 +1102,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
               Navigator.pop(ctx); // Close confirmation dialog
               Navigator.pop(context); // Close detail dialog behind it
             },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: AppTheme.danger),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
             ),
+            child: const Text('Delete'),
           ),
         ],
       ),

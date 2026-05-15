@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:olopsc_iskolinic/crdt/node_id.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../services/database_helper.dart';
 import '../crdt/hlc.dart';
@@ -21,6 +22,9 @@ class SyncClient {
   final String nodeId;
   final String? authSecret;
   final DatabaseHelper _db = DatabaseHelper.instance;
+
+  /// Future used to queue incoming messages and process them sequentially.
+  Future<void> _processingQueue = Future.value();
 
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
@@ -90,7 +94,16 @@ class SyncClient {
       _startHeartbeat();
 
       _subscription = _channel!.stream.listen(
-        _onMessage,
+        (data) {
+          // Queue messages sequentially and safely to prevent race conditions or stalls
+          _processingQueue = _processingQueue.then((_) async {
+            try {
+              await _onMessage(data);
+            } catch (e) {
+              debugPrint('SyncClient: Error in sequential message processing: $e');
+            }
+          });
+        },
         onDone: _onDisconnected,
         onError: (_) => _onDisconnected(),
       );
@@ -155,77 +168,147 @@ class SyncClient {
   /// Send a batch of local changes to the relay server.
   /// Called by SyncProvider after every local write.
   Future<void> pushChanges() async {
-    if (_state != SyncConnectionState.connected) return;
+    try {
+      if (_state != SyncConnectionState.connected) return;
 
-    final lastSync = await _db.getMeta('lastSyncHlc') ?? '';
+      final lastPush = await _db.getMeta('lastPushHlc') ?? '';
+      final nodeId = await NodeId.get();
 
-    // Send patients
-    final patients = await _db.getPatientChangesSince(lastSync);
-    for (int i = 0; i < patients.length; i += _batchSize) {
-      final end = (i + _batchSize).clamp(0, patients.length);
-      final batch = patients.sublist(i, end);
-      _send({
-        'type': 'sync_push',
-        'nodeId': nodeId,
-        'table': 'patients',
-        'records': batch.map((p) => p.toSyncMap()).toList(),
-      });
+      // Track the actual max HLC we successfully send, so we never
+      // advance the marker past data we didn't actually push.
+      var sentMaxHlc = lastPush;
+
+      // Send patients
+      if (_state != SyncConnectionState.connected) return;
+      final patients = await _db.getPatientChangesSince(lastPush);
+      if (patients.isNotEmpty) {
+
+        for (int i = 0; i < patients.length; i += _batchSize) {
+          final end = (i + _batchSize).clamp(0, patients.length);
+          final batch = patients.sublist(i, end);
+          _send({
+            'type': 'sync_push',
+            'nodeId': nodeId,
+            'table': 'patients',
+            'records': batch.map((p) => p.toSyncMap()).toList(),
+          });
+        }
+        sentMaxHlc = _maxHlcFromRecords(
+          patients.map((p) => p.hlc),
+          sentMaxHlc,
+        );
+      }
+
+      // Send visitations
+      if (_state != SyncConnectionState.connected) return;
+      final visitations = await _db.getVisitationChangesSince(lastPush);
+      if (visitations.isNotEmpty) {
+
+        for (int i = 0; i < visitations.length; i += _batchSize) {
+          final end = (i + _batchSize).clamp(0, visitations.length);
+          final batch = visitations.sublist(i, end);
+          _send({
+            'type': 'sync_push',
+            'nodeId': nodeId,
+            'table': 'visitations',
+            'records': batch.map((v) => v.toSyncMap()).toList(),
+          });
+        }
+        sentMaxHlc = _maxHlcFromRecords(
+          visitations.map((v) => v.hlc),
+          sentMaxHlc,
+        );
+      }
+
+      // Send inventory
+      if (_state != SyncConnectionState.connected) return;
+      final inventoryItems = await _db.getInventoryChangesSince(lastPush);
+      if (inventoryItems.isNotEmpty) {
+
+        for (int i = 0; i < inventoryItems.length; i += _batchSize) {
+          final end = (i + _batchSize).clamp(0, inventoryItems.length);
+          final batch = inventoryItems.sublist(i, end);
+          _send({
+            'type': 'sync_push',
+            'nodeId': nodeId,
+            'table': 'inventory',
+            'records': batch.map((v) => v.toSyncMap()).toList(),
+          });
+        }
+        sentMaxHlc = _maxHlcFromRecords(
+          inventoryItems.map((v) => v.hlc),
+          sentMaxHlc,
+        );
+      }
+
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Send inventory stocks
+      if (_state != SyncConnectionState.connected) return;
+      final inventoryStocks = await _db.getInventoryStockChangesSince(lastPush);
+      if (inventoryStocks.isNotEmpty) {
+
+        for (int i = 0; i < inventoryStocks.length; i += _batchSize) {
+          final end = (i + _batchSize).clamp(0, inventoryStocks.length);
+          final batch = inventoryStocks.sublist(i, end);
+          _send({
+            'type': 'sync_push',
+            'nodeId': nodeId,
+            'table': 'inventory_stocks',
+            'records': batch.map((v) => v.toSyncMap()).toList(),
+          });
+        }
+        sentMaxHlc = _maxHlcFromRecords(
+          inventoryStocks.map((v) => v.hlc),
+          sentMaxHlc,
+        );
+      }
+
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Send custom symptoms
+      if (_state != SyncConnectionState.connected) return;
+      final customSymptoms = await _db.getCustomSymptomChangesSince(lastPush);
+      if (customSymptoms.isNotEmpty) {
+
+        for (int i = 0; i < customSymptoms.length; i += _batchSize) {
+          final end = (i + _batchSize).clamp(0, customSymptoms.length);
+          final batch = customSymptoms.sublist(i, end);
+          _send({
+            'type': 'sync_push',
+            'nodeId': nodeId,
+            'table': 'custom_symptoms',
+            'records': batch.map((v) => v.toMap()).toList(),
+          });
+        }
+        sentMaxHlc = _maxHlcFromRecords(
+          customSymptoms.map((v) => v.hlc),
+          sentMaxHlc,
+        );
+      }
+
+      // Only advance the marker if we actually sent records, and only
+      // to the max HLC of data we actually sent — never a fresh HLC.now()
+      // that could leapfrog records inserted concurrently.
+      if (sentMaxHlc != lastPush) {
+        await _db.setMeta('lastPushHlc', sentMaxHlc);
+      }
+    } catch (e, stack) {
+      debugPrint('SyncClient: FATAL error in pushChanges: $e');
+      debugPrint(stack.toString());
     }
+  }
 
-    // Send visitations
-    final visitations = await _db.getVisitationChangesSince(lastSync);
-    for (int i = 0; i < visitations.length; i += _batchSize) {
-      final end = (i + _batchSize).clamp(0, visitations.length);
-      final batch = visitations.sublist(i, end);
-      _send({
-        'type': 'sync_push',
-        'nodeId': nodeId,
-        'table': 'visitations',
-        'records': batch.map((v) => v.toSyncMap()).toList(),
-      });
+  /// Returns the max HLC string from an iterable of HLC strings,
+  /// compared against [currentMax].
+  String _maxHlcFromRecords(Iterable<String> hlcs, String currentMax) {
+    var max = currentMax;
+    for (final hlc in hlcs) {
+      if (hlc.isNotEmpty && hlc.compareTo(max) > 0) {
+        max = hlc;
+      }
     }
-
-    // Send inventory
-    final inventoryItems = await _db.getInventoryChangesSince(lastSync);
-    for (int i = 0; i < inventoryItems.length; i += _batchSize) {
-      final end = (i + _batchSize).clamp(0, inventoryItems.length);
-      final batch = inventoryItems.sublist(i, end);
-      _send({
-        'type': 'sync_push',
-        'nodeId': nodeId,
-        'table': 'inventory',
-        'records': batch.map((v) => v.toSyncMap()).toList(),
-      });
-    }
-
-    // Send inventory stocks
-    final inventoryStocks = await _db.getInventoryStockChangesSince(lastSync);
-    for (int i = 0; i < inventoryStocks.length; i += _batchSize) {
-      final end = (i + _batchSize).clamp(0, inventoryStocks.length);
-      final batch = inventoryStocks.sublist(i, end);
-      _send({
-        'type': 'sync_push',
-        'nodeId': nodeId,
-        'table': 'inventory_stocks',
-        'records': batch.map((v) => v.toSyncMap()).toList(),
-      });
-    }
-
-    // Send custom symptoms
-    final customSymptoms = await _db.getCustomSymptomChangesSince(lastSync);
-    for (int i = 0; i < customSymptoms.length; i += _batchSize) {
-      final end = (i + _batchSize).clamp(0, customSymptoms.length);
-      final batch = customSymptoms.sublist(i, end);
-      _send({
-        'type': 'sync_push',
-        'nodeId': nodeId,
-        'table': 'custom_symptoms',
-        'records': batch.map((v) => v.toMap()).toList(),
-      });
-    }
-
-    // We NO LONGER update lastSyncHlc based on our local push.
-    // Bookmarks are entirely data-driven based on incoming server batches.
+    return max;
   }
 
   Future<void> forcePushAllChanges() async {
@@ -309,7 +392,7 @@ class SyncClient {
 
   // ── Inbound: receive remote changes ──────────────────────────
 
-  void _onMessage(dynamic raw) async {
+  Future<void> _onMessage(dynamic raw) async {
     try {
       final msg = jsonDecode(raw as String) as Map<String, dynamic>;
       final type = msg['type'] as String?;
@@ -322,9 +405,10 @@ class SyncClient {
         case 'sync_push':
           // Remote node pushed changes to us via the relay
           final senderNodeId = msg['nodeId'] as String? ?? '';
-          if (senderNodeId == nodeId) return; // Ignore our own echoes
-
           final table = msg['table'] as String? ?? '';
+
+          if (senderNodeId == nodeId) return;
+
           final records =
               (msg['records'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
@@ -341,8 +425,12 @@ class SyncClient {
             ...result.changedPatientIds,
             ...result.changedVisitationIds,
             ...result.changedInventoryIds,
+            ...result.changedInventoryStockIds,
             ...result.changedCustomSymptomIds,
           };
+
+
+
           if (allChanged.isNotEmpty) {
             onSyncComplete?.call(allChanged);
           }
@@ -357,16 +445,25 @@ class SyncClient {
           final inventory =
               (msg['inventory'] as List?)?.cast<Map<String, dynamic>>() ?? [];
           final inventoryStocks =
-              (msg['inventory_stocks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+              (msg['inventory_stocks'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
           final customSymptoms =
-              (msg['custom_symptoms'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+              (msg['custom_symptoms'] as List?)?.cast<Map<String, dynamic>>() ??
+              [];
 
           // Track max HLC for data-driven bookmarking
           _currentSyncMaxHlc = _getBatchMaxHlc(patients, _currentSyncMaxHlc);
           _currentSyncMaxHlc = _getBatchMaxHlc(visitations, _currentSyncMaxHlc);
           _currentSyncMaxHlc = _getBatchMaxHlc(inventory, _currentSyncMaxHlc);
-          _currentSyncMaxHlc = _getBatchMaxHlc(inventoryStocks, _currentSyncMaxHlc);
-          _currentSyncMaxHlc = _getBatchMaxHlc(customSymptoms, _currentSyncMaxHlc);
+          _currentSyncMaxHlc = _getBatchMaxHlc(
+            inventoryStocks,
+            _currentSyncMaxHlc,
+          );
+          _currentSyncMaxHlc = _getBatchMaxHlc(
+            customSymptoms,
+            _currentSyncMaxHlc,
+          );
 
           final batch = SyncBatch(
             patients: patients,
@@ -380,8 +477,12 @@ class SyncClient {
             ...result.changedPatientIds,
             ...result.changedVisitationIds,
             ...result.changedInventoryIds,
+            ...result.changedInventoryStockIds,
             ...result.changedCustomSymptomIds,
           };
+
+
+
           if (allChanged.isNotEmpty) {
             onSyncComplete?.call(allChanged);
           }
@@ -398,17 +499,20 @@ class SyncClient {
             // Full sync complete — update marker conditionally based on received HLC
             if (_currentSyncMaxHlc.isNotEmpty) {
               final currentLocal = await _db.getMeta('lastSyncHlc') ?? '';
-              if (currentLocal.isEmpty || HLC.unpack(_currentSyncMaxHlc) > HLC.unpack(currentLocal)) {
+              if (currentLocal.isEmpty ||
+                  HLC.unpack(_currentSyncMaxHlc) > HLC.unpack(currentLocal)) {
                 await _db.setMeta('lastSyncHlc', _currentSyncMaxHlc);
               }
             }
           }
           break;
-          
+
         case 'handshake_response':
           final recognized = msg['recognized'] as bool? ?? true;
           if (!recognized || (msg['server_reset'] == true)) {
-            debugPrint('Server reset indicated. Forcing full push of local data...');
+            debugPrint(
+              'Server reset indicated. Forcing full push of local data...',
+            );
             await forcePushAllChanges();
           }
           break;

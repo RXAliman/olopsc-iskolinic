@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -30,6 +31,9 @@ class DatabaseHelper {
       dbPath,
       options: OpenDatabaseOptions(
         version: 7,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -1498,31 +1502,37 @@ class DatabaseHelper {
   }
 
   Future<bool> upsertInventoryStockFromRemote(StockBatch remote) async {
-    final db = await database;
-    final existing = await db.query(
-      'inventory_stocks',
-      where: 'id = ?',
-      whereArgs: [remote.id],
-    );
-
-    if (existing.isEmpty) {
-      await db.insert('inventory_stocks', remote.toMap());
-      return true;
-    }
-
-    final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
-    final remoteHlc = HLC.unpack(remote.hlc);
-
-    if (remoteHlc > localHlc) {
-      await db.update(
+    try {
+      final db = await database;
+      final existing = await db.query(
         'inventory_stocks',
-        remote.toMap(),
         where: 'id = ?',
         whereArgs: [remote.id],
       );
-      return true;
+
+      if (existing.isEmpty) {
+        await db.insert('inventory_stocks', remote.toMap());
+        return true;
+      }
+
+      final localHlc = HLC.unpack(existing.first['hlc'] as String? ?? '');
+      final remoteHlc = HLC.unpack(remote.hlc);
+
+      if (remoteHlc > localHlc) {
+        await db.update(
+          'inventory_stocks',
+          remote.toMap(),
+          where: 'id = ?',
+          whereArgs: [remote.id],
+        );
+        return true;
+      }
+      return false;
+    } catch (e) {
+      // Log the full error to see exactly what's failing (casting, constraints, etc.)
+      debugPrint('DatabaseHelper: Error upserting stock batch (ID: ${remote.id}, ItemID: ${remote.itemId}): $e');
+      return false;
     }
-    return false;
   }
 
   // ── Inventory Reporting ──────────────────────────────────────────
