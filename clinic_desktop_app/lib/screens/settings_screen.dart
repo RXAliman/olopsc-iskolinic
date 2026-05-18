@@ -25,11 +25,37 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '';
   int _dropdownKeyCounter = 0;
+  late TextEditingController _lanIpController;
 
   @override
   void initState() {
     super.initState();
     _loadAppVersion();
+
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    _lanIpController = TextEditingController(text: settings.lanServerIp);
+  }
+
+  @override
+  void dispose() {
+    _lanIpController.dispose();
+    super.dispose();
+  }
+
+  void _applyLanIp(SettingsProvider settings, SyncProvider sync, String val) async {
+    final cleanIp = val.trim();
+    if (cleanIp.isNotEmpty) {
+      await settings.updateLanServerIp(cleanIp);
+      sync.setConnectionMode(1, wsUrl: settings.lanWsUrl);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'LAN Server IP updated to $cleanIp and reconnecting...',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _loadAppVersion() async {
@@ -64,9 +90,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: RadioGroup<int>(
                   groupValue: settings.connectionMode,
                   onChanged: (v) {
-                    if (v == null || v == 1) return; // LAN is disabled
+                    if (v == null) return;
                     settings.updateConnectionMode(v);
-                    sync.setConnectionMode(v);
+
+                    final String wsUrl;
+                    if (v == 1) {
+                      wsUrl = settings.lanWsUrl;
+                    } else {
+                      wsUrl = AppConfig.relayServerUrl;
+                    }
+                    sync.setConnectionMode(v, wsUrl: wsUrl);
                   },
                   child: Column(
                     children: [
@@ -77,9 +110,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle:
                             'Connect directly to other devices on the same Wi-Fi or Ethernet. Best for real-time local sync.',
                         icon: Icons.router_rounded,
-                        disabled: true, // As requested, grayed out
-                        onTap: null,
+                        onTap: () {
+                          settings.updateConnectionMode(1);
+                          sync.setConnectionMode(
+                            1,
+                            wsUrl: settings.lanWsUrl,
+                          );
+                        },
                       ),
+                      if (settings.connectionMode == 1) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 76,
+                            right: 24,
+                            bottom: 20,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'LAN Server IP / Hostname',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 40,
+                                      child: TextField(
+                                        controller: _lanIpController,
+                                        decoration: InputDecoration(
+                                          hintText:
+                                              'e.g., 192.168.1.100 or localhost',
+                                          prefixIcon: const Icon(
+                                            Icons.computer_rounded,
+                                            size: 16,
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 8,
+                                              ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                        onSubmitted: (val) =>
+                                            _applyLanIp(settings, sync, val),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      minimumSize: const Size(80, 40),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    onPressed: () => _applyLanIp(
+                                      settings,
+                                      sync,
+                                      _lanIpController.text,
+                                    ),
+                                    child: const Text('Apply'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Type the IP address of the Clinic A computer running the relay server and click Apply.',
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const Divider(),
                       _buildRadioTile(
                         value: 2,
@@ -90,7 +210,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         icon: Icons.cloud_done_rounded,
                         onTap: () {
                           settings.updateConnectionMode(2);
-                          sync.setConnectionMode(2);
+                          sync.setConnectionMode(
+                            2,
+                            wsUrl: AppConfig.relayServerUrl,
+                          );
                         },
                       ),
                       const Divider(),

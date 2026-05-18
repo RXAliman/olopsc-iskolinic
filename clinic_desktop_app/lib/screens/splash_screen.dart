@@ -178,11 +178,14 @@ class _SplashScreenState extends State<SplashScreen>
       // Step 6: Sync service (fire-and-forget, don't block startup)
       _setStatus('Starting sync service...');
       final syncProvider = SyncProvider();
+      final wsUrl = settingsProvider.connectionMode == 1
+          ? settingsProvider.lanWsUrl
+          : AppConfig.relayServerUrl;
       syncProvider.init(
         patientProvider,
         inventoryProvider,
         customSymptomProvider,
-        wsUrl: AppConfig.relayServerUrl,
+        wsUrl: wsUrl,
         initialMode: settingsProvider.connectionMode,
       );
       patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());

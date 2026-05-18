@@ -36,7 +36,7 @@ class SyncProvider extends ChangeNotifier {
     _patientProvider = patientProvider;
     _inventoryProvider = inventoryProvider;
     _customSymptomProvider = customSymptomProvider;
-    
+
     _inventoryProvider?.onLocalChange = pushChanges;
     _customSymptomProvider?.onLocalChange = pushChanges;
 
@@ -60,7 +60,7 @@ class SyncProvider extends ChangeNotifier {
 
     _client!.onSyncComplete = (changedIds) {
       // The easiest way is to just call `load()` unconditionally when sync pushes anything.
-      
+
       _patientProvider?.onSyncComplete(changedIds);
       _inventoryProvider?.loadInventory();
       _customSymptomProvider?.loadSymptoms();
@@ -72,28 +72,54 @@ class SyncProvider extends ChangeNotifier {
       debugPrint('SyncProvider: compacted $removed old tombstones');
     }
 
-    // Auto-connect to relay server only if in Relay mode
-    if (_currentMode == 2) {
+    // Auto-connect to relay server only if in Relay or LAN mode
+    if (_currentMode == 1 || _currentMode == 2) {
       await connect();
     }
   }
 
   /// Update the current connection mode and trigger connect/disconnect.
-  Future<void> setConnectionMode(int mode) async {
-    if (mode == _currentMode) return;
+  Future<void> setConnectionMode(int mode, {String? wsUrl}) async {
+    if (mode == _currentMode && (wsUrl == null || _client?.wsUrl == wsUrl)) {
+      return;
+    }
     _currentMode = mode;
-    
-    if (mode == 2) {
+
+    disconnect();
+
+    if (mode == 1 || mode == 2) {
+      if (wsUrl != null && wsUrl.isNotEmpty) {
+        final nodeId = await NodeId.get();
+        final authSecret = await AuthService.instance.getSyncSecret();
+        _client = SyncClient(
+          wsUrl: wsUrl,
+          nodeId: nodeId,
+          authSecret: authSecret,
+        );
+
+        _client!.onStateChanged = () {
+          _connectionState = _client!.state;
+          notifyListeners();
+        };
+
+        _client!.onSyncStatusChanged = (_) {
+          notifyListeners();
+        };
+
+        _client!.onSyncComplete = (changedIds) {
+          _patientProvider?.onSyncComplete(changedIds);
+          _inventoryProvider?.loadInventory();
+          _customSymptomProvider?.loadSymptoms();
+        };
+      }
       await connect();
-    } else {
-      disconnect();
     }
     notifyListeners();
   }
 
   /// Manually connect to the relay server.
   Future<void> connect() async {
-    if (_currentMode != 2) return;
+    if (_currentMode != 1 && _currentMode != 2) return;
     await _client?.connect();
   }
 
@@ -101,18 +127,18 @@ class SyncProvider extends ChangeNotifier {
   void disconnect() {
     _client?.disconnect();
   }
-  
+
   /// Force a manual sync by reconnecting
   Future<void> forceSync() async {
     disconnect();
-    if (_currentMode != 2) return;
+    if (_currentMode != 1 && _currentMode != 2) return;
     await Future.delayed(const Duration(milliseconds: 50));
     await connect();
   }
 
   /// Push local changes after a write.
   Future<void> pushChanges() async {
-    if (_currentMode != 2) return;
+    if (_currentMode != 1 && _currentMode != 2) return;
     await _client?.pushChanges();
   }
 
@@ -121,9 +147,9 @@ class SyncProvider extends ChangeNotifier {
   Future<void> reconnectWithNewSecret() async {
     final wsUrl = _client?.wsUrl;
     if (wsUrl == null) return;
-    
+
     disconnect();
-    
+
     final nodeId = await NodeId.get();
     final authSecret = await AuthService.instance.getSyncSecret();
     _client = SyncClient(wsUrl: wsUrl, nodeId: nodeId, authSecret: authSecret);
@@ -143,7 +169,7 @@ class SyncProvider extends ChangeNotifier {
       _customSymptomProvider?.loadSymptoms();
     };
 
-    if (_currentMode == 2) {
+    if (_currentMode == 1 || _currentMode == 2) {
       await connect();
     }
   }
