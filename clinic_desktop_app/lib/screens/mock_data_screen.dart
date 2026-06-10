@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/inventory_provider.dart';
+import '../providers/custom_symptom_provider.dart';
 import '../services/mock_data_service.dart';
 import '../services/database_helper.dart';
 import '../theme/app_theme.dart';
@@ -224,6 +225,7 @@ class _MockPatientTabState extends State<_MockPatientTab> {
     final messenger = ScaffoldMessenger.of(context);
     final patientProvider = context.read<PatientProvider>();
     final inventoryProvider = context.read<InventoryProvider>();
+    final customSymptomProvider = context.read<CustomSymptomProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -251,6 +253,7 @@ class _MockPatientTabState extends State<_MockPatientTab> {
       if (mounted) {
         patientProvider.refreshAll();
         inventoryProvider.loadInventory();
+        customSymptomProvider.loadSymptoms();
         messenger.showSnackBar(
           const SnackBar(content: Text('All mock data has been purged.')),
         );
@@ -273,6 +276,8 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
   int _patientSubsetCount = 5;
   bool _isGenerating = false;
   bool _targetAll = false;
+  int _customSymptomsPerGroup = 5;
+  bool _isGeneratingCustomSymptoms = false;
 
   @override
   Widget build(BuildContext context) {
@@ -463,9 +468,110 @@ class _MockVisitationTabState extends State<_MockVisitationTab> {
               ),
             ),
           ),
+          const SizedBox(height: 32),
+          Text(
+            'Generate Custom Symptoms',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            tickMarkShape: const RoundSliderTickMarkShape(
+                              tickMarkRadius: 2.0,
+                            ),
+                            activeTickMarkColor: AppTheme.accent.withValues(
+                              alpha: 0.5,
+                            ),
+                            inactiveTickMarkColor: AppTheme.accent.withValues(
+                              alpha: 0.2,
+                            ),
+                          ),
+                          child: Slider(
+                            value: _customSymptomsPerGroup.toDouble(),
+                            min: 1,
+                            max: 50,
+                            divisions: 49,
+                            label: _customSymptomsPerGroup.toString(),
+                            onChanged: (val) => setState(() =>
+                                _customSymptomsPerGroup = val.toInt()),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Count per Group: $_customSymptomsPerGroup',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isGeneratingCustomSymptoms
+                          ? null
+                          : _generateCustomSymptoms,
+                      icon: _isGeneratingCustomSymptoms
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.healing),
+                      label: Text(
+                        _isGeneratingCustomSymptoms
+                            ? 'Generating...'
+                            : 'Generate $_customSymptomsPerGroup Symptoms per Group',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _generateCustomSymptoms() async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isGeneratingCustomSymptoms = true);
+    
+    try {
+      final provider = context.read<CustomSymptomProvider>();
+      await MockDataService.bulkGenerateCustomSymptoms(
+        provider,
+        _customSymptomsPerGroup,
+      );
+      
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Generated $_customSymptomsPerGroup custom symptoms for each group (traumatic, medical, behavioral).',
+          ),
+        ),
+      );
+      widget.onRefreshStats();
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Failed to generate custom symptoms: $e'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingCustomSymptoms = false);
+      }
+    }
   }
 
   Future<void> _generate() async {
@@ -521,6 +627,7 @@ class _MockInventoryTab extends StatefulWidget {
 class _MockInventoryTabState extends State<_MockInventoryTab> {
   bool _isSeeding = false;
   int _targetCount = 5;
+  int _seedCount = 10;
 
   @override
   Widget build(BuildContext context) {
@@ -539,6 +646,39 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            tickMarkShape: const RoundSliderTickMarkShape(
+                              tickMarkRadius: 2.0,
+                            ),
+                            activeTickMarkColor: AppTheme.accent.withValues(
+                              alpha: 0.5,
+                            ),
+                            inactiveTickMarkColor: AppTheme.accent.withValues(
+                              alpha: 0.2,
+                            ),
+                          ),
+                          child: Slider(
+                            value: _seedCount.toDouble(),
+                            min: 1,
+                            max: 100,
+                            divisions: 99,
+                            label: _seedCount.toString(),
+                            onChanged: (val) =>
+                                setState(() => _seedCount = val.toInt()),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Items per Clinic: $_seedCount',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -553,13 +693,13 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
                       label: Text(
                         _isSeeding
                             ? 'Seeding...'
-                            : 'Seed Default Clinic Supplies',
+                            : 'Seed $_seedCount Clinic Supplies per Clinic Group',
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Adds Alcohol, Cotton, Band-Aids, etc. to both clinics with stock.',
+                    'Adds supplies with initial stocks to all clinic groups (Clinic A & Clinic B).',
                     style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     textAlign: TextAlign.center,
                   ),
@@ -692,12 +832,12 @@ class _MockInventoryTabState extends State<_MockInventoryTab> {
   Future<void> _seedDefaults() async {
     setState(() => _isSeeding = true);
     final provider = context.read<InventoryProvider>();
-    await MockDataService.seedDefaultInventory(provider);
+    await MockDataService.seedCustomInventory(provider, _seedCount);
     widget.onRefreshStats();
     if (mounted) {
       setState(() => _isSeeding = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Default inventory items seeded.')),
+        SnackBar(content: Text('$_seedCount inventory items seeded per clinic group.')),
       );
     }
   }
@@ -828,6 +968,12 @@ class _DataOverviewTab extends StatelessWidget {
                 Icons.layers,
                 color: Colors.orange,
               ),
+              _statCard(
+                'Mock Custom Symptoms',
+                stats['customSymptoms'] ?? 0,
+                Icons.healing,
+                color: Colors.orange,
+              ),
             ],
           ),
           const SizedBox(height: 32),
@@ -952,6 +1098,7 @@ class _DataOverviewTab extends StatelessWidget {
   Future<void> _confirmNuke(BuildContext context) async {
     final patientProvider = context.read<PatientProvider>();
     final inventoryProvider = context.read<InventoryProvider>();
+    final customSymptomProvider = context.read<CustomSymptomProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -979,6 +1126,7 @@ class _DataOverviewTab extends StatelessWidget {
       if (context.mounted) {
         patientProvider.refreshAll();
         inventoryProvider.loadInventory();
+        customSymptomProvider.loadSymptoms();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Mock data purged successfully.')),
         );

@@ -1156,6 +1156,66 @@ class DatabaseHelper {
     return items;
   }
 
+  Future<List<String>> getDistinctClinics() async {
+    final db = await database;
+    final maps = await db.rawQuery(
+      "SELECT DISTINCT clinic FROM inventory WHERE isDeleted = 0 ORDER BY clinic ASC",
+    );
+    return maps.map((m) => (m['clinic'] as String?) ?? '').toList();
+  }
+
+  Future<int> getInventoryCountByClinic(
+    String clinic, {
+    String query = '',
+  }) async {
+    final db = await database;
+    String sql =
+        'SELECT COUNT(*) as count FROM inventory WHERE isDeleted = 0 AND clinic = ?';
+    List<dynamic> args = [clinic];
+    if (query.isNotEmpty) {
+      sql += ' AND itemName LIKE ?';
+      args.add('%$query%');
+    }
+    final result = await db.rawQuery(sql, args);
+    return result.first['count'] as int? ?? 0;
+  }
+
+  Future<List<InventoryItem>> getInventoryByClinicPaginated({
+    required String clinic,
+    required int limit,
+    required int offset,
+    String query = '',
+  }) async {
+    final db = await database;
+    String where = 'isDeleted = 0 AND clinic = ?';
+    List<dynamic> whereArgs = [clinic];
+    if (query.isNotEmpty) {
+      where += ' AND itemName LIKE ?';
+      whereArgs.add('%$query%');
+    }
+    final itemMaps = await db.query(
+      'inventory',
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: 'itemName ASC',
+      limit: limit,
+      offset: offset,
+    );
+
+    final List<InventoryItem> items = [];
+    for (final itemMap in itemMaps) {
+      final itemId = itemMap['id'] as String;
+      final stockMaps = await db.query(
+        'inventory_stocks',
+        where: 'itemId = ? AND isDeleted = 0',
+        whereArgs: [itemId],
+      );
+      final stocks = stockMaps.map((m) => StockBatch.fromMap(m)).toList();
+      items.add(InventoryItem.fromMap(itemMap, stocks: stocks));
+    }
+    return items;
+  }
+
   Future<List<InventoryItem>> getLowStockItems() async {
     final allItems = await getAllInventoryItems();
     return allItems.where((item) => item.isLowStock).toList();
@@ -1421,6 +1481,60 @@ class DatabaseHelper {
     return maps.map((m) => CustomSymptom.fromMap(m)).toList();
   }
 
+  Future<int> getCustomSymptomCount(
+    String category, {
+    String query = '',
+  }) async {
+    final db = await database;
+    String sql =
+        'SELECT COUNT(*) as count FROM custom_symptoms WHERE category = ? AND isDeleted = 0';
+    List<dynamic> args = [category];
+    if (query.isNotEmpty) {
+      sql += ' AND name LIKE ?';
+      args.add('%$query%');
+    }
+    final result = await db.rawQuery(sql, args);
+    return result.first['count'] as int? ?? 0;
+  }
+
+  Future<List<CustomSymptom>> getCustomSymptomsPaginated({
+    required String category,
+    required int limit,
+    required int offset,
+    String query = '',
+  }) async {
+    final db = await database;
+    String where = 'category = ? AND isDeleted = 0';
+    List<dynamic> whereArgs = [category];
+    if (query.isNotEmpty) {
+      where += ' AND name LIKE ?';
+      whereArgs.add('%$query%');
+    }
+    final maps = await db.query(
+      'custom_symptoms',
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: 'name ASC',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((m) => CustomSymptom.fromMap(m)).toList();
+  }
+
+  Future<void> deleteCustomSymptomSoft(
+    String id, {
+    required String hlc,
+    required String nodeId,
+  }) async {
+    final db = await database;
+    await db.update(
+      'custom_symptoms',
+      {'isDeleted': 1, 'hlc': hlc, 'nodeId': nodeId},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<List<CustomSymptom>> getCustomSymptomChangesSince(
     String sinceHlc,
   ) async {
@@ -1623,6 +1737,11 @@ class DatabaseHelper {
     );
     stats['stocks'] = stocks.first['count'] as int? ?? 0;
 
+    final customSymptoms = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM custom_symptoms WHERE nodeId = 'MOCK_NODE' AND isDeleted = 0",
+    );
+    stats['customSymptoms'] = customSymptoms.first['count'] as int? ?? 0;
+
     final totalPatients = await db.rawQuery(
       "SELECT COUNT(*) as count FROM patients WHERE isDeleted = 0",
     );
@@ -1639,10 +1758,28 @@ class DatabaseHelper {
   Future<void> nukeMockData() async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.delete('inventory_stocks', where: "nodeId = 'MOCK_NODE'");
+      // 1. Delete all stock batches that are mock or belong to a mock inventory item
+      await txn.rawDelete('''
+        DELETE FROM inventory_stocks 
+        WHERE nodeId = 'MOCK_NODE' 
+           OR itemId IN (SELECT id FROM inventory WHERE nodeId = 'MOCK_NODE')
+      ''');
+
+      // 2. Delete mock inventory items
       await txn.delete('inventory', where: "nodeId = 'MOCK_NODE'");
-      await txn.delete('visitations', where: "nodeId = 'MOCK_NODE'");
+
+      // 3. Delete all visitations that are mock or belong to a mock patient
+      await txn.rawDelete('''
+        DELETE FROM visitations 
+        WHERE nodeId = 'MOCK_NODE' 
+           OR patientId IN (SELECT id FROM patients WHERE nodeId = 'MOCK_NODE')
+      ''');
+
+      // 4. Delete mock patients
       await txn.delete('patients', where: "nodeId = 'MOCK_NODE'");
+
+      // 5. Delete mock custom symptoms
+      await txn.delete('custom_symptoms', where: "nodeId = 'MOCK_NODE'");
     });
   }
 

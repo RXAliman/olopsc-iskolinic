@@ -59,4 +59,19 @@ class CustomSymptomProvider extends ChangeNotifier {
     notifyListeners();
     onLocalChange?.call();
   }
+
+  Future<void> deleteCustomSymptom(String id) async {
+    final nodeId = await NodeId.get();
+    final hlc = HLC.now(nodeId).pack();
+
+    await _db.deleteCustomSymptomSoft(id, hlc: hlc, nodeId: nodeId);
+
+    // Update local cache
+    _traumaticSymptoms.removeWhere((s) => s.id == id);
+    _medicalSymptoms.removeWhere((s) => s.id == id);
+    _behavioralSymptoms.removeWhere((s) => s.id == id);
+
+    notifyListeners();
+    onLocalChange?.call();
+  }
 }
