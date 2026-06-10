@@ -2,9 +2,13 @@ import 'dart:math';
 import 'package:uuid/uuid.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
+import '../models/custom_symptom.dart';
 import '../providers/patient_provider.dart';
 import '../providers/inventory_provider.dart';
+import '../providers/custom_symptom_provider.dart';
 import '../constants/symptoms.dart';
+import '../services/database_helper.dart';
+import '../crdt/hlc.dart';
 
 class MockDataService {
   static final Random _random = Random();
@@ -282,5 +286,142 @@ class MockDataService {
         );
       }
     }
+  }
+
+  static Future<void> seedCustomInventory(
+    InventoryProvider provider,
+    int countPerClinic,
+  ) async {
+    final clinics = ['Clinic A', 'Clinic B'];
+    
+    final sampleSupplies = [
+      ('Alcohol', 'bottle'),
+      ('Cotton Balls', 'piece'),
+      ('Band-Aid', 'piece'),
+      ('Betadine', 'bottle'),
+      ('Gauze', 'piece'),
+      ('Medical Tape', 'piece'),
+      ('Paracetamol', 'piece'),
+      ('Ibuprofen', 'piece'),
+      ('Thermometer Cover', 'piece'),
+      ('Ice Pack', 'piece'),
+      ('Splint', 'piece'),
+      ('Aspirin', 'piece'),
+      ('Antiseptic Wipes', 'piece'),
+      ('Calamine Lotion', 'bottle'),
+      ('Elastic Bandage', 'piece'),
+      ('Cold Compress', 'piece'),
+      ('Tweezers', 'piece'),
+      ('Scissors', 'piece'),
+      ('Disposable Gloves', 'piece'),
+      ('Face Mask', 'piece'),
+      ('Hand Sanitizer', 'bottle'),
+      ('Eye Wash', 'bottle'),
+      ('Burn Gel', 'piece'),
+      ('Saline Solution', 'bottle'),
+      ('Hydrogen Peroxide', 'bottle'),
+      ('Cotton Swabs', 'piece'),
+      ('Safety Pins', 'piece'),
+      ('Tongue Depressors', 'piece'),
+      ('Syringe', 'piece'),
+      ('Thermometer', 'piece'),
+      ('Antibiotic Ointment', 'piece'),
+      ('Antihistamine', 'piece'),
+      ('Cough Syrup', 'bottle'),
+      ('Throat Lozenges', 'piece'),
+      ('Antacid', 'piece'),
+      ('Rehydration Salts', 'piece'),
+      ('Ear Drops', 'bottle'),
+      ('Eye Drops', 'bottle'),
+      ('Nasol Spray', 'bottle'),
+      ('Petroleum Jelly', 'bottle'),
+    ];
+
+    for (final clinic in clinics) {
+      for (int i = 0; i < countPerClinic; i++) {
+        String name;
+        String type;
+        if (i < sampleSupplies.length) {
+          name = sampleSupplies[i].$1;
+          type = sampleSupplies[i].$2;
+        } else {
+          name = 'Mock Supply ${i + 1}';
+          type = i % 2 == 0 ? 'piece' : 'bottle';
+        }
+
+        // Check if already exists to avoid duplicates
+        final exists = provider.allItems.any(
+          (item) => item.itemName == name && item.clinic == clinic,
+        );
+        if (exists) continue;
+
+        await provider.addNewSupplyItem(
+          itemName: name,
+          lowStockAmount: 10,
+          clinic: clinic,
+          itemType: type,
+          initialStocks: [
+            (amount: 50, expiry: DateTime.now().add(Duration(days: 365))),
+            (amount: 20, expiry: DateTime.now().add(Duration(days: 180))),
+          ],
+          nodeId: mockNodeId,
+        );
+      }
+    }
+  }
+
+  static Future<void> bulkGenerateCustomSymptoms(
+    CustomSymptomProvider provider,
+    int countPerGroup,
+  ) async {
+    final categories = ['traumatic', 'medical', 'behavioral'];
+    
+    final mockTraumaticNames = [
+      'Fracture', 'Concussion', 'Laceration', 'Bruise', 'Whiplash', 
+      'Dislocation', 'Abrasion', 'Contusion', 'Heat Stroke', 'Frostbite'
+    ];
+    final mockMedicalNames = [
+      'Nausea', 'Fatigue', 'Migraine', 'Congestion', 'Chills', 
+      'Insomnia', 'Dizziness', 'Hypertension', 'Dehydration', 'Heartburn'
+    ];
+    final mockBehavioralNames = [
+      'Anxiety', 'Hyperactivity', 'Mood Swing', 'Social Withdrawal', 
+      'Aggression', 'Irritability', 'Sleep Disorder', 'Lethargy', 'Hyperventilation', 'Panic'
+    ];
+
+    for (final category in categories) {
+      final List<String> sourceNames;
+      if (category == 'traumatic') {
+        sourceNames = mockTraumaticNames;
+      } else if (category == 'medical') {
+        sourceNames = mockMedicalNames;
+      } else {
+        sourceNames = mockBehavioralNames;
+      }
+
+      final shuffled = List<String>.from(sourceNames)..shuffle();
+
+      for (int i = 0; i < countPerGroup; i++) {
+        String name;
+        if (i < shuffled.length) {
+          name = 'Mock ${shuffled[i]}';
+        } else {
+          name = 'Mock ${category[0].toUpperCase()}${category.substring(1)} Symptom ${i + 1}';
+        }
+
+        final hlc = HLC.now(mockNodeId).pack();
+        final symptom = CustomSymptom(
+          id: _uuid.v4(),
+          name: name,
+          category: category,
+          hlc: hlc,
+          nodeId: mockNodeId,
+        );
+
+        await DatabaseHelper.instance.insertCustomSymptom(symptom);
+      }
+    }
+
+    await provider.loadSymptoms();
   }
 }
