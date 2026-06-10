@@ -12,7 +12,7 @@ Precursor to the <a href="https://github.com/RXAliman/iskolinic">ISKOLINIC main 
       <img src="https://github.com/user-attachments/assets/349a114e-7dfe-4242-a271-3f48b27d7d3e" width="150" height="150">
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/17988ad7-7ddd-40cf-82dd-2d9332962de9" width="150" height="150">
+      <img src="https://github.com/user-attachments/assets/e62abce2-0b2c-4d5d-b306-e0233a76f64c" width="150" height="150">
     </td>
     <td align="center">
       <img src="https://github.com/user-attachments/assets/d727dd28-39f2-4f38-81f6-c6906d3763ff" width="150" height="150">
