@@ -11,10 +11,12 @@ class CustomSymptomProvider extends ChangeNotifier {
   List<CustomSymptom> _traumaticSymptoms = [];
   List<CustomSymptom> _medicalSymptoms = [];
   List<CustomSymptom> _behavioralSymptoms = [];
+  List<CustomSymptom> _interventionSymptoms = [];
 
   List<CustomSymptom> get traumaticSymptoms => _traumaticSymptoms;
   List<CustomSymptom> get medicalSymptoms => _medicalSymptoms;
   List<CustomSymptom> get behavioralSymptoms => _behavioralSymptoms;
+  List<CustomSymptom> get interventionSymptoms => _interventionSymptoms;
 
   // Called to push changes after local write
   Future<void> Function()? onLocalChange;
@@ -25,6 +27,7 @@ class CustomSymptomProvider extends ChangeNotifier {
     _traumaticSymptoms = all.where((s) => s.category == 'traumatic').toList();
     _medicalSymptoms = all.where((s) => s.category == 'medical').toList();
     _behavioralSymptoms = all.where((s) => s.category == 'behavioral').toList();
+    _interventionSymptoms = all.where((s) => s.category == 'intervention').toList();
     
     notifyListeners();
   }
@@ -54,6 +57,9 @@ class CustomSymptomProvider extends ChangeNotifier {
       case 'behavioral':
         _behavioralSymptoms.add(symptom);
         break;
+      case 'intervention':
+        _interventionSymptoms.add(symptom);
+        break;
     }
 
     notifyListeners();
@@ -70,6 +76,7 @@ class CustomSymptomProvider extends ChangeNotifier {
     _traumaticSymptoms.removeWhere((s) => s.id == id);
     _medicalSymptoms.removeWhere((s) => s.id == id);
     _behavioralSymptoms.removeWhere((s) => s.id == id);
+    _interventionSymptoms.removeWhere((s) => s.id == id);
 
     notifyListeners();
     onLocalChange?.call();
