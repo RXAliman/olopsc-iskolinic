@@ -2,7 +2,7 @@
 
 <img width="1600" alt="OLOPSC-ISKOLINIC-HEADER" src="https://github.com/user-attachments/assets/d86da463-53d0-4e83-aaea-ad266b1c6cbe" />
 
-Precursor to the <a href="https://github.com/RXAliman/iskolinic">ISKOLINIC main repository</a>. Ongoing Computer Science Thesis project by the ISKOLINIC Team in partnership with Our Lady of Perpetual Succor College (OLOPSC) School Health Services.
+Precursor to the <a href="https://github.com/RXAliman/iskolinic">ISKOLINIC main repository</a>. A Computer Science Thesis project by the ISKOLINIC Team actively used by the Our Lady of Perpetual Succor College (OLOPSC) School Health Services.
 
 ## The ISKOLINIC Team
 
