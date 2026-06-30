@@ -37,7 +37,21 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
   final _treatmentCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
   final _customChiefComplaintCtrl = TextEditingController();
+  final _customInterventionCtrl = TextEditingController();
   final Set<String> _selectedSymptoms = {};
+
+  static const List<String> _builtInInterventions = [
+    'Sent home',
+    'Rested in clinic',
+    'Given medication',
+    'Wound cleaned and dressed',
+    'Referred to hospital',
+    'Observation',
+    'First aid given',
+    'Warm compress',
+    'Cold compress',
+    'Topical/ointment given',
+  ];
   final Set<String> _selectedSupplies = {};
   final Set<String> _fullyConsumedSupplies = {};
 
@@ -152,6 +166,7 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     _treatmentCtrl.dispose();
     _remarksCtrl.dispose();
     _customChiefComplaintCtrl.dispose();
+    _customInterventionCtrl.dispose();
     _searchDebounce?.cancel();
     for (final ctrl in _symptomSearchCtrls.values) {
       ctrl.dispose();
@@ -585,6 +600,140 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
     );
   }
 
+  void _addCustomIntervention(
+    BuildContext context,
+    CustomSymptomProvider provider,
+  ) {
+    final text = _customInterventionCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    final lowerText = text.toLowerCase();
+    final existsInBuiltIn = _builtInInterventions.any(
+      (element) => element.toLowerCase() == lowerText,
+    );
+    final existsInCustom = provider.interventionSymptoms.any(
+      (element) => element.name.toLowerCase() == lowerText,
+    );
+
+    if (existsInBuiltIn || existsInCustom) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Intervention chip already exists'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
+    provider.addCustomSymptom(text, 'intervention');
+    _customInterventionCtrl.clear();
+  }
+
+  void _confirmDeleteCustomIntervention(String id, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Custom Quick Intervention'),
+        content: Text('Are you sure you want to delete "$name"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await context
+                  .read<CustomSymptomProvider>()
+                  .deleteCustomSymptom(id);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInterventionChip(
+    String text, {
+    required bool isCustom,
+    String? id,
+  }) {
+    Widget chip = ActionChip(
+      label: Text(
+        text,
+        style: const TextStyle(fontSize: 12),
+      ),
+      backgroundColor: AppTheme.accent.withValues(alpha: 0.1),
+      padding: const EdgeInsets.all(4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(
+          color: AppTheme.accent,
+        ),
+      ),
+      onPressed: () {
+        final ctrl = _treatmentCtrl;
+        final currentText = ctrl.text.trim();
+        if (currentText.isEmpty) {
+          ctrl.text = text;
+        } else {
+          if (currentText.endsWith(',')) {
+            ctrl.text = '$currentText $text';
+          } else {
+            ctrl.text = '$currentText, $text';
+          }
+        }
+        ctrl.selection = TextSelection.collapsed(
+          offset: ctrl.text.length,
+        );
+      },
+    );
+
+    if (isCustom && id != null) {
+      chip = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          chip,
+          Positioned(
+            top: -6,
+            right: -6,
+            child: GestureDetector(
+              onTap: () => _confirmDeleteCustomIntervention(id, text),
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.danger, width: 1.5),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.remove,
+                  size: 12,
+                  color: AppTheme.danger,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return chip;
+  }
+
   // ── Build ──────────────────────────────────────────────────────
 
   @override
@@ -916,51 +1065,73 @@ class _VisitationFormScreenState extends State<VisitationFormScreen> {
                         const SizedBox(height: 10),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 20),
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children:
-                                [
-                                      'Sent home',
-                                      'Rested in clinic',
-                                      'Given medication',
-                                      'Wound cleaned and dressed',
-                                      'Referred to hospital',
-                                      'Observation',
-                                    ]
-                                    .map(
-                                      (text) => ActionChip(
-                                        label: Text(
+                          child: Consumer<CustomSymptomProvider>(
+                            builder: (context, customSymptomProvider, _) {
+                              final customInterventions =
+                                  customSymptomProvider.interventionSymptoms;
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      ..._builtInInterventions.map(
+                                        (text) => _buildInterventionChip(
                                           text,
-                                          style: const TextStyle(fontSize: 12),
+                                          isCustom: false,
                                         ),
-                                        backgroundColor: AppTheme.accent
-                                            .withValues(alpha: 0.1),
-                                        padding: const EdgeInsets.all(4),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
+                                      ),
+                                      ...customInterventions.map(
+                                        (symptom) => _buildInterventionChip(
+                                          symptom.name,
+                                          isCustom: true,
+                                          id: symptom.id,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _customInterventionCtrl,
+                                          decoration: const InputDecoration(
+                                            labelText:
+                                                'Add Custom Quick Intervention',
+                                            hintText:
+                                                'Type and press enter or click +',
+                                            prefixIcon:
+                                                Icon(Icons.add_task_rounded),
+                                            isDense: true,
                                           ),
-                                          side: const BorderSide(
-                                            color: AppTheme.accent,
-                                          ),
+                                          onSubmitted: (value) {
+                                            _addCustomIntervention(
+                                              context,
+                                              customSymptomProvider,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.add_circle,
+                                          color: AppTheme.accent,
                                         ),
                                         onPressed: () {
-                                          final ctrl = _treatmentCtrl;
-                                          final currentText = ctrl.text;
-                                          if (currentText.isEmpty) {
-                                            ctrl.text = text;
-                                          } else {
-                                            ctrl.text = '$currentText, $text';
-                                          }
-                                          ctrl.selection =
-                                              TextSelection.collapsed(
-                                                offset: ctrl.text.length,
-                                              );
+                                          _addCustomIntervention(
+                                            context,
+                                            customSymptomProvider,
+                                          );
                                         },
                                       ),
-                                    )
-                                    .toList(),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
 

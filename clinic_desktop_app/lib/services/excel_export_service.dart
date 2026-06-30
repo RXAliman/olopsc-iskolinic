@@ -26,7 +26,12 @@ class ExcelExportService {
     // Fetch data on main thread (SQLite needs main thread context)
     final List<Map<String, dynamic>> visitationsData =
         await _db.getVisitationsWithPatientInfoForRange(startDate, endDate);
-    final List<CustomSymptom> customSymptoms = await _db.getAllCustomSymptoms();
+    final List<CustomSymptom> customSymptoms = (await _db.getAllCustomSymptoms())
+        .where((s) =>
+            s.category == 'traumatic' ||
+            s.category == 'medical' ||
+            s.category == 'behavioral')
+        .toList();
 
     // Offload the heavy Excel generation to an isolate
     final List<int>? fileBytes = await compute(_generateSymptomsExcelBytes, {
