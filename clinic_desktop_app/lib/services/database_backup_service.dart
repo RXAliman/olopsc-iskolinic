@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -35,16 +36,23 @@ class BackupInfo {
 /// Backups are stored in a `backups/` subdirectory alongside the database.
 /// The naming convention is: `clinic_backup_<version>_<timestamp>.db`
 ///
+/// **Strategy:** Backups are only created from known-good databases:
+/// - After successful app initialization (not before — avoids backing up
+///   corrupted databases during repeated failed restarts).
+/// - Periodically while the app is running (every 2 hours by default).
+///
 /// Usage:
-/// - Call [createPreMigrationBackup] before opening the database to capture
-///   the state of the database before any migrations run.
+/// - Call [createBackup] after the app initializes successfully.
+/// - Call [startPeriodicBackup] to enable automatic runtime backups.
 /// - Call [restoreBackup] to replace the current database with a backup.
 /// - Call [listBackups] to get all available backups.
 class DatabaseBackupService {
   DatabaseBackupService._();
 
   /// Maximum number of backups to retain. Older backups are pruned automatically.
-  static const int maxBackups = 5;
+  static const int maxBackups = 10;
+
+  static Timer? _periodicTimer;
 
   /// Returns the directory where backups are stored.
   static Future<Directory> _backupDir() async {
@@ -62,14 +70,15 @@ class DatabaseBackupService {
     return p.join(dir.path, AppConfig.databaseName);
   }
 
-  /// Creates a backup of the current database file before migrations run.
+  /// Creates a backup of the current database file.
   ///
-  /// This should be called **before** `openDatabase()` in [DatabaseHelper].
-  /// If the database file doesn't exist yet (first launch), this is a no-op.
+  /// Should only be called after verifying the database is healthy (e.g.,
+  /// after successful app initialization). This avoids backing up corrupted
+  /// databases that would push out known-good backups during rotation.
   ///
   /// Returns the [BackupInfo] of the created backup, or `null` if no backup
   /// was needed (e.g., first launch or file doesn't exist).
-  static Future<BackupInfo?> createPreMigrationBackup(String appVersion) async {
+  static Future<BackupInfo?> createBackup(String appVersion) async {
     try {
       final dbPath = await _dbPath();
       final dbFile = File(dbPath);
@@ -111,6 +120,32 @@ class DatabaseBackupService {
       debugPrint('DatabaseBackupService: Error creating backup: $e');
       return null;
     }
+  }
+
+  /// Starts periodic backups that run every [interval] (default: 2 hours).
+  ///
+  /// Should be called after the app initializes successfully. Each periodic
+  /// backup is a file-copy of the live database, same as [createBackup].
+  /// Old backups are automatically pruned beyond [maxBackups].
+  static void startPeriodicBackup(
+    String appVersion, {
+    Duration interval = const Duration(hours: 2),
+  }) {
+    stopPeriodicBackup();
+    _periodicTimer = Timer.periodic(interval, (_) async {
+      debugPrint('DatabaseBackupService: Running periodic backup...');
+      await createBackup(appVersion);
+    });
+    debugPrint(
+      'DatabaseBackupService: Periodic backup scheduled '
+      '(every ${interval.inMinutes} min)',
+    );
+  }
+
+  /// Stops periodic backups.
+  static void stopPeriodicBackup() {
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
   }
 
   /// Lists all available backups, sorted newest-first.
@@ -161,7 +196,7 @@ class DatabaseBackupService {
       // Safety: create a backup of the current state before restoring
       // (so the user can undo the restore if needed)
       final currentVersion = _extractVersion(p.basename(backup.file.path));
-      await createPreMigrationBackup('pre_restore_$currentVersion');
+      await createBackup('pre_restore_$currentVersion');
 
       // Replace the current database with the backup
       if (await dbFile.exists()) {

@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:intl/intl.dart';
 
 import '../constants/app_config.dart';
 import '../providers/patient_provider.dart';
@@ -12,6 +15,7 @@ import '../providers/local_server_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/update_service.dart';
 import '../services/database_helper.dart';
+import '../services/database_backup_service.dart';
 import '../theme/app_theme.dart';
 
 /// Callback signature for when the splash screen finishes initialization.
@@ -44,6 +48,7 @@ enum _SplashPhase {
   updateAvailable,
   downloading,
   initializing,
+  error,
 }
 
 class _SplashScreenState extends State<SplashScreen>
@@ -53,8 +58,10 @@ class _SplashScreenState extends State<SplashScreen>
   double _downloadProgress = 0;
   String _initStatus = '';
   String? _errorMessage;
+  String? _errorDetail;
   bool _downloadCancelled = false;
   String _currentVersion = '';
+  List<BackupInfo> _availableBackups = [];
 
   late AnimationController _logoController;
   late Animation<double> _logoFade;
@@ -188,6 +195,14 @@ class _SplashScreenState extends State<SplashScreen>
       patientProvider.setOnLocalWrite(() => syncProvider.pushChanges());
       if (!mounted) return;
 
+      // Step 7: Create a known-good database backup & start periodic backups
+      try {
+        await DatabaseBackupService.createBackup(_currentVersion);
+        DatabaseBackupService.startPeriodicBackup(_currentVersion);
+      } catch (e) {
+        debugPrint('SplashScreen: Startup backup failed: $e');
+      }
+
       // Brief pause so the user sees "Ready!" before the transition
       _setStatus('Ready!');
       await Future.delayed(const Duration(milliseconds: 400));
@@ -203,9 +218,23 @@ class _SplashScreenState extends State<SplashScreen>
       );
     } catch (e) {
       if (mounted) {
+        List<BackupInfo> backups = [];
+        try {
+          backups = await DatabaseBackupService.listBackups();
+        } catch (ex) {
+          debugPrint('SplashScreen: Failed to list backups: $ex');
+        }
         setState(() {
-          _errorMessage = 'Initialization error: $e';
-          _initStatus = 'An error occurred';
+          _phase = _SplashPhase.error;
+          _availableBackups = backups;
+          if (AppConfig.isProduction) {
+            _errorMessage =
+                'Something went wrong during startup. '
+                'Please exit the application and try opening it again. If the issue persists, please contact the ISKOLINIC Team.';
+          } else {
+            _errorMessage = 'Initialization error: $e';
+          }
+          _errorDetail = e.toString();
         });
       }
     }
@@ -257,130 +286,104 @@ class _SplashScreenState extends State<SplashScreen>
     _startInitialization();
   }
 
+  /// Exits the application.
+  void _exitApp() {
+    exit(0);
+  }
+
   // ── UI ──────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.primaryLight,
-      body: Center(
-        child: FadeTransition(
-          opacity: _logoFade,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // ── App Logo ──
-              ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Image.asset('assets/app-icon-colored.png', height: 100),
-              ),
-              const SizedBox(height: 24),
-
-              // ── App Name ──
-              Text(
-                AppConfig.appName,
-                style: GoogleFonts.inter(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-
-              // ── Version + Environment Badge ──
-              Row(
-                mainAxisSize: MainAxisSize.min,
+      body: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height,
+            ),
+            child: FadeTransition(
+              opacity: _logoFade,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (_currentVersion.isNotEmpty)
-                    Text(
-                      'v$_currentVersion',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: AppTheme.textMuted,
-                      ),
-                    ),
-                  if (!AppConfig.isProduction) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.warning.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: AppTheme.warning.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        'DEV',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.warning,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 48),
+                  // ── App Logo ──
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset('assets/app-icon-colored.png', height: 100),
+                  ),
+                  const SizedBox(height: 24),
 
-              // ── Content Area ──
-              FadeTransition(
-                opacity: _contentFade,
-                child: SizedBox(
-                  width: 420,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    child: _buildPhaseContent(),
-                  ),
-                ),
-              ),
-
-              // ── Error Message ──
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.danger.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppTheme.danger.withValues(alpha: 0.2),
+                  // ── App Name ──
+                  Text(
+                    AppConfig.appName,
+                    style: GoogleFonts.inter(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  child: Row(
+                  const SizedBox(height: 6),
+
+                  // ── Version + Environment Badge ──
+                  Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        size: 16,
-                        color: AppTheme.danger.withValues(alpha: 0.7),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          _errorMessage!,
+                      if (_currentVersion.isNotEmpty)
+                        Text(
+                          'v$_currentVersion',
                           style: GoogleFonts.inter(
                             fontSize: 13,
-                            color: AppTheme.danger,
+                            color: AppTheme.textMuted,
                           ),
                         ),
-                      ),
+                      if (!AppConfig.isProduction) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.warning.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: AppTheme.warning.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            'DEV',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.warning,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                ),
-              ],
-            ],
+                  const SizedBox(height: 48),
+
+                  // ── Content Area ──
+                  FadeTransition(
+                    opacity: _contentFade,
+                    child: SizedBox(
+                      width: 420,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: _buildPhaseContent(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -398,6 +401,8 @@ class _SplashScreenState extends State<SplashScreen>
         return _buildDownloading();
       case _SplashPhase.initializing:
         return _buildInitializing();
+      case _SplashPhase.error:
+        return _buildError();
     }
   }
 
@@ -642,5 +647,401 @@ class _SplashScreenState extends State<SplashScreen>
         ),
       ],
     );
+  }
+
+  // ── Phase: Error ────────────────────────────────────────────────
+
+  Widget _buildError() {
+    return Container(
+      key: const ValueKey('error'),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.danger.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.error_outline_rounded,
+                  size: 20,
+                  color: AppTheme.danger.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Startup Error',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Message
+          Text(
+            _errorMessage ?? 'An unexpected error occurred.',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+              height: 1.5,
+            ),
+          ),
+
+          // Dev-only: expandable technical details
+          if (!AppConfig.isProduction && _errorDetail != null) ...[
+            const SizedBox(height: 12),
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                title: Text(
+                  'Technical Details',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardLight,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: SelectableText(
+                      _errorDetail!,
+                      style: GoogleFonts.robotoMono(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 20),
+
+          // Buttons
+          if (_availableBackups.isNotEmpty) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showRestoreBackupDialog,
+                icon: const Icon(Icons.restore_rounded, size: 16),
+                label: const Text('Restore from Backup'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.warning,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _errorMessage = null;
+                      _errorDetail = null;
+                    });
+                    _startInitialization();
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Retry'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _exitApp,
+                  icon: const Icon(Icons.exit_to_app_rounded, size: 16),
+                  label: const Text('Exit App'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    foregroundColor: AppTheme.danger,
+                    side: const BorderSide(color: AppTheme.danger),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Displays a dialog listing the available backups, highlighting the latest one.
+  Future<void> _showRestoreBackupDialog() async {
+    final dateFormatter = DateFormat('MMM d, yyyy – h:mm a');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Select Database Backup to Restore',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+        ),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose a backup database to replace the current database. This is recommended if startup failed due to database corruption or locking.',
+                style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _availableBackups.length,
+                  itemBuilder: (context, index) {
+                    final backup = _availableBackups[index];
+                    final isLatest = index == 0; // List is sorted newest first
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isLatest
+                            ? AppTheme.warning.withValues(alpha: 0.05)
+                            : AppTheme.cardLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isLatest
+                              ? AppTheme.warning.withValues(alpha: 0.5)
+                              : AppTheme.dividerColor.withValues(alpha: 0.5),
+                          width: isLatest ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: (isLatest ? AppTheme.warning : AppTheme.accent)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.storage_rounded,
+                              color: isLatest ? AppTheme.warning : AppTheme.accent,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'v${backup.appVersion}',
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    if (isLatest) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.warning,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'LATEST',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${dateFormatter.format(backup.createdAt)}  ·  ${backup.formattedSize}',
+                                  style: GoogleFonts.inter(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _confirmAndRestore(backup);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isLatest ? AppTheme.warning : AppTheme.accent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              textStyle: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            child: const Text('Restore'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Asks the user to confirm the database restoration before performing it.
+  Future<void> _confirmAndRestore(BackupInfo backup) async {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Confirm Restore',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Are you sure you want to replace the current database with the backup from '
+          'v${backup.appVersion} (${backup.formattedSize})?\n\n'
+          'The application will exit after restoration is completed, and you will need to open it again manually.',
+          style: GoogleFonts.inter(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              _performRestore(backup);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm Restore'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Performs the actual restore operation and displays a completion dialog.
+  Future<void> _performRestore(BackupInfo backup) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Restoring database...'),
+          ],
+        ),
+      ),
+    );
+
+    final success = await DatabaseBackupService.restoreBackup(backup);
+
+    if (mounted) {
+      Navigator.pop(context); // Close progress dialog
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: Text(
+            success ? 'Restore Successful' : 'Restore Failed',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+          content: Text(
+            success
+                ? 'The database was successfully restored.\n\nPlease close the application and open it again manually to load the restored database.'
+                : 'Failed to restore the database. Please try another backup or contact support.',
+            style: GoogleFonts.inter(fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                if (success) {
+                  _exitApp();
+                } else {
+                  Navigator.pop(ctx);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: success ? AppTheme.accent : AppTheme.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(success ? 'Exit App' : 'OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

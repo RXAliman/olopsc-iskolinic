@@ -7,6 +7,26 @@
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
+  // ── Single-instance guard ─────────────────────────────────────────
+  // Create a named mutex. If another instance already holds it, bring
+  // that window to the foreground and exit immediately. This prevents
+  // SQLite "database is locked" errors from concurrent access.
+  HANDLE hMutex = ::CreateMutex(nullptr, TRUE,
+                                L"Global\\OLOPSCIskolinicSingleInstance");
+  if (::GetLastError() == ERROR_ALREADY_EXISTS) {
+    // Another instance is running. Try to find its window and focus it.
+    HWND existingWindow = ::FindWindow(nullptr, L"OLOPSC Iskolinic");
+    if (existingWindow) {
+      // Restore if minimized, then bring to front.
+      if (::IsIconic(existingWindow)) {
+        ::ShowWindow(existingWindow, SW_RESTORE);
+      }
+      ::SetForegroundWindow(existingWindow);
+    }
+    if (hMutex) ::CloseHandle(hMutex);
+    return EXIT_SUCCESS;
+  }
+
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
@@ -39,5 +59,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   ::CoUninitialize();
+  if (hMutex) {
+    ::ReleaseMutex(hMutex);
+    ::CloseHandle(hMutex);
+  }
   return EXIT_SUCCESS;
 }
