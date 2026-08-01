@@ -36,6 +36,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   bool _focusSearchOnNextTab = false;
+  String? _settingsScrollTarget;
   bool _isSidebarCollapsed = false;
 
   static const double _expandedWidth = 250;
@@ -165,9 +166,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 4:
         return const AnalyticsScreen();
       case 5:
-        return const ConnectionScreen();
+        return ConnectionScreen(
+          onNavigateToSettings: () => setState(() {
+            _selectedIndex = 6;
+            _settingsScrollTarget = 'formAppManagement';
+          }),
+        );
       case 6:
-        return const SettingsScreen();
+        return SettingsScreen(scrollTarget: _settingsScrollTarget);
       case 7:
         return const DevToolsScreen();
       default:
@@ -1140,6 +1146,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     onTap: () => setState(() {
                                       _focusSearchOnNextTab = false;
                                       _selectedIndex = i;
+                                      _settingsScrollTarget = null;
                                     }),
                                     borderRadius: BorderRadius.circular(12),
                                     hoverColor: AppTheme.textPrimary.withValues(

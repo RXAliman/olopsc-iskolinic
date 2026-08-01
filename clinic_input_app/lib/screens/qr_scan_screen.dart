@@ -73,9 +73,9 @@ class _QrScanScreenState extends State<QrScanScreen> {
         if (!mounted) return;
         if (connected) {
           _showSuccess();
-          await Future.delayed(const Duration(milliseconds: 800));
+          await Future.delayed(const Duration(milliseconds: 500));
           if (mounted) {
-            Navigator.pushReplacementNamed(context, '/welcome');
+            Navigator.pushReplacementNamed(context, '/loading');
           }
         } else {
           _showError(

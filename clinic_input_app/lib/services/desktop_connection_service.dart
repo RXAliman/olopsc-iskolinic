@@ -44,6 +44,7 @@ class DesktopConnectionService {
       _connected = await _healthCheck();
       // ignore: avoid_print
       print('[DesktopConnection] Health check result: $_connected');
+
       return _connected;
     } catch (e) {
       // ignore: avoid_print
@@ -209,6 +210,8 @@ class DesktopConnectionService {
   }
 
   /// Standard auth headers for every request.
+  Map<String, String> get authHeaders => _authHeaders;
+
   Map<String, String> get _authHeaders {
     return {
       'Authorization': 'Bearer $_token',

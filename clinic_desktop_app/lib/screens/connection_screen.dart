@@ -7,7 +7,10 @@ import '../theme/app_theme.dart';
 
 /// Desktop "Connection" tab — shows a QR code the tablet can scan to connect.
 class ConnectionScreen extends StatelessWidget {
-  const ConnectionScreen({super.key});
+  /// Callback to navigate to the Settings tab (Form App Management section).
+  final VoidCallback? onNavigateToSettings;
+
+  const ConnectionScreen({super.key, this.onNavigateToSettings});
 
   @override
   Widget build(BuildContext context) {
@@ -19,14 +22,38 @@ class ConnectionScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Header ──────────────────────────────────────────
-              Text(
-                'Form App Connection',
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Scan the QR code below from the form app to connect',
-                style: Theme.of(context).textTheme.bodyMedium,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Form App Connection',
+                          style: Theme.of(context).textTheme.headlineLarge,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Scan the QR code below from the form app to connect',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (onNavigateToSettings != null)
+                    ElevatedButton.icon(
+                      onPressed: onNavigateToSettings,
+                      icon: const Icon(Icons.settings, size: 18),
+                      label: const Text('Form App Settings'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 32),
 

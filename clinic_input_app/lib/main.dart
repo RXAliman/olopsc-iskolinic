@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/qr_scan_screen.dart';
+import 'screens/connection_loading_screen.dart';
 import 'screens/input_form_screen.dart';
 import 'screens/barcode_scanner_screen.dart';
 import 'screens/welcome_screen.dart';
@@ -34,6 +35,7 @@ class ClinicInputApp extends StatelessWidget {
       routes: {
         '/help': (_) => const ConnectionHelpScreen(),
         '/scan': (_) => const QrScanScreen(),
+        '/loading': (_) => const ConnectionLoadingScreen(),
         '/welcome': (_) => const WelcomeScreen(),
         '/id-method': (_) => const IdentificationMethodScreen(),
         '/barcode': (_) => const BarcodeScannerScreen(),

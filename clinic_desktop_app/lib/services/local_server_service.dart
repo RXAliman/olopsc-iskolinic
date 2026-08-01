@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
@@ -7,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../models/patient.dart';
 import '../models/visitation.dart';
 import '../services/database_helper.dart';
+import '../services/form_app_settings_service.dart';
 import '../crdt/hlc.dart';
 import '../crdt/node_id.dart';
 import 'package:flutter/foundation.dart';
@@ -380,6 +382,47 @@ class LocalServerService {
       }
     });
 
+    // ── Form App Config & Assets ─────────────────────────────────────────
+
+    // Get form app configuration (asset metadata for cache invalidation)
+    router.get('/api/form-config', (shelf.Request request) {
+      try {
+        final config = FormAppSettingsService.instance.getConfig();
+        return shelf.Response.ok(
+          jsonEncode(config),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } catch (e) {
+        return shelf.Response.internalServerError(
+          body: jsonEncode({'error': e.toString()}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    });
+
+    // Serve custom logo image
+    router.get('/api/assets/logo', (shelf.Request request) {
+      return _serveAssetFile('logo');
+    });
+
+    // Serve custom background image
+    router.get('/api/assets/background', (shelf.Request request) {
+      return _serveAssetFile('background');
+    });
+
+    // Serve custom video by index
+    router.get('/api/assets/videos/<index>',
+        (shelf.Request request, String index) {
+      final idx = int.tryParse(index);
+      if (idx == null) {
+        return shelf.Response.badRequest(
+          body: jsonEncode({'error': 'Invalid video index'}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+      return _serveAssetFile('video', idx);
+    });
+
     // Auth middleware — validates Bearer token on every request
     shelf.Middleware authMiddleware() {
       return (shelf.Handler innerHandler) {
@@ -492,6 +535,53 @@ class LocalServerService {
   void clearRequests() {
     _editRequests.clear();
     onDevicesChanged?.call();
+  }
+
+  /// Serve a form app asset file as an HTTP response.
+  shelf.Response _serveAssetFile(String assetType, [int? index]) {
+    final file = FormAppSettingsService.instance.getAssetFile(assetType, index);
+    if (file == null || !file.existsSync()) {
+      return shelf.Response.notFound(
+        jsonEncode({'error': 'Asset not configured'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    final ext = p.extension(file.path).toLowerCase();
+    final contentType = _mimeTypeForExtension(ext);
+
+    return shelf.Response.ok(
+      file.openRead(),
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': file.lengthSync().toString(),
+      },
+    );
+  }
+
+  /// Map file extensions to MIME types for serving assets.
+  String _mimeTypeForExtension(String ext) {
+    switch (ext) {
+      case '.png':
+        return 'image/png';
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.gif':
+        return 'image/gif';
+      case '.webp':
+        return 'image/webp';
+      case '.mp4':
+        return 'video/mp4';
+      case '.mov':
+        return 'video/quicktime';
+      case '.avi':
+        return 'video/x-msvideo';
+      case '.webm':
+        return 'video/webm';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   /// Detect the local IP address on the LAN (not loopback).

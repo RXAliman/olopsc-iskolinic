@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
+import '../services/desktop_connection_service.dart';
+import '../services/form_app_config_service.dart';
 import '../services/persistent_form_service.dart';
+import '../theme/app_theme.dart';
 import '../widgets/responsive_layout.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -21,11 +25,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Timer? _sleepTimer;
   bool _isSleeping = false;
 
+  /// Custom video file paths from FormAppConfigService.
+  /// Empty means use the default bundled video.
+  List<String> _videoPlaylist = [];
+
+  /// Current index in the video playlist.
+  int _currentVideoIndex = 0;
+
   @override
   void initState() {
     super.initState();
-    _initVideo();
+    _loadConfigAndInitVideo();
     _startTimers();
+  }
+
+  /// Load custom assets config, then start the video.
+  Future<void> _loadConfigAndInitVideo() async {
+    await FormAppConfigService.instance.init();
+    _videoPlaylist = FormAppConfigService.instance.getVideoPaths();
+    _currentVideoIndex = 0;
+    _initVideo();
   }
 
   void _startTimers() {
@@ -53,22 +72,110 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   void _initVideo() {
     if (_isSleeping) return;
-    _videoController =
-        VideoPlayerController.asset('assets/olopsc-hs-clinic-avp.mp4')
-          ..initialize().then((_) {
-            if (!mounted) return;
-            _videoController!.setVolume(0.0);
-            _videoController!.setLooping(true);
-            _videoController!.play();
-            setState(() => _videoInitialized = true);
-          });
+
+    if (_videoPlaylist.isNotEmpty) {
+      // Use custom video files from the playlist
+      final path = _videoPlaylist[_currentVideoIndex];
+      _videoController = VideoPlayerController.file(File(path));
+    } else {
+      // Fallback to default bundled video
+      _videoController =
+          VideoPlayerController.asset('assets/olopsc-hs-clinic-avp.mp4');
+    }
+
+    _videoController!.initialize().then((_) {
+      if (!mounted) return;
+      _videoController!.setVolume(0.0);
+
+      if (_videoPlaylist.length > 1) {
+        // Playlist mode: don't loop individual videos,
+        // instead advance to next on completion
+        _videoController!.setLooping(false);
+        _videoController!.addListener(_onVideoProgress);
+      } else {
+        // Single video (custom or default): loop it
+        _videoController!.setLooping(true);
+      }
+
+      _videoController!.play();
+      setState(() => _videoInitialized = true);
+    });
+  }
+
+  /// Listener for playlist advancement.
+  void _onVideoProgress() {
+    if (_videoController == null) return;
+    final position = _videoController!.value.position;
+    final duration = _videoController!.value.duration;
+
+    if (duration > Duration.zero && position >= duration) {
+      // Current video finished — advance to next
+      _advanceToNextVideo();
+    }
+  }
+
+  /// Dispose current video and play the next one in the playlist.
+  void _advanceToNextVideo() {
+    _videoController?.removeListener(_onVideoProgress);
+    _videoController?.dispose();
+    _videoController = null;
+    _videoInitialized = false;
+
+    _currentVideoIndex = (_currentVideoIndex + 1) % _videoPlaylist.length;
+    _initVideo();
   }
 
   Future<void> _handleTap() async {
     if (_isSleeping) {
       setState(() => _isSleeping = false);
-      _initVideo();
+      _loadConfigAndInitVideo();
       _startTimers();
+      return;
+    }
+
+    // Verify active connection to the desktop server before proceeding
+    final isConnected =
+        await DesktopConnectionService.instance.checkConnection();
+    if (!mounted) return;
+
+    if (!isConnected) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.wifi_off_rounded, color: AppTheme.danger),
+              SizedBox(width: 12),
+              Text('Connection Lost'),
+            ],
+          ),
+          content: const Text(
+            'The form app is no longer connected to the desktop server. Please return to the setup screen to reconnect.',
+          ),
+          actions: [
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/help',
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.settings_rounded),
+              label: const Text('Return to Setup'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
       return;
     }
 
@@ -115,6 +222,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     }
 
     // Fully dispose video to release hardware codec buffers for the camera
+    _videoController?.removeListener(_onVideoProgress);
     await _videoController?.dispose();
     _videoController = null;
     _videoInitialized = false;
@@ -128,7 +236,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
     // Re-initialize video when coming back
     if (mounted) {
-      _initVideo();
+      _loadConfigAndInitVideo();
       _startTimers(); // Restart timers when returning to welcome screen
     }
   }
@@ -136,6 +244,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void dispose() {
     _stopTimers();
+    _videoController?.removeListener(_onVideoProgress);
     _videoController?.dispose();
     super.dispose();
   }
@@ -186,9 +295,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         body: Container(
           width: double.infinity,
           height: double.infinity,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/welcome-background.png'),
+              image: FormAppConfigService.instance.getBackgroundProvider() ??
+                  const AssetImage('assets/welcome-background.png'),
               fit: BoxFit.cover,
             ),
           ),
@@ -204,11 +314,29 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Upper left: OLOPCS Marikina City Logo
-                    Image.asset(
-                      'assets/olopsc-marikina-city.png',
-                      height: isMobile ? 40 : 80,
-                      fit: BoxFit.contain,
+                    // Upper left: Logo (custom or default)
+                    Builder(
+                      builder: (context) {
+                        final logoProvider =
+                            FormAppConfigService.instance.getLogoProvider();
+                        if (logoProvider != null) {
+                          return Image(
+                            image: logoProvider,
+                            height: isMobile ? 40 : 80,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/olopsc-marikina-city.png',
+                              height: isMobile ? 40 : 80,
+                              fit: BoxFit.contain,
+                            ),
+                          );
+                        }
+                        return Image.asset(
+                          'assets/olopsc-marikina-city.png',
+                          height: isMobile ? 40 : 80,
+                          fit: BoxFit.contain,
+                        );
+                      },
                     ),
                     // Upper right: Date and Time
                     StreamBuilder(

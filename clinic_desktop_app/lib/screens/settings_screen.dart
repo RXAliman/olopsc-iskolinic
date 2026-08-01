@@ -16,7 +16,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final String? scrollTarget;
+
+  const SettingsScreen({super.key, this.scrollTarget});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -25,11 +27,37 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '';
   int _dropdownKeyCounter = 0;
+  final GlobalKey _formAppManagementKey = GlobalKey();
+  late Future<List<BackupInfo>> _backupsFuture;
+  int _backupsPage = 0;
 
   @override
   void initState() {
     super.initState();
     _loadAppVersion();
+    _backupsFuture = DatabaseBackupService.listBackups();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToTarget());
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.scrollTarget != oldWidget.scrollTarget) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToTarget());
+    }
+  }
+
+  void _scrollToTarget() {
+    if (widget.scrollTarget == 'formAppManagement') {
+      final context = _formAppManagementKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
   }
 
   Future<void> _loadAppVersion() async {
@@ -310,6 +338,345 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 48),
 
+          // ── Form App Management ─────────────────────────────────────────
+          Container(
+            key: _formAppManagementKey,
+            child: _buildSectionHeader(
+              'Form App Management',
+              Icons.tablet_rounded,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Consumer<SettingsProvider>(
+            builder: (context, settings, _) {
+              return Container(
+                decoration: AppTheme.glassCard(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Form App Assets',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Customize the welcome screen assets displayed on the form app (tablet/phone). '
+                      'Changes are served to connected devices automatically.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Logo ──
+                    _buildAssetRow(
+                      context: context,
+                      title: 'Welcome Screen Logo',
+                      subtitle: settings.hasCustomLogo
+                          ? 'Custom logo set'
+                          : 'Using default logo (olopsc-marikina-city.png)',
+                      icon: Icons.image_rounded,
+                      hasCustom: settings.hasCustomLogo,
+                      previewWidget: settings.hasCustomLogo
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(settings.formAppLogoPath!),
+                                height: 48,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.broken_image_rounded,
+                                  size: 48,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            )
+                          : null,
+                      onChoose: () => _pickFormAppImage(
+                        context,
+                        onPicked: (path) => settings.setFormAppLogo(path),
+                      ),
+                      onReset: () => settings.clearFormAppLogo(),
+                    ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Divider(),
+                    ),
+
+                    // ── Background ──
+                    _buildAssetRow(
+                      context: context,
+                      title: 'Welcome Screen Background',
+                      subtitle: settings.hasCustomBackground
+                          ? 'Custom background set'
+                          : 'Using default background (welcome-background.png)',
+                      icon: Icons.wallpaper_rounded,
+                      hasCustom: settings.hasCustomBackground,
+                      previewWidget: settings.hasCustomBackground
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(settings.formAppBackgroundPath!),
+                                height: 48,
+                                width: 85,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.broken_image_rounded,
+                                  size: 48,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            )
+                          : null,
+                      onChoose: () => _pickFormAppImage(
+                        context,
+                        onPicked: (path) => settings.setFormAppBackground(path),
+                      ),
+                      onReset: () => settings.clearFormAppBackground(),
+                    ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Divider(),
+                    ),
+
+                    // ── Videos ──
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: settings.hasCustomVideos
+                                ? AppTheme.accent.withValues(alpha: 0.1)
+                                : AppTheme.cardLight,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.video_library_rounded,
+                            color: settings.hasCustomVideos
+                                ? AppTheme.accent
+                                : AppTheme.textMuted,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome Screen Videos',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                settings.hasCustomVideos
+                                    ? '${settings.formAppVideoCount} custom video(s) — played sequentially in loop'
+                                    : 'Using default video (olopsc-hs-clinic-avp.mp4)',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                              if (settings.hasCustomVideos &&
+                                  settings.formAppVideoCount > 1) ...[
+                                Text(
+                                  'Drag the handle on the left to reorder the videos.',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        fontStyle: FontStyle.italic,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+
+                              // Video list
+                              if (settings.hasCustomVideos) ...[
+                                ReorderableListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  buildDefaultDragHandles: false,
+                                  proxyDecorator: (child, index, animation) {
+                                    return Material(
+                                      color: Colors.transparent,
+                                      elevation: 0,
+                                      child: child,
+                                    );
+                                  },
+                                  itemCount: settings.formAppVideoCount,
+                                  onReorder: (oldIndex, newIndex) {
+                                    if (newIndex > oldIndex) {
+                                      newIndex -= 1;
+                                    }
+                                    settings.reorderFormAppVideo(
+                                      oldIndex,
+                                      newIndex,
+                                    );
+                                  },
+                                  itemBuilder: (context, i) {
+                                    final uniqueId =
+                                        settings.getFormAppVideoHash(i) ??
+                                        'video_$i';
+                                    return Container(
+                                      key: ValueKey(uniqueId),
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.cardLight,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: AppTheme.dividerColor,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          ReorderableDragStartListener(
+                                            index: i,
+                                            child: MouseRegion(
+                                              cursor: SystemMouseCursors.grab,
+                                              hitTestBehavior:
+                                                  HitTestBehavior.opaque,
+                                              child: Container(
+                                                color: Colors.transparent,
+                                                padding: const EdgeInsets.only(
+                                                  right: 12,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.drag_indicator_rounded,
+                                                  color: AppTheme.textMuted,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.accent.withValues(
+                                                alpha: 0.15,
+                                              ),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                '${i + 1}',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppTheme.accent,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Icon(
+                                            Icons.movie_rounded,
+                                            size: 16,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              settings.getFormAppVideoOriginalName(
+                                                    i,
+                                                  ) ??
+                                                  'Video ${i + 1}',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.close_rounded,
+                                              size: 18,
+                                            ),
+                                            color: AppTheme.danger,
+                                            tooltip: 'Remove video',
+                                            onPressed: () =>
+                                                settings.removeFormAppVideo(i),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 4),
+                              ],
+
+                              // Action buttons
+                              Row(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _pickFormAppVideos(context, settings),
+                                    icon: const Icon(
+                                      Icons.add_rounded,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Add Videos'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  if (settings.hasCustomVideos) ...[
+                                    const SizedBox(width: 8),
+                                    OutlinedButton.icon(
+                                      onPressed: () =>
+                                          settings.clearFormAppVideos(),
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Clear All'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppTheme.danger,
+                                        side: BorderSide(
+                                          color: AppTheme.danger.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 48),
+
           if (!AppConfig.isProduction) ...[
             // ── Developer Mode ─────────────────────────────────────────────
             _buildSectionHeader('Developer Settings', Icons.code_rounded),
@@ -517,6 +884,140 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildAssetRow({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool hasCustom,
+    required VoidCallback onChoose,
+    required VoidCallback onReset,
+    Widget? previewWidget,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: hasCustom
+                ? AppTheme.accent.withValues(alpha: 0.1)
+                : AppTheme.cardLight,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: hasCustom ? AppTheme.accent : AppTheme.textMuted,
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: onChoose,
+                    icon: const Icon(Icons.upload_file_rounded, size: 18),
+                    label: Text(hasCustom ? 'Replace' : 'Choose File'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                  if (hasCustom) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: onReset,
+                      icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                      label: const Text('Reset to Default'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textSecondary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (previewWidget != null) ...[
+          const SizedBox(width: 16),
+          previewWidget,
+        ],
+      ],
+    );
+  }
+
+  Future<void> _pickFormAppImage(
+    BuildContext context, {
+    required Future<void> Function(String path) onPicked,
+  }) async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      await onPicked(result.files.single.path!);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Asset updated successfully.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickFormAppVideos(
+    BuildContext context,
+    SettingsProvider settings,
+  ) async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.video,
+      allowMultiple: true,
+    );
+
+    if (result != null && result.files.isNotEmpty) {
+      final paths = result.files
+          .where((f) => f.path != null)
+          .map((f) => f.path!)
+          .toList();
+      if (paths.isNotEmpty) {
+        await settings.addFormAppVideos(paths);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${paths.length} video(s) added to the playlist.'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildRadioTile({
@@ -838,7 +1339,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildBackupsList() {
     return FutureBuilder<List<BackupInfo>>(
-      future: DatabaseBackupService.listBackups(),
+      future: _backupsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -877,75 +1378,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         final dateFormatter = DateFormat('MMM d, yyyy – h:mm a');
 
+        const itemsPerPage = 5;
+        final totalPages = (backups.length / itemsPerPage).ceil();
+        final startIndex = _backupsPage * itemsPerPage;
+        final endIndex = startIndex + itemsPerPage;
+        final paginatedBackups = backups.sublist(
+          startIndex,
+          endIndex > backups.length ? backups.length : endIndex,
+        );
+
         return Column(
-          children: backups.map((backup) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppTheme.cardLight,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.dividerColor.withValues(alpha: 0.5),
+          children: [
+            ...paginatedBackups.map((backup) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
-              ),
-              child: Row(
+                decoration: BoxDecoration(
+                  color: AppTheme.cardLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.dividerColor.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.storage_rounded,
+                        color: AppTheme.accent,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'v${backup.appVersion}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${dateFormatter.format(backup.createdAt)}  ·  ${backup.formattedSize}',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _handleRestore(context, backup),
+                      icon: const Icon(Icons.restore_rounded, size: 16),
+                      label: const Text('Restore/Revert'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.warning,
+                        side: BorderSide(
+                          color: AppTheme.warning.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (totalPages > 1) ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppTheme.accent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.storage_rounded,
-                      color: AppTheme.accent,
-                      size: 20,
-                    ),
+                  IconButton(
+                    onPressed: _backupsPage > 0
+                        ? () => setState(() => _backupsPage--)
+                        : null,
+                    icon: const Icon(Icons.chevron_left_rounded),
+                    tooltip: 'Previous',
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'v${backup.appVersion}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${dateFormatter.format(backup.createdAt)}  ·  ${backup.formattedSize}',
-                          style: TextStyle(
-                            color: AppTheme.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Page ${_backupsPage + 1} of $totalPages',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: () => _handleRestore(context, backup),
-                    icon: const Icon(Icons.restore_rounded, size: 16),
-                    label: const Text('Restore/Revert'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.warning,
-                      side: BorderSide(
-                        color: AppTheme.warning.withValues(alpha: 0.5),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                    ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _backupsPage < totalPages - 1
+                        ? () => setState(() => _backupsPage++)
+                        : null,
+                    icon: const Icon(Icons.chevron_right_rounded),
+                    tooltip: 'Next',
                   ),
                 ],
               ),
-            );
-          }).toList(),
+            ],
+          ],
         );
       },
     );
